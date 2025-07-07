@@ -1,0 +1,573 @@
+Plan de Trabajo - Plataforma TattooConnect
+Siempre referenciar los artifacts creados como guía de diseño
+Implementar validaciones en cada endpoint
+Usar Tailwind CSS para todos los estilos
+Mantener consistencia en naming conventions
+Crear seeds con datos realistas para testing
+Documentar cada función importante
+Manejar errores apropiadamente en cada fase
+
+Referencias de diseño:
+artifact: https://claude.ai/public/artifacts/7ebde920-bf66-48e0-aeda-6e2b115a0b41o (para feed, explorar tatuadores, crear oferta)
+artifact: tattoo-artist-dashboard https://claude.ai/public/artifacts/9b606898-fec0-4753-a677-80d80ce5b785
+
+Todo se subirá al git https://github.com/karlwennerstrom/paltattoo.git, tienes que crear la rama des y cuando te lo pida, subir los cambios a esa rama.
+
+
+
+📋 Estructura del Proyecto y Preparación
+FASE 0: Configuración Inicial del Proyecto
+proyecto-tattoo-connect/
+├── backend/
+│   ├── config/
+│   │   ├── database.js
+│   │   ├── jwt.js
+│   │   └── multer.js
+│   ├── controllers/
+│   ├── middleware/
+│   ├── models/
+│   ├── routes/
+│   ├── uploads/
+│   │   ├── profiles/
+│   │   ├── portfolio/
+│   │   └── references/
+│   ├── seeds/
+│   ├── .env
+│   ├── package.json
+│   └── server.js
+├── frontend/
+│   ├── public/
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── common/
+│   │   │   ├── auth/
+│   │   │   ├── client/
+│   │   │   ├── artist/
+│   │   │   └── admin/
+│   │   ├── pages/
+│   │   ├── context/
+│   │   ├── services/
+│   │   ├── hooks/
+│   │   └── styles/
+│   ├── package.json
+│   └── tailwind.config.js
+├── database/
+│   ├── schema.sql
+│   └── seeds.sql
+└── docs/
+    ├── api-documentation.md
+    └── frontend-components.md
+
+🗄️ FASE 1: Base de Datos y Backend Foundation
+Tarea 1.1: Configuración de Base de Datos MySQL
+sql-- Crear todas las tablas según especificación
+CREATE DATABASE tattoo_connect;
+
+-- Tablas principales:
+- users (autenticación base)
+- user_profiles (datos específicos por tipo)
+- tattoo_artists (información del tatuador)
+- clients (información del cliente)
+- body_parts (catálogo)
+- tattoo_styles (catálogo)
+- comunas (catálogo Chile)
+- color_types (catálogo)
+
+
+
+
+Tarea 1.2: Seeds y Datos Iniciales
+sql-- Poblar catálogos:
+- todas comunas de Chile por región
+- 15+ estilos de tatuajes
+- 20+ partes del cuerpo
+- Tipos de color
+- Usuarios de ejemplo
+- Tatuadores de ejemplo
+Tarea 1.3: Configuración Backend Node.js
+javascript// Package.json dependencies:
+- express
+- mysql2
+- bcryptjs
+- jsonwebtoken
+- multer
+- cors
+- dotenv
+- express-validator
+- nodemailer
+Tarea 1.4: Modelos de Base de Datos
+javascript// Crear modelos para:
+- User.js (autenticación)
+- TattooArtist.js
+- Client.js
+- TattooRequest.js
+- Proposal.js
+- Portfolio.js
+- BodyPart.js
+- TattooStyle.js
+- Comuna.js
+
+🔐 FASE 2: Sistema de Autenticación
+Tarea 2.1: Middleware de Autenticación
+javascript// middleware/auth.js
+- JWT token validation
+- User type verification
+- Protected routes middleware
+Tarea 2.2: Controladores de Autenticación
+javascript// controllers/authController.js
+- register (diferenciado client/artist)
+- login
+- logout
+- refreshToken
+- forgotPassword
+- resetPassword
+Tarea 2.3: Rutas de Autenticación
+javascript// routes/auth.js
+POST /api/auth/register
+POST /api/auth/login
+POST /api/auth/logout
+POST /api/auth/refresh
+POST /api/auth/forgot-password
+POST /api/auth/reset-password
+Tarea 2.4: Validaciones
+javascript// Usar express-validator para:
+- Email format
+- Password strength
+- Required fields por user type
+- Phone validation
+- Instagram URL validation
+
+// OK 
+
+
+👤 FASE 3: Gestión de Perfiles
+Tarea 3.1: Controladores de Perfil
+javascript// controllers/profileController.js
+- getProfile
+- updateProfile
+- uploadProfileImage
+- getPublicProfile
+Tarea 3.2: Rutas de Perfil
+javascript// routes/profile.js
+GET /api/profile
+PUT /api/profile
+POST /api/profile/upload-image
+GET /api/profile/public/:userId
+Tarea 3.3: Upload de Imágenes
+javascript// Configurar Multer para:
+- Profile images
+- Image resizing
+- File type validation
+- Storage organization
+
+🖼️ FASE 4: Sistema de Portfolio (Solo Tatuadores)
+Tarea 4.1: Controladores de Portfolio
+javascript// controllers/portfolioController.js
+- getPortfolioItems
+- createPortfolioItem
+- updatePortfolioItem
+- deletePortfolioItem
+- uploadPortfolioMedia
+Tarea 4.2: Rutas de Portfolio
+javascript// routes/portfolio.js
+GET /api/portfolio/:artistId
+POST /api/portfolio
+PUT /api/portfolio/:itemId
+DELETE /api/portfolio/:itemId
+POST /api/portfolio/upload
+Tarea 4.3: Gestión de Multimedia
+javascript// Soporte para:
+- Imágenes (JPG, PNG)
+- Videos cortos (MP4)
+- Organización por categorías
+- Límites de tamaño y cantidad
+
+OK
+
+📝 FASE 5: Sistema de Ofertas de Tatuajes
+Tarea 5.1: Controladores de Ofertas
+javascript// controllers/tattooRequestController.js
+- createTattooRequest
+- getTattooRequests (feed)
+- getTattooRequestById
+- updateTattooRequest
+- deleteTattooRequest
+- uploadReferenceImage
+Tarea 5.2: Rutas de Ofertas
+javascript// routes/tattooRequests.js
+POST /api/tattoo-requests
+GET /api/tattoo-requests (con filtros)
+GET /api/tattoo-requests/:id
+PUT /api/tattoo-requests/:id
+DELETE /api/tattoo-requests/:id
+POST /api/tattoo-requests/upload-reference
+Tarea 5.3: Sistema de Filtros
+javascript// Filtros avanzados:
+- Por estilo de tatuaje
+- Por ubicación (comuna)
+- Por rango de presupuesto
+- Por fecha preferida
+- Por parte del cuerpo
+- Por tipo de color
+
+ok 
+
+💬 FASE 6: Sistema de Propuestas
+Tarea 6.1: Controladores de Propuestas
+javascript// controllers/proposalController.js
+- createProposal
+- getProposalsForRequest
+- getProposalsForArtist
+- updateProposalStatus
+- deleteProposal
+Tarea 6.2: Rutas de Propuestas
+javascript// routes/proposals.js
+POST /api/proposals
+GET /api/proposals/request/:requestId
+GET /api/proposals/artist/:artistId
+PUT /api/proposals/:proposalId/status
+DELETE /api/proposals/:proposalId
+Tarea 6.3: Estados de Propuestas
+javascript// Estados:
+- pending (enviada, esperando respuesta)
+- accepted (aceptada por cliente)
+- rejected (rechazada por cliente)
+- cancelled (cancelada por tatuador)
+
+OK
+
+📧 FASE 7: Sistema de Notificaciones
+Tarea 7.1: Configuración de Email
+javascript// config/email.js
+- Configurar Nodemailer
+- Templates de email
+- SMTP settings
+Tarea 7.2: Controlador de Notificaciones
+javascript// controllers/notificationController.js
+- sendProposalNotification //hasta aqui vamos 
+- sendAcceptanceNotification
+- sendReminderNotification
+- getNotifications
+- markAsRead
+Tarea 7.3: Templates de Email
+html<!-- Crear templates para: -->
+- Nueva propuesta recibida
+- Propuesta aceptada/rechazada
+- Recordatorios de cita
+- Bienvenida nuevos usuarios
+
+PENDIENTE-----------
+
+🏪 FASE 8: Tiendas Patrocinadoras
+Tarea 8.1: Modelo y Controladores
+javascript// models/SponsoredShop.js
+// controllers/sponsoredShopController.js
+- getSponsoredShops
+- createSponsoredShop (admin only)
+- updateSponsoredShop
+- deleteSponsoredShop
+- toggleActiveStatus
+Tarea 8.2: Rutas de Tiendas
+javascript// routes/sponsoredShops.js
+GET /api/sponsored-shops
+POST /api/sponsored-shops (admin)
+PUT /api/sponsored-shops/:id (admin)
+DELETE /api/sponsored-shops/:id (admin)
+PUT /api/sponsored-shops/:id/toggle (admin)
+
+---- Pendiente ----
+
+💳 FASE 9: Sistema de Suscripciones
+Tarea 9.1: Modelos de Suscripción
+javascript// models/Subscription.js
+// models/Payment.js
+// models/Plan.js
+- subscription_plans (Basic, Premium, Pro)
+- user_subscriptions
+- payment_history
+Tarea 9.2: Controladores de Suscripción
+javascript// controllers/subscriptionController.js
+- getSubscriptionStatus
+- createSubscription
+- updateSubscription
+- cancelSubscription
+- getPaymentHistory
+- addPaymentMethod
+- setDefaultPaymentMethod
+Tarea 9.3: Integración de Pagos
+javascript// Integrar con:
+- mercado pago chile, pagos recurrentes 
+- user id mercado pago app: 183050733
+- Número de aplicación 5698143216134280
+
+Vendedor
+TESTUSER262529959
+F9rxQQcub6
+16/06/2025
+
+Chile
+Comprador
+TESTUSER643717378
+xUzH7muFoA
+16/06/2025
+
+
+
+
+🗓️ FASE 10: Sistema de Calendario (solo usuarios pro)
+Tarea 10.1: Modelos de Calendario
+javascript// models/Appointment.js
+// models/Availability.js
+- appointments
+- artist_availability
+- appointment_status
+Tarea 10.2: Controladores de Calendario
+javascript// controllers/calendarController.js
+- getAppointments
+- createAppointment
+- updateAppointment
+- cancelAppointment
+- getAvailability
+- setAvailability
+
+OK __---------------------------------------------
+
+⚛️ FASE 11: Frontend React Foundation
+Tarea 11.1: Configuración React + Tailwind
+javascript// Configurar:
+- Create React App
+- Tailwind CSS
+- React Router DOM
+- Axios para API calls
+- Context API para estado global
+Tarea 11.2: Estructura de Componentes
+javascript// Crear estructura base:
+- Layout components
+- Common components (Button, Input, Modal)
+- Auth components
+- Navigation components
+Tarea 11.3: Servicios API
+javascript// services/api.js
+- Configurar axios instance
+- Interceptors para tokens
+- Error handling
+- API endpoints constants
+
+🔐 FASE 12: Frontend - Autenticación
+Tarea 12.1: Pantallas de Auth
+javascript// Implementar diseños mostrados en artifacts:
+- RegisterView (con Google OAuth)
+- LoginView
+- Forgot Password
+- Reset Password
+Tarea 12.2: Context de Autenticación
+javascript// context/AuthContext.js
+- Login/logout functions
+- User state management
+- Token management
+- Protected routes
+Tarea 12.3: Componentes de Auth
+javascript// components/auth/
+- LoginForm
+- RegisterForm
+- ProtectedRoute
+- UserTypeSelector
+
+hasta aqui ok ----arriba ok abajo   no
+
+🏠 FASE 13: Frontend - Feed Principal
+Tarea 13.1: Feed de Ofertas
+javascript// Implementar según artifact tattoo-platform-demo:
+- FeedView component
+- TattooOfferCard component
+- Infinite scroll o paginación
+- Filtros en sidebar
+Tarea 13.2: Sidebar y Filtros
+javascript// components/common/
+- Sidebar con tiendas patrocinadoras
+- FilterPanel component
+- SponsoredShop component
+Tarea 13.3: Crear Oferta
+javascript// Implementar CreateOfferView:
+- Formulario completo de oferta
+- Upload de imagen de referencia
+- Drag & drop functionality
+- Validaciones en tiempo real
+
+no terminada  abajo -.----
+
+
+👨‍🎨 FASE 14: Frontend - Sección Tatuadores
+Tarea 14.1: Explorar Tatuadores
+javascript// Implementar ArtistsView:
+- Grid de tatuadores
+- TattooArtistCard component
+- Búsqueda y filtros
+- Paginación
+Tarea 14.2: Perfil Público del Tatuador
+javascript// components/artist/
+- PublicArtistProfile
+- PortfolioGallery
+- ContactInfo
+- SpecialtiesDisplay
+
+
+
+🎛️ FASE 15: Frontend - Dashboard del Tatuador
+Tarea 15.1: Implementar Dashboard Completo
+javascript// Usar artifact tattoo-artist-dashboard como referencia:
+- Navigation tabs
+- OverviewTab con métricas
+- ProfileTab para edición
+- PortfolioTab para gestión
+Tarea 15.2: Gestión de Propuestas
+javascript// ProposalsTab:
+- Lista de propuestas enviadas
+- Estados visuales claros
+- Acciones (modificar, cancelar)
+- Filtros por estado
+
+ok arriba abajo no
+
+
+Tarea 15.3: Sistema de Suscripciones
+javascript// PaymentsTab actualizado:
+- Estado de suscripción
+- Métodos de pago
+- Historial de pagos
+- Configuración de facturación
+Tarea 15.4: Calendario Integrado
+javascript// CalendarTab:
+- Vista de calendario mensual
+- Gestión de citas
+- Disponibilidad
+- Integración con propuestas aceptadas
+
+
+ok 
+
+
+👑 FASE 16: Frontend - Panel de Administración
+Tarea 16.1: Dashboard Admin
+javascript// Usar artifact AdminView como referencia:
+- Métricas generales de la plataforma
+- Gestión de usuarios
+- Moderación de contenido
+- Analytics avanzados
+Tarea 16.2: Gestión de Usuarios
+javascript// components/admin/
+- UserManagement component
+- UserDetails modal
+- Bulk actions
+- User status management
+Tarea 16.3: Moderación de Contenido
+javascript// Content moderation:
+- Portfolio approval system
+- Offer moderation
+- Report handling
+- Content flagging
+
+ok arriba abajo no
+
+🔧 FASE 17: Integraciones y APIs Externas
+Tarea 17.1: Integración de Pagos
+javascript// Implementar:
+- Mercado Pago Chile (pagos recurrentes)
+- Webhook handling
+- Payment status tracking
+Tarea 17.2: Google OAuth
+javascript// Configurar:
+- Google OAuth 2.0
+- Social login buttons
+- Account linking
+- Profile data sync
+
+
+
+🧪 FASE 18: Testing y Optimización
+Tarea 18.1: Testing Backend
+javascript// Implementar tests:
+- Unit tests para controladores
+- Integration tests para APIs
+- Authentication flow tests
+- Database transaction tests
+Tarea 18.2: Testing Frontend
+javascript// Testing con Jest/React Testing Library:
+- Component unit tests
+- Integration tests
+- User flow tests
+- Accessibility tests
+Tarea 18.3: Performance Optimization
+javascript// Optimizaciones:
+- Image lazy loading
+- Code splitting
+- API response caching
+- Database query optimization
+
+🚀 FASE 19: Deployment y Configuración
+Tarea 19.1: Configuración de Producción
+javascript// Setup para producción:
+- Environment variables
+- Security headers
+- SSL certificates
+- Database optimization
+Tarea 19.2: Docker Configuration
+dockerfile# Crear Dockerfiles para:
+- Backend Node.js
+- Frontend React build
+- MySQL database
+- Docker Compose setup
+Tarea 19.3: Deployment
+javascript// Deploy a:
+- Backend: Railway, Heroku, o VPS
+- Frontend: Vercel, Netlify
+- Database: PlanetScale, AWS RDS
+- Files: AWS S3, Cloudinary
+
+📚 FASE 20: Documentación y Finalización
+Tarea 20.1: Documentación API
+javascript// Crear documentación completa:
+- Swagger/OpenAPI documentation
+- Postman collection
+- Authentication guide
+- Error codes reference
+Tarea 20.2: Documentación de Usuario
+markdown# Crear guías para:
+- Manual de usuario para clientes
+- Manual de usuario para tatuadores
+- FAQ section
+- Troubleshooting guide
+Tarea 20.3: Monitoreo y Analytics
+javascript// Implementar:
+- Google Analytics
+- Error tracking (Sentry)
+- Performance monitoring
+- User behavior analytics
+
+🎯 Comandos para Claude Code por Fase
+Para cada fase, usar este formato:
+bash# FASE X: [Nombre de la fase]
+# Implementar [descripción específica]
+# 
+# Referencias de diseño:
+# - artifact: https://claude.ai/public/artifacts/7ebde920-bf66-48e0-aeda-6e2b115a0b41o (para feed, explorar tatuadores, crear oferta)
+# - artifact: tattoo-artist-dashboard https://claude.ai/public/artifacts/9b606898-fec0-4753-a677-80d80ce5b785
+#
+# Tareas específicas:
+# 1. [Tarea específica]
+# 2. [Tarea específica]
+# 3. [Tarea específica]
+#
+# Archivos a crear/modificar:
+# - [Lista de archivos]
+#
+# Testear que funcione correctamente antes de continuar
+📝 Notas Importantes para Claude Code
+
+Siempre referenciar los artifacts creados como guía de diseño
+Implementar validaciones en cada endpoint
+Usar Tailwind CSS para todos los estilos
+Mantener consistencia en naming conventions
+Crear seeds con datos realistas para testing
+Documentar cada función importante
+Manejar errores apropiadamente en cada fase

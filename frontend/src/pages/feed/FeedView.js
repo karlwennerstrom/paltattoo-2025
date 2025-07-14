@@ -3,8 +3,9 @@ import { PageContainer, Grid } from '../../components/common/Layout';
 import Button from '../../components/common/Button';
 import TattooOfferCard from '../../components/feed/TattooOfferCard';
 import FeedSidebar from '../../components/feed/FeedSidebar';
-import { requestsAPI } from '../../services/api';
-import { useAuth } from '../../context';
+import { offerService } from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
+import toast from 'react-hot-toast';
 
 const FeedView = () => {
   const { isArtist, isClient } = useAuth();
@@ -35,47 +36,31 @@ const FeedView = () => {
     if (node) observer.current.observe(node);
   }, [loadingMore, hasMore]);
 
-  // Mock data for demo
-  const generateMockOffers = (pageNum, limit = 12) => {
-    const styles = ['Realista', 'Tradicional', 'Neo-tradicional', 'Blackwork', 'Japonés'];
-    const sizes = ['Pequeño', 'Mediano', 'Grande', 'Manga completa'];
-    const bodyParts = ['Brazo', 'Pierna', 'Espalda', 'Pecho', 'Hombro'];
-    const titles = [
-      'Diseño de dragón japonés',
-      'Rosa tradicional con detalles',
-      'Retrato realista familiar',
-      'Manga completa biomecánica',
-      'Tatuaje minimalista geométrico',
-      'León en blackwork',
-      'Flores acuarela coloridas',
-      'Frase con caligrafía',
-      'Paisaje en antebrazo',
-      'Mandala detallado',
-    ];
+  // Helper function to build filter params for API
+  const buildFilterParams = (filters, pageNum, limit = 20) => {
+    const params = {
+      limit,
+      offset: (pageNum - 1) * limit,
+      status: 'active'
+    };
 
-    return Array.from({ length: limit }, (_, i) => {
-      const index = ((pageNum - 1) * limit) + i;
-      return {
-        id: index + 1,
-        title: titles[index % titles.length],
-        description: `Busco artista especializado para realizar este diseño. Tengo referencias y estoy abierto a sugerencias creativas.`,
-        budget: Math.floor(Math.random() * 800000) + 50000,
-        style: styles[Math.floor(Math.random() * styles.length)],
-        size: sizes[Math.floor(Math.random() * sizes.length)],
-        bodyPart: bodyParts[Math.floor(Math.random() * bodyParts.length)],
-        referenceImage: null,
-        status: Math.random() > 0.9 ? 'urgent' : 'open',
-        proposalsCount: Math.floor(Math.random() * 15),
-        createdAt: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString(),
-        user: {
-          id: index + 100,
-          name: `Usuario ${index + 1}`,
-          location: 'Santiago, Chile',
-          avatar: null,
-        },
-        isFavorited: Math.random() > 0.7,
-      };
-    });
+    if (filters.styles && filters.styles.length > 0) {
+      params.style = filters.styles[0]; // API expects single style for now
+    }
+
+    if (filters.bodyParts && filters.bodyParts.length > 0) {
+      params.bodyPart = filters.bodyParts[0]; // API expects single body part for now
+    }
+
+    if (filters.priceRange && filters.priceRange[0] > 0) {
+      params.minBudget = filters.priceRange[0];
+    }
+
+    if (filters.priceRange && filters.priceRange[1] < 1000000) {
+      params.maxBudget = filters.priceRange[1];
+    }
+
+    return params;
   };
 
   const loadOffers = async (pageNum = 1, append = false) => {
@@ -83,22 +68,22 @@ const FeedView = () => {
       if (!append) setLoading(true);
       else setLoadingMore(true);
 
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      // In production, use: const response = await requestsAPI.getRequests({ page: pageNum, ...filters });
-      const mockData = generateMockOffers(pageNum);
+      const filterParams = buildFilterParams(filters, pageNum);
+      const response = await offerService.getAll(filterParams);
+      const newOffers = response.data || [];
       
       if (append) {
-        setOffers(prev => [...prev, ...mockData]);
+        setOffers(prev => [...prev, ...newOffers]);
       } else {
-        setOffers(mockData);
+        setOffers(newOffers);
       }
       
-      setHasMore(mockData.length === 12); // Assuming 12 items per page
+      // Assume we have more data if we got a full page
+      setHasMore(newOffers.length === filterParams.limit);
       setError(null);
     } catch (err) {
       setError('Error al cargar las ofertas');
+      toast.error('Error al cargar las ofertas');
       console.error('Error loading offers:', err);
     } finally {
       setLoading(false);
@@ -159,9 +144,9 @@ const FeedView = () => {
   return (
     <PageContainer
       title="Ofertas de Tatuajes"
-      subtitle={isArtist() ? "Encuentra tu próximo proyecto" : "Encuentra tu próximo cliente"}
+      subtitle={isArtist ? "Encuentra tu próximo proyecto" : "Encuentra tu próximo cliente"}
       actions={
-        isClient() && (
+        isClient && (
           <Button variant="primary" size="md" href="/offers/create">
             <svg className="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />

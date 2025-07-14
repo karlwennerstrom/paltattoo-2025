@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { PageContainer } from '../../components/common/Layout';
 import Button from '../../components/common/Button';
 import PublicArtistProfile from '../../components/artists/PublicArtistProfile';
-import { artistsAPI } from '../../services/api';
+import { artistService, portfolioService } from '../../services/api';
 
 const ArtistProfileView = () => {
   const { id } = useParams();
@@ -20,13 +20,22 @@ const ArtistProfileView = () => {
     try {
       setLoading(true);
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      // In production: const response = await artistsAPI.getArtist(id);
-      
-      // Mock artist data
-      const mockArtist = {
+      // Try to load real artist data
+      let artistData;
+      try {
+        const [artistResponse, portfolioResponse] = await Promise.all([
+          artistService.getById(id),
+          portfolioService.getAll(id)
+        ]);
+        
+        artistData = {
+          ...artistResponse.data,
+          portfolioImages: portfolioResponse.data || []
+        };
+      } catch (apiError) {
+        console.log('API not available, using mock data:', apiError.message);
+        // Fallback to mock data if API is not available
+        artistData = {
         id: parseInt(id),
         name: 'Carlos Mendoza',
         profileImage: null,
@@ -69,9 +78,10 @@ const ArtistProfileView = () => {
             year: 2022
           }
         ]
-      };
+        };
+      }
       
-      setArtist(mockArtist);
+      setArtist(artistData);
       setError(null);
     } catch (err) {
       setError('Error al cargar el perfil del artista');

@@ -4,9 +4,11 @@ import { PageContainer, Card, Grid } from '../../components/common/Layout';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
 import { getTattooImageUrl, getProfileImageUrl } from '../../utils/imageHelpers';
+import { offerService } from '../../services/api';
+import toast from 'react-hot-toast';
 
 const SendProposalPage = () => {
-  const { id } = useParams();
+  const { offerId } = useParams(); // Updated to match route params
   const navigate = useNavigate();
   const [offer, setOffer] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -14,7 +16,7 @@ const SendProposalPage = () => {
   
   const [proposal, setProposal] = useState({
     message: '',
-    estimatedPrice: '',
+    proposedPrice: '', // Changed to match API
     estimatedDuration: '',
     sessionCount: '1',
     startDate: '',
@@ -22,36 +24,56 @@ const SendProposalPage = () => {
     notes: ''
   });
 
-  // Mock offer data
+  // Load offer data from API
   useEffect(() => {
     const loadOffer = async () => {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      const mockOffer = {
-        id: parseInt(id),
-        title: 'Diseño de dragón japonés',
-        description: 'Busco artista especializado para realizar este diseño. Tengo referencias y estoy abierto a sugerencias creativas.',
-        budget: 350000,
-        style: 'Japonés',
-        size: 'Mediano',
-        bodyPart: 'Brazo',
-        referenceImage: null,
-        user: {
-          id: 1,
-          name: 'María González',
-          location: 'Santiago, Chile',
-          avatar: null,
-        },
-        createdAt: '2024-01-20T10:30:00Z'
-      };
-      
-      setOffer(mockOffer);
-      setLoading(false);
+      try {
+        setLoading(true);
+        const response = await offerService.getById(offerId);
+        const result = { success: true, data: response.data };
+        
+        if (result.success) {
+          const offerData = result.data;
+          
+          // Transform API data to match component expectations
+          const transformedOffer = {
+            id: offerData.id,
+            title: offerData.title,
+            description: offerData.description,
+            budget: offerData.budget_max || offerData.budget_min,
+            budgetMin: offerData.budget_min,
+            budgetMax: offerData.budget_max,
+            style: offerData.style_name,
+            size: offerData.size_approximate,
+            bodyPart: offerData.body_part_name,
+            referenceImage: offerData.references?.[0]?.image_url,
+            user: {
+              id: offerData.client_user_id,
+              name: `${offerData.client_first_name || ''} ${offerData.client_last_name || ''}`.trim(),
+              location: offerData.comuna_name ? `${offerData.comuna_name}, ${offerData.region}` : 'Chile',
+              avatar: null,
+            },
+            createdAt: offerData.created_at
+          };
+          
+          setOffer(transformedOffer);
+        } else {
+          toast.error(result.error);
+          navigate('/feed');
+        }
+      } catch (error) {
+        console.error('Error loading offer:', error);
+        toast.error('Error al cargar la oferta');
+        navigate('/feed');
+      } finally {
+        setLoading(false);
+      }
     };
 
-    loadOffer();
-  }, [id]);
+    if (offerId) {
+      loadOffer();
+    }
+  }, [offerId, navigate]);
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('es-CL', {
@@ -64,22 +86,32 @@ const SendProposalPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!proposal.message || !proposal.estimatedPrice) {
-      alert('Por favor completa los campos obligatorios');
+    if (!proposal.message || !proposal.proposedPrice) {
+      toast.error('Por favor completa los campos obligatorios');
       return;
     }
 
     setSubmitting(true);
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      const proposalData = {
+        message: proposal.message,
+        proposedPrice: parseFloat(proposal.proposedPrice),
+        estimatedDuration: proposal.estimatedDuration
+      };
+
+      const response = await offerService.createProposal(offerId, proposalData);
+      const result = { success: true, data: response.data };
       
-      // Show success and redirect
-      alert('¡Propuesta enviada exitosamente!');
-      navigate('/proposals');
+      if (result.success) {
+        toast.success('¡Propuesta enviada exitosamente!');
+        navigate('/artist/proposals');
+      } else {
+        toast.error(result.error || 'Error al enviar la propuesta');
+      }
     } catch (error) {
-      alert('Error al enviar la propuesta. Inténtalo de nuevo.');
+      console.error('Error sending proposal:', error);
+      toast.error('Error al enviar la propuesta. Inténtalo de nuevo.');
     } finally {
       setSubmitting(false);
     }
@@ -204,8 +236,8 @@ const SendProposalPage = () => {
                 <Input
                   label="Precio estimado (CLP) *"
                   type="number"
-                  value={proposal.estimatedPrice}
-                  onChange={(e) => setProposal(prev => ({ ...prev, estimatedPrice: e.target.value }))}
+                  value={proposal.proposedPrice}
+                  onChange={(e) => setProposal(prev => ({ ...prev, proposedPrice: e.target.value }))}
                   placeholder="250000"
                   required
                 />

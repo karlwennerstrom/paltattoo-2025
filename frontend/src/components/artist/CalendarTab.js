@@ -368,7 +368,7 @@ const CalendarTab = () => {
             <div className="grid grid-cols-7 gap-1">
               {getDaysInMonth(currentDate).map((day, index) => {
                 if (!day) {
-                  return <div key={index} className="h-28"></div>;
+                  return <div key={`empty-${index}`} className="h-28"></div>;
                 }
 
                 const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
@@ -378,7 +378,7 @@ const CalendarTab = () => {
 
                 return (
                   <div
-                    key={day}
+                    key={`day-${index}-${day}`}
                     onClick={() => setSelectedDate(date)}
                     className={twMerge(
                       'h-28 p-2 border border-primary-700 cursor-pointer transition-colors hover:bg-primary-700',

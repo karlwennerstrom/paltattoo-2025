@@ -9,8 +9,47 @@ const PortfolioGallery = ({ images, artist, className = '' }) => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'masonry'
 
+  // Process images - handle both URL strings and portfolio objects
+  const processedImages = images?.length > 0 
+    ? images.map((item, index) => {
+        if (typeof item === 'string') {
+          // Handle URL strings
+          return {
+            id: index + 1,
+            url: item,
+            title: `Tatuaje ${index + 1}`,
+            description: `Trabajo realizado por ${artist?.name || 'el artista'}`,
+            category: ['Realista', 'Tradicional', 'Blackwork', 'Color'][index % 4],
+            style: ['Realista', 'Tradicional', 'Neo-tradicional', 'Blackwork'][index % 4],
+            size: ['Pequeño', 'Mediano', 'Grande'][index % 3],
+            duration: `${Math.floor(Math.random() * 8) + 1} horas`,
+            bodyPart: ['Brazo', 'Pierna', 'Espalda', 'Pecho'][index % 4],
+            date: new Date(Date.now() - Math.random() * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            likes: Math.floor(Math.random() * 100) + 10,
+            isHealed: Math.random() > 0.5
+          };
+        } else {
+          // Handle portfolio objects from API
+          return {
+            id: item.id || index + 1,
+            url: item.imageUrl || item.url,
+            title: item.title || `Tatuaje ${index + 1}`,
+            description: item.description || `Trabajo realizado por ${artist?.name || 'el artista'}`,
+            category: item.category || item.style || 'Realista',
+            style: item.style || item.category || 'Realista',
+            size: item.size || 'Mediano',
+            duration: item.duration || `${Math.floor(Math.random() * 8) + 1} horas`,
+            bodyPart: item.bodyPart || 'Brazo',
+            date: item.createdAt ? new Date(item.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+            likes: item.likes || Math.floor(Math.random() * 100) + 10,
+            isHealed: item.isHealed !== undefined ? item.isHealed : Math.random() > 0.5
+          };
+        }
+      })
+    : null;
+
   // Mock data if no images provided
-  const mockImages = images || Array.from({ length: 12 }, (_, i) => ({
+  const mockImages = processedImages || Array.from({ length: 12 }, (_, i) => ({
     id: i + 1,
     url: getTattooImageUrl(null, i),
     title: `Tatuaje ${i + 1}`,
@@ -25,11 +64,12 @@ const PortfolioGallery = ({ images, artist, className = '' }) => {
     isHealed: Math.random() > 0.5
   }));
 
-  const categories = ['all', ...new Set(mockImages.map(img => img.category))];
+  const displayImages = processedImages || mockImages;
+  const categories = ['all', ...new Set(displayImages.map(img => img.category))];
   
   const filteredImages = selectedCategory === 'all' 
-    ? mockImages 
-    : mockImages.filter(img => img.category === selectedCategory);
+    ? displayImages 
+    : displayImages.filter(img => img.category === selectedCategory);
 
   const openImageModal = (image) => {
     setSelectedImage(image);
@@ -69,6 +109,7 @@ const PortfolioGallery = ({ images, artist, className = '' }) => {
             {/* View Mode Toggle */}
             <div className="flex items-center space-x-2">
               <button
+                key="grid-view"
                 onClick={() => setViewMode('grid')}
                 className={twMerge(
                   'p-2 rounded transition-colors',
@@ -80,6 +121,7 @@ const PortfolioGallery = ({ images, artist, className = '' }) => {
                 </svg>
               </button>
               <button
+                key="masonry-view"
                 onClick={() => setViewMode('masonry')}
                 className={twMerge(
                   'p-2 rounded transition-colors',

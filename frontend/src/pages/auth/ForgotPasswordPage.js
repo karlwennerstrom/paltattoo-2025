@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth, useApp } from '../../context';
+import toast from 'react-hot-toast';
+import { useAuth } from '../../contexts/AuthContext';
 import { Button, Input, Card } from '../../components/common';
 
 const ForgotPasswordPage = () => {
   const { forgotPassword } = useAuth();
-  const { showSuccess, showError } = useApp();
+  // Toast notifications will be handled by the API service
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -36,11 +37,11 @@ const ForgotPasswordPage = () => {
     try {
       await forgotPassword(email);
       setIsSubmitted(true);
-      showSuccess('Te hemos enviado un email con instrucciones para restablecer tu contraseña');
+      toast.success('Te hemos enviado un email con instrucciones para restablecer tu contraseña');
     } catch (error) {
       const errorMessage = error.response?.data?.message || 'Error al enviar el email';
       setError(errorMessage);
-      showError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }

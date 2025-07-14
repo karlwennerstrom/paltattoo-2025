@@ -1,16 +1,42 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { twMerge } from 'tailwind-merge';
 import { Card, Grid } from '../common/Layout';
 import Button from '../common/Button';
 import Input from '../common/Input';
 import Modal from '../common/Modal';
 import { getTattooImageUrl, getProfileImageUrl } from '../../utils/imageHelpers';
+import { proposalService } from '../../services/api';
+import toast from 'react-hot-toast';
+import { FiMail, FiClock, FiCheckCircle, FiXCircle, FiDollarSign, FiCalendar, FiEdit2, FiTrash2, FiEye } from 'react-icons/fi';
 
 const ProposalsTab = () => {
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [viewingProposal, setViewingProposal] = useState(null);
   const [editingProposal, setEditingProposal] = useState(null);
-  const [proposals, setProposals] = useState([
+  const [loading, setLoading] = useState(true);
+  const [proposals, setProposals] = useState([]);
+
+  useEffect(() => {
+    loadProposals();
+  }, [selectedStatus]);
+
+  const loadProposals = async () => {
+    try {
+      setLoading(true);
+      const response = await proposalService.getMyProposals(
+        selectedStatus !== 'all' ? { status: selectedStatus } : {}
+      );
+      setProposals(response.data || []);
+    } catch (error) {
+      console.error('Error loading proposals:', error);
+      toast.error('Error al cargar las propuestas');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Mock data for development while backend is not ready
+  const mockProposals = [
     {
       id: 1,
       client: {
@@ -103,26 +129,29 @@ const ProposalsTab = () => {
       isFlexibleDate: false,
       specialRequests: 'El tatuaje actual es muy oscuro'
     }
-  ]);
+  ];
+
+  // Use mock data if no real data is available
+  const displayProposals = proposals.length > 0 ? proposals : (loading ? [] : mockProposals);
 
   const statusOptions = [
-    { value: 'all', label: 'Todas', count: proposals.length },
-    { value: 'pending', label: 'Pendientes', count: proposals.filter(p => p.status === 'pending').length },
-    { value: 'in_progress', label: 'En Progreso', count: proposals.filter(p => p.status === 'in_progress').length },
-    { value: 'accepted', label: 'Aceptadas', count: proposals.filter(p => p.status === 'accepted').length },
-    { value: 'declined', label: 'Rechazadas', count: proposals.filter(p => p.status === 'declined').length }
+    { value: 'all', label: 'Todas', count: displayProposals.length },
+    { value: 'pending', label: 'Pendientes', count: displayProposals.filter(p => p.status === 'pending').length },
+    { value: 'accepted', label: 'Aceptadas', count: displayProposals.filter(p => p.status === 'accepted').length },
+    { value: 'rejected', label: 'Rechazadas', count: displayProposals.filter(p => p.status === 'rejected').length },
+    { value: 'withdrawn', label: 'Retiradas', count: displayProposals.filter(p => p.status === 'withdrawn').length }
   ];
 
   const filteredProposals = selectedStatus === 'all' 
-    ? proposals 
-    : proposals.filter(p => p.status === selectedStatus);
+    ? displayProposals 
+    : displayProposals.filter(p => p.status === selectedStatus);
 
   const getStatusBadge = (status) => {
     const badges = {
       pending: { color: 'bg-yellow-600', text: 'Pendiente' },
-      in_progress: { color: 'bg-blue-600', text: 'En Progreso' },
       accepted: { color: 'bg-green-600', text: 'Aceptada' },
-      declined: { color: 'bg-red-600', text: 'Rechazada' }
+      rejected: { color: 'bg-red-600', text: 'Rechazada' },
+      withdrawn: { color: 'bg-gray-600', text: 'Retirada' }
     };
     return badges[status] || badges.pending;
   };
@@ -136,10 +165,41 @@ const ProposalsTab = () => {
     return badges[priority] || badges.medium;
   };
 
-  const handleStatusChange = (proposalId, newStatus) => {
-    setProposals(prev => prev.map(p => 
-      p.id === proposalId ? { ...p, status: newStatus } : p
-    ));
+  const handleStatusChange = async (proposalId, newStatus) => {
+    try {
+      await proposalService.updateStatus(proposalId, { status: newStatus });
+      toast.success(
+        newStatus === 'withdrawn' ? 'Propuesta retirada exitosamente' : 
+        newStatus === 'accepted' ? 'Propuesta aceptada' : 
+        'Estado actualizado'
+      );
+      loadProposals();
+    } catch (error) {
+      toast.error('Error al actualizar el estado de la propuesta');
+    }
+  };
+
+  const handleUpdateProposal = async (proposalId, updates) => {
+    try {
+      await proposalService.update(proposalId, updates);
+      toast.success('Propuesta actualizada exitosamente');
+      setEditingProposal(null);
+      loadProposals();
+    } catch (error) {
+      toast.error('Error al actualizar la propuesta');
+    }
+  };
+
+  const handleDeleteProposal = async (proposalId) => {
+    if (!window.confirm('¿Estás seguro de eliminar esta propuesta?')) return;
+    
+    try {
+      await proposalService.delete(proposalId);
+      toast.success('Propuesta eliminada exitosamente');
+      loadProposals();
+    } catch (error) {
+      toast.error('Error al eliminar la propuesta');
+    }
   };
 
   const formatCurrency = (amount) => {
@@ -199,6 +259,11 @@ const ProposalsTab = () => {
       </div>
 
       {/* Proposals List */}
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent-500"></div>
+        </div>
+      ) : (
       <div className="space-y-4">
         {filteredProposals.length === 0 ? (
           <Card className="text-center py-12">
@@ -224,9 +289,9 @@ const ProposalsTab = () => {
                       className="h-12 w-12 rounded-full object-cover"
                     />
                     <div>
-                      <h3 className="text-lg font-semibold text-primary-100">{proposal.title}</h3>
+                      <h3 className="text-lg font-semibold text-primary-100">{proposal.offer?.title || proposal.title}</h3>
                       <div className="flex items-center space-x-2 text-sm text-primary-400">
-                        <span>{proposal.client.name}</span>
+                        <span>{proposal.offer?.client?.name || proposal.client?.name || 'Cliente'}</span>
                         <span>•</span>
                         <div className="flex items-center space-x-1">
                           <svg className="h-3 w-3 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
@@ -250,7 +315,7 @@ const ProposalsTab = () => {
                   </div>
                 </div>
 
-                <p className="text-primary-300 mb-4 line-clamp-2">{proposal.description}</p>
+                <p className="text-primary-300 mb-4 line-clamp-2">{proposal.message || proposal.description}</p>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                   <div>
@@ -266,16 +331,20 @@ const ProposalsTab = () => {
                     <p className="text-sm text-primary-200">{proposal.bodyPart}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-primary-500">Presupuesto</p>
-                    <p className="text-sm text-primary-200 font-medium">{formatCurrency(proposal.budget)}</p>
+                    <p className="text-xs text-primary-500">Precio Propuesto</p>
+                    <p className="text-sm text-primary-200 font-medium">{formatCurrency(proposal.proposedPrice || proposal.budget)}</p>
                   </div>
                 </div>
 
                 <div className="flex items-center justify-between pt-4 border-t border-primary-700">
                   <div className="flex items-center space-x-4 text-xs text-primary-500">
                     <span>{timeAgo(proposal.createdAt)}</span>
-                    <span>•</span>
-                    <span>Fecha límite: {new Date(proposal.deadline).toLocaleDateString('es-CL')}</span>
+                    {proposal.estimatedDuration && (
+                      <>
+                        <span>•</span>
+                        <span>Duración: {proposal.estimatedDuration} días</span>
+                      </>
+                    )}
                     {proposal.referenceImages.length > 0 && (
                       <>
                         <span>•</span>
@@ -296,19 +365,27 @@ const ProposalsTab = () => {
                     {proposal.status === 'pending' && (
                       <>
                         <Button
-                          variant="secondary"
+                          variant="ghost"
                           size="sm"
-                          onClick={() => handleStatusChange(proposal.id, 'accepted')}
+                          onClick={() => setEditingProposal(proposal)}
                         >
-                          Aceptar
+                          <FiEdit2 size={16} />
                         </Button>
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleStatusChange(proposal.id, 'declined')}
+                          onClick={() => handleStatusChange(proposal.id, 'withdrawn')}
+                          className="text-warning-400 hover:text-warning-300"
+                        >
+                          <FiXCircle size={16} />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteProposal(proposal.id)}
                           className="text-error-400 hover:text-error-300"
                         >
-                          Rechazar
+                          <FiTrash2 size={16} />
                         </Button>
                       </>
                     )}
@@ -339,6 +416,61 @@ const ProposalsTab = () => {
           })
         )}
       </div>
+      )}
+
+      {/* Edit Proposal Modal */}
+      <Modal
+        isOpen={editingProposal !== null}
+        onClose={() => setEditingProposal(null)}
+        title="Editar Propuesta"
+        size="md"
+      >
+        {editingProposal && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-primary-300 mb-1">Mensaje</label>
+              <textarea
+                className="input-field w-full h-24"
+                defaultValue={editingProposal.message}
+                onChange={(e) => setEditingProposal({...editingProposal, message: e.target.value})}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-primary-300 mb-1">Precio Propuesto</label>
+                <Input
+                  type="number"
+                  value={editingProposal.proposedPrice}
+                  onChange={(e) => setEditingProposal({...editingProposal, proposedPrice: e.target.value})}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-primary-300 mb-1">Duración (días)</label>
+                <Input
+                  type="number"
+                  value={editingProposal.estimatedDuration}
+                  onChange={(e) => setEditingProposal({...editingProposal, estimatedDuration: e.target.value})}
+                />
+              </div>
+            </div>
+            <div className="flex justify-end space-x-3 pt-4">
+              <Button variant="ghost" onClick={() => setEditingProposal(null)}>
+                Cancelar
+              </Button>
+              <Button
+                variant="primary"
+                onClick={() => handleUpdateProposal(editingProposal.id, {
+                  message: editingProposal.message,
+                  proposedPrice: parseFloat(editingProposal.proposedPrice),
+                  estimatedDuration: parseInt(editingProposal.estimatedDuration)
+                })}
+              >
+                Guardar Cambios
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {/* Proposal Detail Modal */}
       <Modal

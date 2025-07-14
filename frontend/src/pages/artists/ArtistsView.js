@@ -4,7 +4,8 @@ import Input from '../../components/common/Input';
 import Button from '../../components/common/Button';
 import TattooArtistCard from '../../components/artists/TattooArtistCard';
 import ArtistFilters from '../../components/artists/ArtistFilters';
-import { artistsAPI } from '../../services/api';
+import Pagination from '../../components/common/Pagination';
+import { artistService } from '../../services/api';
 
 const ArtistsView = () => {
   const [artists, setArtists] = useState([]);
@@ -13,6 +14,7 @@ const ArtistsView = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [paginationMode, setPaginationMode] = useState('traditional'); // 'traditional' | 'loadMore'
   const [filters, setFilters] = useState({
     location: '',
     specialties: [],
@@ -90,19 +92,35 @@ const ArtistsView = () => {
     try {
       if (!append) setLoading(true);
 
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      // In production, use: const response = await artistsAPI.getArtists({ page: pageNum, search: searchQuery, ...filters });
-      const mockData = generateMockArtists(pageNum);
-      
-      if (append) {
-        setArtists(prev => [...prev, ...mockData]);
-      } else {
-        setArtists(mockData);
+      let artistData;
+      let totalPagesCount = 5;
+
+      try {
+        // Try to load real artist data from API
+        const response = await artistService.getAll({
+          page: pageNum,
+          limit: 12,
+          search: searchQuery,
+          ...filters
+        });
+        
+        artistData = response.data?.artists || response.data || [];
+        totalPagesCount = response.data?.totalPages || Math.ceil((response.data?.total || 60) / 12);
+      } catch (apiError) {
+        console.log('API not available, using mock data:', apiError.message);
+        // Fallback to mock data
+        await new Promise(resolve => setTimeout(resolve, 800));
+        artistData = generateMockArtists(pageNum);
+        totalPagesCount = 5;
       }
       
-      setTotalPages(5); // Mock total pages
+      if (append) {
+        setArtists(prev => [...prev, ...artistData]);
+      } else {
+        setArtists(artistData);
+      }
+      
+      setTotalPages(totalPagesCount);
       setError(null);
     } catch (err) {
       setError('Error al cargar los artistas');
@@ -130,6 +148,15 @@ const ArtistsView = () => {
       const nextPage = page + 1;
       setPage(nextPage);
       loadArtists(nextPage, true);
+    }
+  };
+
+  const handlePageChange = (newPage) => {
+    if (newPage !== page && newPage >= 1 && newPage <= totalPages && !loading) {
+      setPage(newPage);
+      loadArtists(newPage, false);
+      // Scroll to top for better UX
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
@@ -191,22 +218,50 @@ const ArtistsView = () => {
         {/* Main content */}
         <div className="lg:col-span-3">
           {/* Results header */}
-          <div className="flex items-center justify-between mb-6">
-            <p className="text-primary-400">
-              {loading ? 'Cargando...' : `${artists.length} artistas encontrados`}
-            </p>
-            <div className="flex items-center space-x-2">
-              <span className="text-sm text-primary-400">Vista:</span>
-              <Button variant="ghost" size="sm" className="p-2">
-                <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                </svg>
-              </Button>
-              <Button variant="ghost" size="sm" className="p-2">
-                <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
-                </svg>
-              </Button>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 space-y-4 sm:space-y-0">
+            <div className="flex items-center space-x-4">
+              <p className="text-primary-400">
+                {loading && artists.length === 0 ? 'Cargando...' : 
+                 paginationMode === 'loadMore' ? `${artists.length} artistas cargados` :
+                 `${artists.length} artistas (página ${page} de ${totalPages})`}
+              </p>
+            </div>
+            
+            <div className="flex items-center space-x-4">
+              {/* Pagination mode selector */}
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-primary-400">Navegación:</span>
+                <select
+                  value={paginationMode}
+                  onChange={(e) => {
+                    setPaginationMode(e.target.value);
+                    if (e.target.value === 'traditional' && page > 1) {
+                      // Reset to page 1 when switching to traditional pagination
+                      setPage(1);
+                      loadArtists(1, false);
+                    }
+                  }}
+                  className="px-3 py-1 text-sm bg-primary-700 border border-primary-600 rounded-lg text-primary-100 focus:outline-none focus:ring-2 focus:ring-accent-500"
+                >
+                  <option value="traditional">Por páginas</option>
+                  <option value="loadMore">Cargar más</option>
+                </select>
+              </div>
+
+              {/* View mode toggles */}
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-primary-400">Vista:</span>
+                <Button variant="ghost" size="sm" className="p-2">
+                  <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                  </svg>
+                </Button>
+                <Button variant="ghost" size="sm" className="p-2">
+                  <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+                  </svg>
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -258,24 +313,38 @@ const ArtistsView = () => {
                 ))}
               </Grid>
 
-              {/* Load more button */}
-              {page < totalPages && (
-                <div className="flex justify-center mt-8">
-                  <Button
-                    onClick={handleLoadMore}
-                    variant="secondary"
+              {/* Pagination */}
+              <div className="mt-8">
+                {paginationMode === 'traditional' ? (
+                  <Pagination
+                    currentPage={page}
+                    totalPages={totalPages}
+                    onPageChange={handlePageChange}
                     loading={loading}
-                  >
-                    Cargar más artistas
-                  </Button>
-                </div>
-              )}
-
-              {page >= totalPages && artists.length > 0 && (
-                <div className="text-center py-8">
-                  <p className="text-primary-400">No hay más artistas para mostrar</p>
-                </div>
-              )}
+                    className="justify-center"
+                  />
+                ) : (
+                  <>
+                    {page < totalPages && (
+                      <div className="flex justify-center">
+                        <Button
+                          onClick={handleLoadMore}
+                          variant="secondary"
+                          loading={loading}
+                          className="min-w-40"
+                        >
+                          Cargar más artistas
+                        </Button>
+                      </div>
+                    )}
+                    {page >= totalPages && artists.length > 0 && (
+                      <div className="text-center py-4">
+                        <p className="text-primary-400">No hay más artistas para mostrar</p>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             </>
           )}
         </div>

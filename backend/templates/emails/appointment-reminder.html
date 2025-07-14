@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recordatorio de Cita - TattooConnect</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            background-color: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 3px solid #17a2b8;
+        }
+        .logo {
+            font-size: 28px;
+            font-weight: bold;
+            color: #ff6b35;
+            margin-bottom: 10px;
+        }
+        .reminder-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            margin: 20px 0;
+            border-radius: 10px;
+            text-align: center;
+        }
+        .appointment-detail {
+            margin: 10px 0;
+            display: flex;
+            align-items: center;
+        }
+        .appointment-detail strong {
+            min-width: 120px;
+            color: #555;
+        }
+        .appointment-detail span {
+            color: #17a2b8;
+            font-weight: 600;
+        }
+        .countdown {
+            background-color: #ff6b35;
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .countdown h3 {
+            margin: 0;
+            font-size: 24px;
+        }
+        .btn {
+            display: inline-block;
+            background-color: #ff6b35;
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 10px 5px;
+            font-weight: bold;
+        }
+        .btn:hover {
+            background-color: #e55a2b;
+        }
+        .btn-secondary {
+            background-color: #6c757d;
+        }
+        .btn-secondary:hover {
+            background-color: #545b62;
+        }
+        .btn-danger {
+            background-color: #dc3545;
+        }
+        .btn-danger:hover {
+            background-color: #c82333;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            color: #666;
+            font-size: 14px;
+        }
+        .checklist {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .checklist-item {
+            margin: 8px 0;
+            display: flex;
+            align-items: center;
+        }
+        .checklist-item::before {
+            content: "✅";
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">🎨 TattooConnect</div>
+            <h1 style="color: #17a2b8; margin: 0;">⏰ Recordatorio de Cita</h1>
+        </div>
+
+        <div class="reminder-card">
+            <h2 style="margin: 0; font-size: 28px;">🎨 ¡Tu cita se acerca!</h2>
+            <p style="margin: 10px 0; font-size: 18px;">No olvides tu sesión de tatuaje</p>
+        </div>
+
+        <p>Hola <strong>{{clientName}}</strong>,</p>
+        
+        <p>Te recordamos que tienes una cita programada con <strong>{{artistName}}</strong>.</p>
+
+        {{#if hoursUntilAppointment}}
+        <div class="countdown">
+            <h3>{{hoursUntilAppointment}} horas restantes</h3>
+            <p style="margin: 5px 0;">{{daysUntilAppointment}} días, {{remainingHours}} horas</p>
+        </div>
+        {{/if}}
+
+        <div style="background-color: #e7f3ff; border-left: 4px solid #17a2b8; padding: 20px; margin: 20px 0; border-radius: 5px;">
+            <h3 style="color: #17a2b8; margin-top: 0;">📅 Detalles de tu Cita</h3>
+            
+            <div class="appointment-detail">
+                <strong>🎨 Tatuador:</strong>
+                <span>{{artistName}}</span>
+            </div>
+            
+            <div class="appointment-detail">
+                <strong>📅 Fecha:</strong>
+                <span>{{appointmentDate}}</span>
+            </div>
+            
+            <div class="appointment-detail">
+                <strong>⏰ Hora:</strong>
+                <span>{{startTime}} - {{endTime}}</span>
+            </div>
+            
+            <div class="appointment-detail">
+                <strong>⏱️ Duración:</strong>
+                <span>{{durationHours}} horas</span>
+            </div>
+            
+            {{#if location}}
+            <div class="appointment-detail">
+                <strong>📍 Ubicación:</strong>
+                <span>{{location}}</span>
+            </div>
+            {{/if}}
+            
+            {{#if estimatedPrice}}
+            <div class="appointment-detail">
+                <strong>💰 Precio Est.:</strong>
+                <span>${{estimatedPrice}}</span>
+            </div>
+            {{/if}}
+        </div>
+
+        <div class="checklist">
+            <h4 style="color: #495057; margin-top: 0;">📋 Lista de Verificación Pre-Cita</h4>
+            <div class="checklist-item">Desayuna o almuerza antes de la sesión</div>
+            <div class="checklist-item">Trae una identificación válida</div>
+            <div class="checklist-item">Llega 10 minutos antes</div>
+            <div class="checklist-item">Viste ropa cómoda y accesible para el área del tatuaje</div>
+            <div class="checklist-item">No consumas alcohol 24 horas antes</div>
+            <div class="checklist-item">Trae agua y snacks ligeros</div>
+            <div class="checklist-item">Confirma la dirección y planifica tu ruta</div>
+            {{#if depositAmount}}
+            <div class="checklist-item">Verifica que el depósito de ${{depositAmount}} esté pagado</div>
+            {{/if}}
+        </div>
+
+        {{#if notes}}
+        <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 20px 0;">
+            <h4 style="color: #856404; margin-top: 0;">📝 Notas Especiales del Tatuador:</h4>
+            <p style="margin: 0; color: #856404;">{{notes}}</p>
+        </div>
+        {{/if}}
+
+        {{#if artistContact}}
+        <div style="background-color: #d1ecf1; border: 1px solid #bee5eb; padding: 15px; border-radius: 5px; margin: 20px 0;">
+            <h4 style="color: #0c5460; margin-top: 0;">📞 Contacto del Tatuador:</h4>
+            <p style="margin: 0; color: #0c5460;">
+                <strong>{{artistName}}</strong><br>
+                {{artistContact}}
+            </p>
+        </div>
+        {{/if}}
+
+        <div style="text-align: center; margin: 30px 0;">
+            <a href="{{confirmUrl}}" class="btn">Confirmar Asistencia</a>
+            <a href="{{dashboardUrl}}" class="btn btn-secondary">Ver Dashboard</a>
+            {{#if allowCancellation}}
+            <a href="{{cancelUrl}}" class="btn btn-danger">Cancelar Cita</a>
+            {{/if}}
+        </div>
+
+        {{#if weatherInfo}}
+        <div style="background-color: #e2f4f6; padding: 15px; border-radius: 5px; margin: 20px 0;">
+            <h4 style="color: #0c5460; margin-top: 0;">🌤️ Clima Esperado:</h4>
+            <p style="margin: 0; color: #0c5460;">{{weatherInfo}} - Planifica tu transporte accordingly.</p>
+        </div>
+        {{/if}}
+
+        <div style="background-color: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 5px; margin: 20px 0;">
+            <h4 style="color: #155724; margin-top: 0;">💡 Consejos para el Día de tu Tatuaje:</h4>
+            <ul style="margin: 0; color: #155724;">
+                <li><strong>Hidratación:</strong> Bebe mucha agua antes de la sesión</li>
+                <li><strong>Descanso:</strong> Asegúrate de haber dormido bien</li>
+                <li><strong>Piel:</strong> Mantén la zona hidratada días previos</li>
+                <li><strong>Medicamentos:</strong> Evita aspirinas 24h antes</li>
+                <li><strong>Actitud:</strong> ¡Relájate y disfruta el proceso!</li>
+            </ul>
+        </div>
+
+        <p>Si necesitas reprogramar o tienes alguna pregunta, no dudes en contactarnos o al tatuador directamente.</p>
+
+        <p>¡Estamos emocionados de verte pronto y ser parte de tu nueva obra de arte!</p>
+
+        <div class="footer">
+            <p><strong>TattooConnect</strong><br>
+            Conectando artistas con clientes<br>
+            <a href="{{unsubscribeUrl}}" style="color: #666;">Cancelar suscripción</a> | 
+            <a href="{{supportUrl}}" style="color: #666;">Soporte</a></p>
+        </div>
+    </div>
+</body>
+</html>

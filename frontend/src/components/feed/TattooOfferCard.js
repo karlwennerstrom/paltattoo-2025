@@ -3,30 +3,57 @@ import { Link } from 'react-router-dom';
 import { twMerge } from 'tailwind-merge';
 import Button from '../common/Button';
 import { getTattooImageUrl, getProfileImageUrl } from '../../utils/imageHelpers';
-import { useAuth } from '../../context';
+import { useAuth } from '../../contexts/AuthContext';
 
 const TattooOfferCard = ({ offer, onFavorite, onShare, onSendProposal, className = '' }) => {
   const { isArtist } = useAuth();
   const [imageLoaded, setImageLoaded] = useState(false);
   const [isFavorited, setIsFavorited] = useState(offer.isFavorited || false);
 
+  // Transform API data to ensure compatibility
+  const transformedOffer = {
+    id: offer.id,
+    title: offer.title,
+    description: offer.description,
+    budget: offer.budget_max || offer.budget_min || offer.budget,
+    budgetMin: offer.budget_min,
+    budgetMax: offer.budget_max,
+    style: offer.style_name || offer.style,
+    size: offer.size_approximate || offer.size,
+    bodyPart: offer.body_part_name || offer.bodyPart,
+    status: offer.status,
+    referenceImage: offer.references?.[0]?.image_url || offer.referenceImage,
+    user: {
+      id: offer.client_user_id || offer.user?.id,
+      name: offer.client_first_name && offer.client_last_name 
+        ? `${offer.client_first_name} ${offer.client_last_name}`.trim()
+        : offer.user?.name || 'Usuario',
+      location: offer.comuna_name && offer.region 
+        ? `${offer.comuna_name}, ${offer.region}`
+        : offer.user?.location || 'Chile',
+      avatar: offer.user?.avatar
+    },
+    createdAt: offer.created_at || offer.createdAt,
+    proposalsCount: offer.proposal_count || offer.proposalsCount || 0
+  };
+
   const handleFavorite = () => {
     setIsFavorited(!isFavorited);
     if (onFavorite) {
-      onFavorite(offer.id, !isFavorited);
+      onFavorite(transformedOffer.id, !isFavorited);
     }
   };
 
   const handleShare = () => {
     if (onShare) {
-      onShare(offer);
+      onShare(transformedOffer);
     } else {
       // Default share functionality
       if (navigator.share) {
         navigator.share({
-          title: offer.title,
-          text: offer.description,
-          url: window.location.origin + `/offers/${offer.id}`,
+          title: transformedOffer.title,
+          text: transformedOffer.description,
+          url: window.location.origin + `/offers/${transformedOffer.id}`,
         });
       }
     }
@@ -34,7 +61,7 @@ const TattooOfferCard = ({ offer, onFavorite, onShare, onSendProposal, className
 
   const handleSendProposal = () => {
     if (onSendProposal) {
-      onSendProposal(offer);
+      onSendProposal(transformedOffer);
     }
   };
 
@@ -75,8 +102,8 @@ const TattooOfferCard = ({ offer, onFavorite, onShare, onSendProposal, className
           </div>
         )}
         <img
-          src={getTattooImageUrl(offer.referenceImage)}
-          alt={offer.title}
+          src={getTattooImageUrl(transformedOffer.referenceImage)}
+          alt={transformedOffer.title}
           className={twMerge(
             'w-full h-full object-cover transition-opacity duration-300',
             imageLoaded ? 'opacity-100' : 'opacity-0'
@@ -85,7 +112,7 @@ const TattooOfferCard = ({ offer, onFavorite, onShare, onSendProposal, className
         />
         
         {/* Status badge */}
-        {offer.status === 'urgent' && (
+        {transformedOffer.status === 'urgent' && (
           <div className="absolute top-2 left-2 px-2 py-1 bg-error-600 text-white text-xs font-medium rounded">
             Urgente
           </div>
@@ -93,7 +120,10 @@ const TattooOfferCard = ({ offer, onFavorite, onShare, onSendProposal, className
         
         {/* Price badge */}
         <div className="absolute top-2 right-2 px-3 py-1 bg-black bg-opacity-75 text-white text-sm font-medium rounded">
-          {formatPrice(offer.budget)}
+          {transformedOffer.budgetMin && transformedOffer.budgetMax && transformedOffer.budgetMin !== transformedOffer.budgetMax 
+            ? `${formatPrice(transformedOffer.budgetMin)} - ${formatPrice(transformedOffer.budgetMax)}`
+            : formatPrice(transformedOffer.budget)
+          }
         </div>
 
         {/* Action buttons */}
@@ -127,66 +157,66 @@ const TattooOfferCard = ({ offer, onFavorite, onShare, onSendProposal, className
         {/* Title and time */}
         <div className="flex justify-between items-start mb-2">
           <h3 className="text-lg font-semibold text-primary-100 flex-1 mr-2">
-            <Link to={`/offers/${offer.id}`} className="hover:text-accent-400 transition-colors">
-              {offer.title}
+            <Link to={`/offers/${transformedOffer.id}`} className="hover:text-accent-400 transition-colors">
+              {transformedOffer.title}
             </Link>
           </h3>
           <span className="text-xs text-primary-500 whitespace-nowrap">
-            {timeAgo(offer.createdAt)}
+            {timeAgo(transformedOffer.createdAt)}
           </span>
         </div>
 
         {/* Description */}
         <p className="text-sm text-primary-300 mb-3 line-clamp-2">
-          {offer.description}
+          {transformedOffer.description}
         </p>
 
         {/* Tags */}
         <div className="flex flex-wrap gap-2 mb-3">
-          {offer.style && (
+          {transformedOffer.style && (
             <span className="px-2 py-1 bg-primary-700 text-primary-300 text-xs rounded">
-              {offer.style}
+              {transformedOffer.style}
             </span>
           )}
-          {offer.size && (
+          {transformedOffer.size && (
             <span className="px-2 py-1 bg-primary-700 text-primary-300 text-xs rounded">
-              {offer.size}
+              {transformedOffer.size}
             </span>
           )}
-          {offer.bodyPart && (
+          {transformedOffer.bodyPart && (
             <span className="px-2 py-1 bg-primary-700 text-primary-300 text-xs rounded">
-              {offer.bodyPart}
+              {transformedOffer.bodyPart}
             </span>
           )}
         </div>
 
         {/* User info */}
         <div className="flex items-center justify-between">
-          <Link to={`/users/${offer.user.id}`} className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
+          <Link to={`/users/${transformedOffer.user.id}`} className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
             <div className="h-8 w-8 bg-primary-600 rounded-full flex items-center justify-center">
-              {offer.user.avatar ? (
-                <img src={getProfileImageUrl(offer.user.avatar)} alt={offer.user.name} className="h-full w-full rounded-full object-cover" />
+              {transformedOffer.user.avatar ? (
+                <img src={getProfileImageUrl(transformedOffer.user.avatar)} alt={transformedOffer.user.name} className="h-full w-full rounded-full object-cover" />
               ) : (
                 <span className="text-xs font-medium text-primary-200">
-                  {offer.user.name?.[0] || '?'}
+                  {transformedOffer.user.name?.[0] || '?'}
                 </span>
               )}
             </div>
             <div>
-              <p className="text-sm font-medium text-primary-200">{offer.user.name}</p>
-              <p className="text-xs text-primary-400">{offer.user.location}</p>
+              <p className="text-sm font-medium text-primary-200">{transformedOffer.user.name}</p>
+              <p className="text-xs text-primary-400">{transformedOffer.user.location}</p>
             </div>
           </Link>
 
           {/* Proposals count */}
           <div className="text-right">
-            <p className="text-sm font-medium text-accent-400">{offer.proposalsCount || 0}</p>
+            <p className="text-sm font-medium text-accent-400">{transformedOffer.proposalsCount}</p>
             <p className="text-xs text-primary-400">propuestas</p>
           </div>
         </div>
 
         {/* Action button for artists */}
-        {isArtist() && (
+        {isArtist && (
           <div className="mt-4 pt-3 border-t border-primary-700">
             <Button
               variant="primary"

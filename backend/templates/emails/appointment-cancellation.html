@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cita Cancelada - TattooConnect</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            background-color: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 3px solid #dc3545;
+        }
+        .logo {
+            font-size: 28px;
+            font-weight: bold;
+            color: #ff6b35;
+            margin-bottom: 10px;
+        }
+        .cancellation-card {
+            background-color: #f8d7da;
+            border-left: 4px solid #dc3545;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .appointment-detail {
+            margin: 10px 0;
+            display: flex;
+            align-items: center;
+        }
+        .appointment-detail strong {
+            min-width: 120px;
+            color: #555;
+        }
+        .appointment-detail span {
+            color: #dc3545;
+            font-weight: 600;
+        }
+        .btn {
+            display: inline-block;
+            background-color: #ff6b35;
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 10px 5px;
+            font-weight: bold;
+        }
+        .btn:hover {
+            background-color: #e55a2b;
+        }
+        .btn-secondary {
+            background-color: #6c757d;
+        }
+        .btn-secondary:hover {
+            background-color: #545b62;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            color: #666;
+            font-size: 14px;
+        }
+        .refund-info {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">🎨 TattooConnect</div>
+            <h1 style="color: #dc3545; margin: 0;">❌ Cita Cancelada</h1>
+        </div>
+
+        <p>Hola <strong>{{clientName}}</strong>,</p>
+        
+        <p>Lamentamos informarte que tu cita con <strong>{{artistName}}</strong> ha sido cancelada.</p>
+
+        <div class="cancellation-card">
+            <h3 style="color: #dc3545; margin-top: 0;">📅 Cita Cancelada</h3>
+            
+            <div class="appointment-detail">
+                <strong>🎨 Tatuador:</strong>
+                <span>{{artistName}}</span>
+            </div>
+            
+            <div class="appointment-detail">
+                <strong>📅 Fecha Original:</strong>
+                <span>{{appointmentDate}}</span>
+            </div>
+            
+            <div class="appointment-detail">
+                <strong>⏰ Hora Original:</strong>
+                <span>{{startTime}} - {{endTime}}</span>
+            </div>
+            
+            <div class="appointment-detail">
+                <strong>📝 Cancelado por:</strong>
+                <span>{{cancelledBy}}</span>
+            </div>
+            
+            <div class="appointment-detail">
+                <strong>📅 Fecha de Cancel.:</strong>
+                <span>{{cancellationDate}}</span>
+            </div>
+        </div>
+
+        {{#if cancellationReason}}
+        <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #6c757d;">
+            <h4 style="color: #495057; margin-top: 0;">📝 Motivo de la Cancelación:</h4>
+            <p style="margin: 0; color: #495057;">{{cancellationReason}}</p>
+        </div>
+        {{/if}}
+
+        {{#if refundInfo}}
+        <div class="refund-info">
+            <h4 style="color: #0c5460; margin-top: 0;">💰 Información de Reembolso</h4>
+            {{#if refundInfo.hasDeposit}}
+            <p style="margin: 5px 0; color: #0c5460;">
+                <strong>Depósito Pagado:</strong> ${{refundInfo.depositAmount}}
+            </p>
+            <p style="margin: 5px 0; color: #0c5460;">
+                <strong>Estado del Reembolso:</strong> {{refundInfo.refundStatus}}
+            </p>
+            {{#if refundInfo.refundDate}}
+            <p style="margin: 5px 0; color: #0c5460;">
+                <strong>Fecha de Reembolso:</strong> {{refundInfo.refundDate}}
+            </p>
+            {{/if}}
+            {{#if refundInfo.processingTime}}
+            <p style="margin: 5px 0; color: #0c5460;">
+                <strong>Tiempo de Procesamiento:</strong> {{refundInfo.processingTime}}
+            </p>
+            {{/if}}
+            {{else}}
+            <p style="margin: 0; color: #0c5460;">No se había realizado ningún pago para esta cita.</p>
+            {{/if}}
+        </div>
+        {{/if}}
+
+        <div style="text-align: center; margin: 30px 0;">
+            <a href="{{findArtistsUrl}}" class="btn">Buscar Otros Tatuadores</a>
+            <a href="{{dashboardUrl}}" class="btn btn-secondary">Ir al Dashboard</a>
+        </div>
+
+        <div style="background-color: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 5px; margin: 20px 0;">
+            <h4 style="color: #155724; margin-top: 0;">💡 ¿Qué puedes hacer ahora?</h4>
+            <ul style="margin: 0; color: #155724;">
+                <li>Buscar otros tatuadores disponibles en tu área</li>
+                <li>Revisar el portfolio de nuevos artistas</li>
+                <li>Explorar diferentes estilos de tatuajes</li>
+                <li>Contactar directamente al tatuador para reprogramar</li>
+                {{#if artistContact}}
+                <li>Contactar a {{artistName}} en: {{artistContact}}</li>
+                {{/if}}
+            </ul>
+        </div>
+
+        {{#if supportMessage}}
+        <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 20px 0;">
+            <h4 style="color: #856404; margin-top: 0;">📞 ¿Necesitas Ayuda?</h4>
+            <p style="margin: 0; color: #856404;">{{supportMessage}}</p>
+        </div>
+        {{/if}}
+
+        <p>Entendemos que esto puede ser decepcionante. Te invitamos a explorar otros talentosos tatuadores en nuestra plataforma.</p>
+
+        <p>¡Esperamos que pronto puedas encontrar al artista perfecto para tu próximo tatuaje!</p>
+
+        <div class="footer">
+            <p><strong>TattooConnect</strong><br>
+            Conectando artistas con clientes<br>
+            <a href="{{unsubscribeUrl}}" style="color: #666;">Cancelar suscripción</a> | 
+            <a href="{{supportUrl}}" style="color: #666;">Soporte</a></p>
+        </div>
+    </div>
+</body>
+</html>

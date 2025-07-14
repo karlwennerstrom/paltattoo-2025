@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { useAuth, useApp } from '../../context';
+import toast from 'react-hot-toast';
+import { useAuth } from '../../contexts/AuthContext';
 import { Button, Input, Card } from '../../components/common';
 
 const ResetPasswordPage = () => {
   const { token } = useParams();
   const navigate = useNavigate();
   const { resetPassword } = useAuth();
-  const { showSuccess, showError } = useApp();
+  // Toast notifications will be handled by the API service
   
   const [formData, setFormData] = useState({
     password: '',
@@ -65,14 +66,14 @@ const ResetPasswordPage = () => {
     
     try {
       await resetPassword(token, formData.password);
-      showSuccess('Tu contraseña ha sido restablecida exitosamente');
+      toast.success('Tu contraseña ha sido restablecida exitosamente');
       navigate('/login');
     } catch (error) {
       const errorMessage = error.response?.data?.message || 'Error al restablecer la contraseña';
       if (errorMessage.includes('token') || errorMessage.includes('expired')) {
         setIsTokenValid(false);
       }
-      showError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }

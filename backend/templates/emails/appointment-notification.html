@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nueva Cita Programada - TattooConnect</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            background-color: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 3px solid #ff6b35;
+        }
+        .logo {
+            font-size: 28px;
+            font-weight: bold;
+            color: #ff6b35;
+            margin-bottom: 10px;
+        }
+        .appointment-card {
+            background-color: #f8f9fa;
+            border-left: 4px solid #ff6b35;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .appointment-detail {
+            margin: 10px 0;
+            display: flex;
+            align-items: center;
+        }
+        .appointment-detail strong {
+            min-width: 120px;
+            color: #555;
+        }
+        .appointment-detail span {
+            color: #ff6b35;
+            font-weight: 600;
+        }
+        .btn {
+            display: inline-block;
+            background-color: #ff6b35;
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 10px 5px;
+            font-weight: bold;
+        }
+        .btn:hover {
+            background-color: #e55a2b;
+        }
+        .btn-secondary {
+            background-color: #6c757d;
+        }
+        .btn-secondary:hover {
+            background-color: #545b62;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            color: #666;
+            font-size: 14px;
+        }
+        .icon {
+            width: 16px;
+            height: 16px;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">🎨 TattooConnect</div>
+            <h1 style="color: #333; margin: 0;">Nueva Cita Programada</h1>
+        </div>
+
+        <p>Hola <strong>{{clientName}}</strong>,</p>
+        
+        <p>¡Excelente noticia! Tu cita con <strong>{{artistName}}</strong> ha sido programada exitosamente.</p>
+
+        <div class="appointment-card">
+            <h3 style="color: #ff6b35; margin-top: 0;">📅 Detalles de tu Cita</h3>
+            
+            <div class="appointment-detail">
+                <strong>🎨 Tatuador:</strong>
+                <span>{{artistName}}</span>
+            </div>
+            
+            <div class="appointment-detail">
+                <strong>📅 Fecha:</strong>
+                <span>{{appointmentDate}}</span>
+            </div>
+            
+            <div class="appointment-detail">
+                <strong>⏰ Hora:</strong>
+                <span>{{startTime}} - {{endTime}}</span>
+            </div>
+            
+            <div class="appointment-detail">
+                <strong>⏱️ Duración:</strong>
+                <span>{{durationHours}} horas</span>
+            </div>
+            
+            {{#if location}}
+            <div class="appointment-detail">
+                <strong>📍 Ubicación:</strong>
+                <span>{{location}}</span>
+            </div>
+            {{/if}}
+            
+            {{#if estimatedPrice}}
+            <div class="appointment-detail">
+                <strong>💰 Precio Est.:</strong>
+                <span>${{estimatedPrice}}</span>
+            </div>
+            {{/if}}
+            
+            {{#if depositAmount}}
+            <div class="appointment-detail">
+                <strong>💳 Depósito:</strong>
+                <span>${{depositAmount}}</span>
+            </div>
+            {{/if}}
+        </div>
+
+        {{#if notes}}
+        <div style="background-color: #e3f2fd; padding: 15px; border-radius: 5px; margin: 20px 0;">
+            <h4 style="color: #1976d2; margin-top: 0;">📝 Notas Especiales:</h4>
+            <p style="margin: 0;">{{notes}}</p>
+        </div>
+        {{/if}}
+
+        <div style="text-align: center; margin: 30px 0;">
+            <a href="{{dashboardUrl}}" class="btn">Ver en Dashboard</a>
+            <a href="{{artistProfileUrl}}" class="btn btn-secondary">Perfil del Tatuador</a>
+        </div>
+
+        <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 20px 0;">
+            <h4 style="color: #856404; margin-top: 0;">⚠️ Importante:</h4>
+            <ul style="margin: 0; color: #856404;">
+                <li>Llega 10 minutos antes de tu cita</li>
+                <li>Trae una identificación válida</li>
+                <li>Asegúrate de haber comido antes de la sesión</li>
+                <li>No consumas alcohol 24 horas antes</li>
+                {{#if depositAmount}}
+                <li>El depósito de ${{depositAmount}} debe estar pagado antes de la cita</li>
+                {{/if}}
+            </ul>
+        </div>
+
+        <p>Si necesitas modificar o cancelar tu cita, por favor hazlo con al menos 24 horas de anticipación.</p>
+
+        <p>¡Estamos emocionados de ver tu nuevo tatuaje!</p>
+
+        <div class="footer">
+            <p><strong>TattooConnect</strong><br>
+            Conectando artistas con clientes<br>
+            <a href="{{unsubscribeUrl}}" style="color: #666;">Cancelar suscripción</a> | 
+            <a href="{{supportUrl}}" style="color: #666;">Soporte</a></p>
+        </div>
+    </div>
+</body>
+</html>

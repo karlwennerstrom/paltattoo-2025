@@ -1,0 +1,219 @@
+const promisePool = require('../config/database');
+
+class TattooRequest {
+  static async create(requestData) {
+    const {
+      clientId, title, description, bodyPartId, styleId,
+      colorTypeId, sizeDescription, budgetMin, budgetMax, deadline
+    } = requestData;
+    
+    const [result] = await promisePool.execute(
+      `INSERT INTO tattoo_offers 
+       (client_id, title, description, body_part_id, style_id, color_type_id, 
+        size_description, budget_min, budget_max, deadline)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [clientId, title, description, bodyPartId, styleId, colorTypeId,
+       sizeDescription, budgetMin, budgetMax, deadline]
+    );
+    
+    return result.insertId;
+  }
+
+  static async findById(id) {
+    const [rows] = await promisePool.execute(
+      `SELECT o.*, 
+              c.user_id as client_user_id,
+              up.first_name as client_first_name, 
+              up.last_name as client_last_name,
+              bp.name as body_part_name, 
+              ts.name as style_name,
+              ct.name as color_type_name,
+              co.name as comuna_name,
+              co.region,
+              (SELECT COUNT(*) FROM proposals p WHERE p.offer_id = o.id) as proposal_count
+       FROM tattoo_offers o
+       JOIN clients c ON o.client_id = c.id
+       JOIN users u ON c.user_id = u.id
+       LEFT JOIN user_profiles up ON u.id = up.user_id
+       LEFT JOIN comunas co ON c.comuna_id = co.id
+       JOIN body_parts bp ON o.body_part_id = bp.id
+       JOIN tattoo_styles ts ON o.style_id = ts.id
+       JOIN color_types ct ON o.color_type_id = ct.id
+       WHERE o.id = ?`,
+      [id]
+    );
+    
+    return rows[0];
+  }
+
+  static async update(offerId, updateData) {
+    const fields = [];
+    const values = [];
+    
+    const allowedFields = [
+      'title', 'description', 'body_part_id', 'style_id', 'color_type_id',
+      'size_description', 'budget_min', 'budget_max', 'deadline', 'status'
+    ];
+    
+    Object.entries(updateData).forEach(([key, value]) => {
+      if (allowedFields.includes(key) && value !== undefined) {
+        fields.push(`${key} = ?`);
+        values.push(value);
+      }
+    });
+    
+    if (fields.length === 0) return false;
+    
+    values.push(offerId);
+    
+    const [result] = await promisePool.execute(
+      `UPDATE tattoo_offers SET ${fields.join(', ')} WHERE id = ?`,
+      values
+    );
+    
+    return result.affectedRows > 0;
+  }
+
+  static async delete(offerId) {
+    const [result] = await promisePool.execute(
+      'DELETE FROM tattoo_offers WHERE id = ?',
+      [offerId]
+    );
+    
+    return result.affectedRows > 0;
+  }
+
+  static async search(filters = {}) {
+    let query = `
+      SELECT o.*, 
+             up.first_name as client_first_name, 
+             up.last_name as client_last_name,
+             bp.name as body_part_name, 
+             ts.name as style_name,
+             ct.name as color_type_name,
+             co.name as comuna_name,
+             co.region,
+             (SELECT COUNT(*) FROM proposals p WHERE p.offer_id = o.id) as proposal_count
+      FROM tattoo_offers o
+      JOIN clients c ON o.client_id = c.id
+      JOIN users u ON c.user_id = u.id
+      LEFT JOIN user_profiles up ON u.id = up.user_id
+      LEFT JOIN comunas co ON c.comuna_id = co.id
+      JOIN body_parts bp ON o.body_part_id = bp.id
+      JOIN tattoo_styles ts ON o.style_id = ts.id
+      JOIN color_types ct ON o.color_type_id = ct.id
+      WHERE u.is_active = true
+    `;
+    
+    const conditions = [];
+    const values = [];
+    
+    if (filters.status) {
+      conditions.push('o.status = ?');
+      values.push(filters.status);
+    }
+    
+    if (filters.styleId) {
+      conditions.push('o.style_id = ?');
+      values.push(filters.styleId);
+    }
+    
+    if (filters.bodyPartId) {
+      conditions.push('o.body_part_id = ?');
+      values.push(filters.bodyPartId);
+    }
+    
+    if (filters.colorTypeId) {
+      conditions.push('o.color_type_id = ?');
+      values.push(filters.colorTypeId);
+    }
+    
+    if (filters.minBudget) {
+      conditions.push('o.budget_max >= ?');
+      values.push(filters.minBudget);
+    }
+    
+    if (filters.maxBudget) {
+      conditions.push('o.budget_min <= ?');
+      values.push(filters.maxBudget);
+    }
+    
+    if (filters.comunaId) {
+      conditions.push('co.id = ?');
+      values.push(filters.comunaId);
+    }
+    
+    if (conditions.length > 0) {
+      query += ' AND ' + conditions.join(' AND ');
+    }
+    
+    query += ' ORDER BY o.created_at DESC';
+    
+    if (filters.limit) {
+      const limit = parseInt(filters.limit);
+      query += ` LIMIT ${limit}`;
+    }
+    
+    if (filters.offset) {
+      const offset = parseInt(filters.offset);
+      query += ` OFFSET ${offset}`;
+    }
+    
+    const [rows] = await promisePool.execute(query, values);
+    return rows;
+  }
+
+  static async addReference(offerId, imageUrl, description = null) {
+    const [result] = await promisePool.execute(
+      'INSERT INTO offer_references (offer_id, image_url, description) VALUES (?, ?, ?)',
+      [offerId, imageUrl, description]
+    );
+    
+    return result.insertId;
+  }
+
+  static async getReferences(offerId) {
+    const [rows] = await promisePool.execute(
+      'SELECT * FROM offer_references WHERE offer_id = ? ORDER BY created_at',
+      [offerId]
+    );
+    
+    return rows;
+  }
+
+  static async deleteReference(referenceId) {
+    const [result] = await promisePool.execute(
+      'DELETE FROM offer_references WHERE id = ?',
+      [referenceId]
+    );
+    
+    return result.affectedRows > 0;
+  }
+
+  static async hasProposal(offerId, artistId) {
+    const [rows] = await promisePool.execute(
+      'SELECT 1 FROM proposals WHERE offer_id = ? AND artist_id = ?',
+      [offerId, artistId]
+    );
+    
+    return rows.length > 0;
+  }
+
+  static async getProposals(offerId) {
+    const [rows] = await promisePool.execute(
+      `SELECT p.*, ta.studio_name, ta.rating, ta.instagram_url,
+              up.first_name, up.last_name, up.profile_image
+       FROM proposals p
+       JOIN tattoo_artists ta ON p.artist_id = ta.id
+       JOIN users u ON ta.user_id = u.id
+       LEFT JOIN user_profiles up ON u.id = up.user_id
+       WHERE p.offer_id = ? AND u.is_active = true
+       ORDER BY p.created_at DESC`,
+      [offerId]
+    );
+    
+    return rows;
+  }
+}
+
+module.exports = TattooRequest;

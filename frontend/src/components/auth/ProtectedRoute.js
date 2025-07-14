@@ -1,6 +1,6 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../../context';
+import { useAuth } from '../../contexts/AuthContext';
 import LoadingPage from '../../pages/LoadingPage';
 
 const ProtectedRoute = ({ 
@@ -33,9 +33,9 @@ const ProtectedRoute = ({
   // Check role requirement
   if (requiredRole && isAuthenticated) {
     const hasRequiredRole = 
-      (requiredRole === 'artist' && isArtist()) ||
-      (requiredRole === 'client' && isClient()) ||
-      (requiredRole === 'admin' && isAdmin());
+      (requiredRole === 'artist' && isArtist) ||
+      (requiredRole === 'client' && isClient) ||
+      (requiredRole === 'admin' && isAdmin);
     
     if (!hasRequiredRole) {
       return <Navigate to="/unauthorized" replace />;
@@ -43,7 +43,7 @@ const ProtectedRoute = ({
   }
 
   // Check subscription requirement (for artists)
-  if (requiredSubscription && isAuthenticated && isArtist()) {
+  if (requiredSubscription && isAuthenticated && isArtist) {
     // This would need to check the actual subscription status
     // For now, we'll just render the children
     // In a real implementation, you'd check:

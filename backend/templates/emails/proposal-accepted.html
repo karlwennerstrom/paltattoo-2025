@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>¡Tu propuesta fue aceptada!</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+    <table cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; margin: 0 auto; background-color: #ffffff;">
+        <tr>
+            <td style="background-color: #28a745; padding: 40px 20px; text-align: center;">
+                <h1 style="color: #ffffff; margin: 0; font-size: 32px;">¡Felicitaciones!</h1>
+                <p style="color: #ffffff; margin: 10px 0 0 0; font-size: 18px;">Tu propuesta fue aceptada</p>
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 40px 20px;">
+                <h2 style="color: #1a1a2e; margin: 0 0 20px 0;">¡Hola {{artistName}}!</h2>
+                <p style="color: #333; line-height: 1.6; margin: 0 0 20px 0;">
+                    Tenemos excelentes noticias: <strong>{{clientName}}</strong> ha aceptado tu propuesta.
+                </p>
+                
+                <div style="background-color: #d4edda; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #28a745;">
+                    <h3 style="color: #155724; margin: 0 0 15px 0;">"{{offerTitle}}"</h3>
+                    <p style="color: #155724; margin: 0 0 10px 0;">
+                        <strong>Precio acordado:</strong> {{proposedPrice}}
+                    </p>
+                </div>
+                
+                <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                    <h4 style="color: #1a1a2e; margin: 0 0 15px 0;">Información de contacto del cliente:</h4>
+                    <p style="color: #333; margin: 0;">
+                        <strong>Contacto:</strong> {{clientContact}}
+                    </p>
+                </div>
+                
+                <div style="background-color: #fff3cd; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ffc107;">
+                    <h4 style="color: #856404; margin: 0 0 10px 0;">Próximos pasos:</h4>
+                    <ul style="color: #856404; margin: 0; padding-left: 20px; line-height: 1.6;">
+                        <li>Contacta al cliente para coordinar los detalles</li>
+                        <li>Programa una cita si es necesario</li>
+                        <li>Confirma todos los aspectos del tatuaje</li>
+                        <li>¡Prepárate para crear arte increíble!</li>
+                    </ul>
+                </div>
+                
+                <div style="text-align: center; margin: 30px 0;">
+                    <a href="{{dashboardUrl}}" style="display: inline-block; padding: 15px 30px; background-color: #28a745; color: #ffffff; text-decoration: none; border-radius: 25px; font-weight: bold;">
+                        Ver en mi dashboard
+                    </a>
+                </div>
+                
+                <p style="color: #666; font-size: 14px; line-height: 1.6; margin: 20px 0 0 0;">
+                    ¡Felicitaciones por conseguir este trabajo! Esperamos que sea una experiencia 
+                    increíble tanto para ti como para tu cliente.
+                </p>
+            </td>
+        </tr>
+        <tr>
+            <td style="background-color: #f8f9fa; padding: 20px; text-align: center;">
+                <p style="color: #666; font-size: 12px; margin: 0;">
+                    © 2024 TattooConnect. Todos los derechos reservados.
+                </p>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

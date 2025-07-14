@@ -1,10 +1,11 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageContainer, Card, Stack } from '../../components/common/Layout';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
-import { useAuth } from '../../context';
-import { requestsAPI, catalogsAPI } from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
+import { offerService, catalogService } from '../../services/api';
+import toast from 'react-hot-toast';
 
 const CreateOfferView = () => {
   const navigate = useNavigate();
@@ -15,19 +16,20 @@ const CreateOfferView = () => {
   const [catalogs, setCatalogs] = useState({
     styles: [],
     bodyParts: [],
+    colorTypes: [],
   });
   
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    budget: '',
-    style: '',
-    size: '',
-    bodyPart: '',
-    isUrgent: false,
+    budgetMin: '',
+    budgetMax: '',
+    styleId: '',
+    sizeDescription: '',
+    bodyPartId: '',
+    colorTypeId: '',
     deadline: '',
     referenceImage: null,
-    additionalInfo: '',
   });
   
   const [errors, setErrors] = useState({});
@@ -35,31 +37,26 @@ const CreateOfferView = () => {
   const [imagePreview, setImagePreview] = useState(null);
 
   // Load catalogs on mount
-  React.useEffect(() => {
+  useEffect(() => {
     loadCatalogs();
   }, []);
 
   const loadCatalogs = async () => {
     try {
-      // In production: const [styles, bodyParts] = await Promise.all([
-      //   catalogsAPI.getTattooStyles(),
-      //   catalogsAPI.getBodyParts()
-      // ]);
+      const [stylesRes, bodyPartsRes, colorTypesRes] = await Promise.all([
+        catalogService.getStyles(),
+        catalogService.getBodyParts(),
+        catalogService.getColorTypes()
+      ]);
       
-      // Mock data for demo
       setCatalogs({
-        styles: [
-          'Realista', 'Tradicional', 'Neo-tradicional', 'Blackwork',
-          'Dotwork', 'Acuarela', 'Japonés', 'Tribal', 'Minimalista',
-          'Geométrico', 'Biomecánico', 'New School'
-        ],
-        bodyParts: [
-          'Brazo', 'Antebrazo', 'Pierna', 'Espalda', 'Pecho',
-          'Hombro', 'Muñeca', 'Tobillo', 'Cuello', 'Mano'
-        ],
+        styles: stylesRes.data || [],
+        bodyParts: bodyPartsRes.data || [],
+        colorTypes: colorTypesRes.data || [],
       });
     } catch (error) {
       console.error('Error loading catalogs:', error);
+      toast.error('Error al cargar los catálogos');
     }
   };
 
@@ -119,6 +116,7 @@ const CreateOfferView = () => {
     }
     
     setFormData(prev => ({ ...prev, referenceImage: file }));
+    setErrors(prev => ({ ...prev, referenceImage: '' }));
     
     // Create preview
     const reader = new FileReader();
@@ -151,26 +149,42 @@ const CreateOfferView = () => {
       newErrors.description = 'La descripción debe tener al menos 50 caracteres';
     }
     
-    if (!formData.budget) {
-      newErrors.budget = 'El presupuesto es requerido';
-    } else if (parseInt(formData.budget) < 10000) {
-      newErrors.budget = 'El presupuesto mínimo es $10.000';
+    if (!formData.budgetMin) {
+      newErrors.budgetMin = 'El presupuesto mínimo es requerido';
+    } else if (parseInt(formData.budgetMin) < 10000) {
+      newErrors.budgetMin = 'El presupuesto mínimo debe ser al menos $10.000';
     }
     
-    if (!formData.style) {
-      newErrors.style = 'Selecciona un estilo';
+    if (!formData.budgetMax) {
+      newErrors.budgetMax = 'El presupuesto máximo es requerido';
+    } else if (parseInt(formData.budgetMax) < parseInt(formData.budgetMin)) {
+      newErrors.budgetMax = 'El presupuesto máximo debe ser mayor al mínimo';
     }
     
-    if (!formData.size) {
-      newErrors.size = 'Selecciona un tamaño';
+    if (!formData.styleId) {
+      newErrors.styleId = 'Selecciona un estilo';
     }
     
-    if (!formData.bodyPart) {
-      newErrors.bodyPart = 'Selecciona la parte del cuerpo';
+    if (!formData.sizeDescription) {
+      newErrors.sizeDescription = 'Describe el tamaño del tatuaje';
     }
     
-    if (formData.isUrgent && !formData.deadline) {
-      newErrors.deadline = 'La fecha límite es requerida para ofertas urgentes';
+    if (!formData.bodyPartId) {
+      newErrors.bodyPartId = 'Selecciona la parte del cuerpo';
+    }
+    
+    if (!formData.colorTypeId) {
+      newErrors.colorTypeId = 'Selecciona el tipo de color';
+    }
+    
+    if (formData.deadline) {
+      const deadlineDate = new Date(formData.deadline);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      if (deadlineDate < today) {
+        newErrors.deadline = 'La fecha límite debe ser futura';
+      }
     }
     
     return newErrors;
@@ -182,32 +196,54 @@ const CreateOfferView = () => {
     const validationErrors = validateForm();
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
+      // Scroll to first error
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
     
     try {
       setLoading(true);
       
-      // Create form data for file upload
-      const submitData = new FormData();
-      Object.keys(formData).forEach(key => {
-        if (formData[key] !== null && formData[key] !== '') {
-          submitData.append(key, formData[key]);
-        }
-      });
+      // Prepare offer data
+      const offerData = {
+        title: formData.title,
+        description: formData.description,
+        bodyPartId: parseInt(formData.bodyPartId),
+        styleId: parseInt(formData.styleId),
+        colorTypeId: parseInt(formData.colorTypeId),
+        sizeDescription: formData.sizeDescription,
+        budgetMin: parseInt(formData.budgetMin),
+        budgetMax: parseInt(formData.budgetMax),
+        deadline: formData.deadline || null
+      };
       
-      // In production: const response = await requestsAPI.createRequest(submitData);
+      // Create the offer first
+      const response = await offerService.create(offerData);
+      const offerId = response.data.offer.id;
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Upload reference image if provided
+      if (formData.referenceImage) {
+        const imageFormData = new FormData();
+        imageFormData.append('reference', formData.referenceImage);
+        await offerService.uploadReferences(offerId, [formData.referenceImage]);
+      }
       
-      // Show success message and redirect
-      navigate('/feed', { 
-        state: { message: 'Oferta creada exitosamente' }
-      });
+      toast.success('Oferta creada exitosamente');
+      navigate('/feed');
     } catch (error) {
       console.error('Error creating offer:', error);
-      setErrors({ submit: 'Error al crear la oferta. Por favor intenta nuevamente.' });
+      if (error.response?.data?.errors) {
+        const apiErrors = {};
+        error.response.data.errors.forEach(err => {
+          if (err.path) {
+            apiErrors[err.path] = err.msg;
+          }
+        });
+        setErrors(apiErrors);
+      } else {
+        setErrors({ submit: error.response?.data?.error || 'Error al crear la oferta' });
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setLoading(false);
     }
@@ -237,6 +273,7 @@ const CreateOfferView = () => {
                 placeholder="Ej: Tatuaje de dragón japonés en brazo"
                 helperText="Sé específico para atraer a los artistas adecuados"
                 required
+                maxLength={100}
               />
               
               <div>
@@ -248,6 +285,7 @@ const CreateOfferView = () => {
                   value={formData.description}
                   onChange={handleInputChange}
                   rows={5}
+                  maxLength={1000}
                   className={`w-full px-4 py-3 bg-primary-700 border ${
                     errors.description ? 'border-error-500' : 'border-primary-600'
                   } rounded-lg text-primary-100 placeholder-primary-500 focus:border-accent-500 focus:outline-none resize-none`}
@@ -258,133 +296,146 @@ const CreateOfferView = () => {
                   <p className="mt-1 text-sm text-error-400">{errors.description}</p>
                 )}
                 <p className="mt-1 text-xs text-primary-500">
-                  {formData.description.length}/500 caracteres
+                  {formData.description.length}/1000 caracteres
                 </p>
               </div>
               
-              <Input
-                label="Presupuesto (CLP)"
-                name="budget"
-                type="number"
-                value={formData.budget}
-                onChange={handleInputChange}
-                error={errors.budget}
-                placeholder="100000"
-                helperText="Ingresa tu presupuesto máximo en pesos chilenos"
-                required
-                icon={
-                  <span className="text-primary-400">$</span>
-                }
-              />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Input
+                  label="Presupuesto mínimo (CLP)"
+                  name="budgetMin"
+                  type="number"
+                  value={formData.budgetMin}
+                  onChange={handleInputChange}
+                  error={errors.budgetMin}
+                  placeholder="100000"
+                  helperText="Presupuesto mínimo en pesos chilenos"
+                  required
+                  min="10000"
+                  icon={<span className="text-primary-400">$</span>}
+                />
+                
+                <Input
+                  label="Presupuesto máximo (CLP)"
+                  name="budgetMax"
+                  type="number"
+                  value={formData.budgetMax}
+                  onChange={handleInputChange}
+                  error={errors.budgetMax}
+                  placeholder="500000"
+                  helperText="Presupuesto máximo en pesos chilenos"
+                  required
+                  min="10000"
+                  icon={<span className="text-primary-400">$</span>}
+                />
+              </div>
             </Stack>
           </Card>
 
           {/* Tattoo Details */}
           <Card title="Detalles del Tatuaje">
             <Stack spacing={4}>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-primary-200 mb-2">
-                    Estilo
+                    Estilo *
                   </label>
                   <select
-                    name="style"
-                    value={formData.style}
+                    name="styleId"
+                    value={formData.styleId}
                     onChange={handleInputChange}
                     className={`w-full px-4 py-3 bg-primary-700 border ${
-                      errors.style ? 'border-error-500' : 'border-primary-600'
+                      errors.styleId ? 'border-error-500' : 'border-primary-600'
                     } rounded-lg text-primary-100 focus:border-accent-500 focus:outline-none`}
                     required
                   >
                     <option value="">Seleccionar...</option>
                     {catalogs.styles.map(style => (
-                      <option key={style} value={style}>{style}</option>
+                      <option key={style.id} value={style.id}>{style.name}</option>
                     ))}
                   </select>
-                  {errors.style && (
-                    <p className="mt-1 text-sm text-error-400">{errors.style}</p>
+                  {errors.styleId && (
+                    <p className="mt-1 text-sm text-error-400">{errors.styleId}</p>
                   )}
                 </div>
                 
                 <div>
                   <label className="block text-sm font-medium text-primary-200 mb-2">
-                    Tamaño
+                    Parte del cuerpo *
                   </label>
                   <select
-                    name="size"
-                    value={formData.size}
+                    name="bodyPartId"
+                    value={formData.bodyPartId}
                     onChange={handleInputChange}
                     className={`w-full px-4 py-3 bg-primary-700 border ${
-                      errors.size ? 'border-error-500' : 'border-primary-600'
-                    } rounded-lg text-primary-100 focus:border-accent-500 focus:outline-none`}
-                    required
-                  >
-                    <option value="">Seleccionar...</option>
-                    <option value="small">Pequeño (2-5cm)</option>
-                    <option value="medium">Mediano (5-15cm)</option>
-                    <option value="large">Grande (15-30cm)</option>
-                    <option value="xlarge">Extra Grande (30cm+)</option>
-                  </select>
-                  {errors.size && (
-                    <p className="mt-1 text-sm text-error-400">{errors.size}</p>
-                  )}
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-primary-200 mb-2">
-                    Parte del cuerpo
-                  </label>
-                  <select
-                    name="bodyPart"
-                    value={formData.bodyPart}
-                    onChange={handleInputChange}
-                    className={`w-full px-4 py-3 bg-primary-700 border ${
-                      errors.bodyPart ? 'border-error-500' : 'border-primary-600'
+                      errors.bodyPartId ? 'border-error-500' : 'border-primary-600'
                     } rounded-lg text-primary-100 focus:border-accent-500 focus:outline-none`}
                     required
                   >
                     <option value="">Seleccionar...</option>
                     {catalogs.bodyParts.map(part => (
-                      <option key={part} value={part}>{part}</option>
+                      <option key={part.id} value={part.id}>{part.name}</option>
                     ))}
                   </select>
-                  {errors.bodyPart && (
-                    <p className="mt-1 text-sm text-error-400">{errors.bodyPart}</p>
+                  {errors.bodyPartId && (
+                    <p className="mt-1 text-sm text-error-400">{errors.bodyPartId}</p>
                   )}
                 </div>
               </div>
               
-              <div className="flex items-center space-x-4">
-                <label className="flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    name="isUrgent"
-                    checked={formData.isUrgent}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-primary-200 mb-2">
+                    Tipo de color *
+                  </label>
+                  <select
+                    name="colorTypeId"
+                    value={formData.colorTypeId}
                     onChange={handleInputChange}
-                    className="w-4 h-4 text-accent-600 bg-primary-700 border-primary-600 rounded focus:ring-accent-500"
-                  />
-                  <span className="ml-2 text-sm text-primary-300">
-                    Marcar como urgente
-                  </span>
-                </label>
+                    className={`w-full px-4 py-3 bg-primary-700 border ${
+                      errors.colorTypeId ? 'border-error-500' : 'border-primary-600'
+                    } rounded-lg text-primary-100 focus:border-accent-500 focus:outline-none`}
+                    required
+                  >
+                    <option value="">Seleccionar...</option>
+                    {catalogs.colorTypes.map(type => (
+                      <option key={type.id} value={type.id}>{type.name}</option>
+                    ))}
+                  </select>
+                  {errors.colorTypeId && (
+                    <p className="mt-1 text-sm text-error-400">{errors.colorTypeId}</p>
+                  )}
+                </div>
                 
-                {formData.isUrgent && (
-                  <Input
-                    type="date"
-                    name="deadline"
-                    value={formData.deadline}
-                    onChange={handleInputChange}
-                    error={errors.deadline}
-                    size="sm"
-                    min={new Date().toISOString().split('T')[0]}
-                  />
-                )}
+                <Input
+                  label="Descripción del tamaño"
+                  name="sizeDescription"
+                  value={formData.sizeDescription}
+                  onChange={handleInputChange}
+                  error={errors.sizeDescription}
+                  placeholder="Ej: 15x20cm, manga completa, etc."
+                  helperText="Describe el tamaño aproximado"
+                  required
+                />
+              </div>
+              
+              <div>
+                <Input
+                  label="Fecha límite (opcional)"
+                  type="date"
+                  name="deadline"
+                  value={formData.deadline}
+                  onChange={handleInputChange}
+                  error={errors.deadline}
+                  min={new Date().toISOString().split('T')[0]}
+                  helperText="Si necesitas el tatuaje antes de una fecha específica"
+                />
               </div>
             </Stack>
           </Card>
 
           {/* Reference Image */}
-          <Card title="Imagen de Referencia">
+          <Card title="Imagen de Referencia (Opcional)">
             <div>
               <div
                 className={`relative border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
@@ -444,25 +495,16 @@ const CreateOfferView = () => {
               {errors.referenceImage && (
                 <p className="mt-2 text-sm text-error-400">{errors.referenceImage}</p>
               )}
+              <p className="mt-2 text-xs text-primary-500">
+                Agregar una imagen de referencia ayuda a los tatuadores a entender mejor tu idea
+              </p>
             </div>
-          </Card>
-
-          {/* Additional Information */}
-          <Card title="Información Adicional (Opcional)">
-            <textarea
-              name="additionalInfo"
-              value={formData.additionalInfo}
-              onChange={handleInputChange}
-              rows={3}
-              className="w-full px-4 py-3 bg-primary-700 border border-primary-600 rounded-lg text-primary-100 placeholder-primary-500 focus:border-accent-500 focus:outline-none resize-none"
-              placeholder="Cualquier detalle adicional que quieras compartir..."
-            />
           </Card>
 
           {/* Error message */}
           {errors.submit && (
-            <div className="bg-error-50 border border-error-200 rounded-lg p-4">
-              <p className="text-error-800 text-sm">{errors.submit}</p>
+            <div className="bg-error-900 border border-error-700 rounded-lg p-4">
+              <p className="text-error-200 text-sm">{errors.submit}</p>
             </div>
           )}
 

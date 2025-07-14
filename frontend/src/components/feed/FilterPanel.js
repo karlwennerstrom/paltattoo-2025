@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { twMerge } from 'tailwind-merge';
 import Button from '../common/Button';
 import Input from '../common/Input';
-import { catalogsAPI } from '../../services/api';
+import { catalogService } from '../../services/api';
 
 const FilterPanel = ({ filters, onFilterChange, className = '' }) => {
   const [localFilters, setLocalFilters] = useState(filters || {
@@ -44,13 +44,13 @@ const FilterPanel = ({ filters, onFilterChange, className = '' }) => {
         setError(null);
 
         // Fetch tattoo styles
-        const stylesData = await catalogsAPI.getTattooStyles();
-        const stylesNames = stylesData.map(style => style.name).sort();
+        const stylesResponse = await catalogService.getStyles();
+        const stylesNames = stylesResponse.data.map(style => style.name).sort();
         setTattooStyles(stylesNames);
 
         // Fetch body parts
-        const bodyPartsData = await catalogsAPI.getBodyParts();
-        const bodyPartsNames = bodyPartsData.map(part => part.name).sort();
+        const bodyPartsResponse = await catalogService.getBodyParts();
+        const bodyPartsNames = bodyPartsResponse.data.map(part => part.name).sort();
         setBodyParts(bodyPartsNames);
 
       } catch (err) {

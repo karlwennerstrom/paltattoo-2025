@@ -1,0 +1,104 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment Variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+logs/
+*.log
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+.nyc_output
+
+# Build outputs
+build/
+dist/
+
+# Database
+*.sql
+!database/setup.sql
+!database/seed_data.sql
+
+# Uploads
+uploads/
+!uploads/.gitkeep
+
+# IDE and Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
+
+# Docker
+.dockerignore
+Dockerfile
+docker-compose.yml
+
+# SSL certificates
+*.pem
+*.key
+*.crt
+
+# Backup files
+*.backup
+*.bak
+
+# Cache
+.cache/
+.parcel-cache/
+
+# Next.js (if used later)
+.next/
+
+# Nuxt.js (if used later)
+.nuxt/
+
+# Gatsby (if used later)
+.cache/
+public/
+
+# React
+/frontend/build/
+
+# Testing
+/coverage
+
+# Production
+/build
+
+# Misc
+*.tgz
+*.tar.gz
+
+# Lock files (optional - remove if you want to commit them)
+# package-lock.json
+# yarn.lock

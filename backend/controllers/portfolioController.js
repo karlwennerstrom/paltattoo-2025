@@ -75,6 +75,55 @@ const getPortfolioItems = async (req, res) => {
   }
 };
 
+const getMyPortfolioItems = async (req, res) => {
+  try {
+    const artist = await TattooArtist.findByUserId(req.user.id);
+    
+    if (!artist) {
+      return res.status(404).json({ error: 'Perfil de tatuador no encontrado' });
+    }
+    
+    const { category, mediaType, limit, offset } = req.query;
+    
+    let portfolioItems = await Portfolio.findByArtist(artist.id, limit);
+    
+    // Filter by category if specified
+    if (category) {
+      portfolioItems = portfolioItems.filter(item => item.category === category);
+    }
+    
+    // Filter by media type if specified
+    if (mediaType) {
+      portfolioItems = portfolioItems.filter(item => item.media_type === mediaType);
+    }
+    
+    // Apply offset if specified
+    if (offset) {
+      portfolioItems = portfolioItems.slice(parseInt(offset));
+    }
+    
+    const itemsWithUrls = portfolioItems.map(item => ({
+      ...item,
+      imageUrl: `/uploads/portfolio/${item.image_url}`,
+      thumbnailUrl: item.thumbnail_url ? `/uploads/portfolio/${item.thumbnail_url}` : null
+    }));
+    
+    res.json({
+      items: itemsWithUrls,
+      total: portfolioItems.length,
+      artist: {
+        id: artist.id,
+        studioName: artist.studio_name,
+        firstName: artist.first_name,
+        lastName: artist.last_name
+      }
+    });
+  } catch (error) {
+    console.error('Get my portfolio items error:', error);
+    res.status(500).json({ error: 'Error al obtener items del portafolio' });
+  }
+};
+
 const createPortfolioItem = async (req, res) => {
   try {
     const artist = await TattooArtist.findByUserId(req.user.id);
@@ -364,6 +413,7 @@ const getPortfolioStats = async (req, res) => {
 
 module.exports = {
   getPortfolioItems,
+  getMyPortfolioItems,
   createPortfolioItem: [createPortfolioValidation, handleValidationErrors, createPortfolioItem],
   updatePortfolioItem: [updatePortfolioValidation, handleValidationErrors, updatePortfolioItem],
   deletePortfolioItem,

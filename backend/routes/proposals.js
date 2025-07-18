@@ -30,6 +30,8 @@ const updateValidation = [
 
 router.get('/artist', authenticate, authorizeArtist, proposalController.getProposalsByArtist);
 
+router.get('/my', authenticate, authorizeArtist, proposalController.getProposalsByArtist);
+
 router.get('/offer/:offerId', authenticate, authorizeClient, proposalController.getProposalsByOffer);
 
 router.get('/:id', authenticate, proposalController.getProposalDetails);

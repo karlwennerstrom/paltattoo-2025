@@ -4,6 +4,13 @@ const portfolioController = require('../controllers/portfolioController');
 const { authenticate, authorizeArtist } = require('../middleware/auth');
 const { uploadPortfolio, uploadMultiplePortfolio } = require('../config/multer');
 
+// GET /api/portfolio/my - Get portfolio items for current artist (artist only)
+router.get('/my', 
+  authenticate, 
+  authorizeArtist, 
+  portfolioController.getMyPortfolioItems
+);
+
 // GET /api/portfolio/:artistId - Get portfolio items for an artist (public)
 router.get('/:artistId', portfolioController.getPortfolioItems);
 

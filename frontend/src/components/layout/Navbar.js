@@ -65,7 +65,7 @@ const Navbar = () => {
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <div className="flex-shrink-0">
-            <Link to="/" className="flex items-center space-x-3 group">
+            <Link to={isAdmin ? "/admin/dashboard" : isArtist ? "/artist/dashboard" : "/"} className="flex items-center space-x-3 group">
               <div className="relative">
                 <img 
                   src="/paltattoo-icono.png" 
@@ -85,7 +85,7 @@ const Navbar = () => {
           {/* Desktop Navigation */}
           <div className="hidden md:block">
             <div className="ml-10 flex items-baseline space-x-4">
-              <NavLink to="/">Inicio</NavLink>
+              {!isAdmin && !isArtist && <NavLink to="/">Inicio</NavLink>}
               <NavLink to="/artists">Tatuadores</NavLink>
               <NavLink to="/feed">Feed</NavLink>
               <NavLink to="/shops">Tiendas</NavLink>
@@ -100,7 +100,6 @@ const Navbar = () => {
               
               {isAuthenticated && isArtist && (
                 <>
-                  <NavLink to="/artist/dashboard">Dashboard</NavLink>
                   <NavLink to="/artist/portfolio">Portafolio</NavLink>
                   <NavLink to="/artist/proposals">Propuestas</NavLink>
                   <NavLink to="/artist/calendar">Calendario</NavLink>
@@ -219,9 +218,11 @@ const Navbar = () => {
       {isMobileMenuOpen && (
         <div className="md:hidden">
           <div className="px-4 pt-4 pb-6 space-y-2 bg-black/95 backdrop-blur-xl border-t border-white/10">
-            <NavLink to="/" onClick={() => setIsMobileMenuOpen(false)}>
-              Inicio
-            </NavLink>
+            {!isAdmin && !isArtist && (
+              <NavLink to="/" onClick={() => setIsMobileMenuOpen(false)}>
+                Inicio
+              </NavLink>
+            )}
             <NavLink to="/artists" onClick={() => setIsMobileMenuOpen(false)}>
               Tatuadores
             </NavLink>
@@ -248,9 +249,6 @@ const Navbar = () => {
             
             {isAuthenticated && isArtist && (
               <>
-                <NavLink to="/artist/dashboard" onClick={() => setIsMobileMenuOpen(false)}>
-                  Dashboard
-                </NavLink>
                 <NavLink to="/artist/portfolio" onClick={() => setIsMobileMenuOpen(false)}>
                   Portafolio
                 </NavLink>

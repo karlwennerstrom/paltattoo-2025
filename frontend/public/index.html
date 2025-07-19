@@ -160,7 +160,8 @@
     
     <!-- Service Worker Registration -->
     <script>
-      // Register service worker for offline functionality
+      // Service worker temporarily disabled
+      /*
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js')
@@ -172,6 +173,7 @@
             });
         });
       }
+      */
       
       // Hide loading spinner once React has loaded
       window.addEventListener('load', () => {

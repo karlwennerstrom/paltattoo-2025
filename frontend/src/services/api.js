@@ -87,7 +87,7 @@ export const artistService = {
   addPortfolioItem: (data) => api.post('/artists/portfolio', data),
   updatePortfolioItem: (id, data) => api.put(`/artists/portfolio/${id}`, data),
   deletePortfolioItem: (id) => api.delete(`/artists/portfolio/${id}`),
-  getStats: () => api.get('/artists/stats'),
+  getStats: () => api.get('/stats/artist'),
   getReviews: (id) => api.get(`/artists/${id}/reviews`),
 };
 
@@ -135,15 +135,15 @@ export const profileService = {
     });
   },
   deleteAvatar: () => api.delete('/profile/avatar'),
-  getMyOffers: () => api.get('/profile/offers'),
-  getMyProposals: () => api.get('/profile/proposals'),
+  getMyOffers: () => api.get('/offers/my'),
+  getMyProposals: () => api.get('/proposals/my'),
   getFavorites: () => api.get('/profile/favorites'),
   addFavorite: (type, id) => api.post('/profile/favorites', { type, id }),
   removeFavorite: (type, id) => api.delete(`/profile/favorites/${type}/${id}`),
-  getAppointments: () => api.get('/profile/appointments'),
-  createAppointment: (data) => api.post('/profile/appointments', data),
-  updateAppointment: (id, data) => api.put(`/profile/appointments/${id}`, data),
-  cancelAppointment: (id) => api.delete(`/profile/appointments/${id}`),
+  getAppointments: () => api.get('/calendar/appointments'),
+  createAppointment: (data) => api.post('/calendar/appointments', data),
+  updateAppointment: (id, data) => api.put(`/calendar/appointments/${id}`, data),
+  cancelAppointment: (id) => api.delete(`/calendar/appointments/${id}`),
   getNotifications: () => api.get('/profile/notifications'),
   markNotificationAsRead: (id) => api.put(`/profile/notifications/${id}/read`),
   markAllNotificationsAsRead: () => api.put('/profile/notifications/read-all'),
@@ -151,7 +151,7 @@ export const profileService = {
 
 // Portfolio services
 export const portfolioService = {
-  getAll: (artistId) => api.get(`/portfolio?artist=${artistId}`),
+  getAll: (artistId) => api.get(`/portfolio/${artistId || 'my'}`),
   getById: (id) => api.get(`/portfolio/${id}`),
   create: (data) => {
     const formData = new FormData();
@@ -168,7 +168,7 @@ export const portfolioService = {
   },
   update: (id, data) => api.put(`/portfolio/${id}`, data),
   delete: (id) => api.delete(`/portfolio/${id}`),
-  toggleFeatured: (id) => api.put(`/portfolio/${id}/featured`),
+  toggleFeatured: (id) => api.post(`/portfolio/${id}/feature`),
   incrementViews: (id) => api.post(`/portfolio/${id}/views`),
 };
 

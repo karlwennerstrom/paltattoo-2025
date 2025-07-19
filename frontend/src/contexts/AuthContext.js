@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { authService } from '../services/api';
+import { autoLoginForDev } from '../utils/authHelper';
 import toast from 'react-hot-toast';
 
 const AuthContext = createContext();
@@ -21,16 +22,26 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const checkAuth = async () => {
       try {
+        console.log('Checking auth...');
         const token = localStorage.getItem('authToken');
         if (token) {
           const response = await authService.getProfile();
           setUser(response.data);
+        } else {
+          // Auto-login for development
+          console.log('No token found, attempting auto-login...');
+          const autoLoginSuccess = await autoLoginForDev();
+          if (autoLoginSuccess) {
+            const response = await authService.getProfile();
+            setUser(response.data);
+          }
         }
       } catch (error) {
         console.error('Error checking auth:', error);
         localStorage.removeItem('authToken');
         localStorage.removeItem('user');
       } finally {
+        console.log('Setting loading to false');
         setLoading(false);
       }
     };

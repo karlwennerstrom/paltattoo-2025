@@ -5,9 +5,18 @@ import { PageContainer } from '../components/common/Layout';
 import { useAuth } from '../contexts/AuthContext';
 
 const HomePage = () => {
-  const { user } = useAuth();
+  const { user, isAdmin, isArtist } = useAuth();
   const navigate = useNavigate();
   const [currentTestimonial, setCurrentTestimonial] = useState(0);
+
+  // Redirect admin and artist users to their dashboards
+  useEffect(() => {
+    if (isAdmin) {
+      navigate('/admin/dashboard', { replace: true });
+    } else if (isArtist) {
+      navigate('/artist/dashboard', { replace: true });
+    }
+  }, [isAdmin, isArtist, navigate]);
 
   const testimonials = [
     {

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { useAuth } from './contexts/AuthContext';
 
@@ -21,15 +21,28 @@ import FavoritesPage from './pages/client/FavoritesPage';
 import MyAppointmentsPage from './pages/client/MyAppointmentsPage';
 
 // Artist pages
-import ArtistDashboard from './components/artist/ArtistDashboard';
-import ProposalsPage from './pages/artist/ProposalsPage';
-import PortfolioPage from './pages/artist/PortfolioPage';
-import CalendarPage from './pages/artist/CalendarPage';
-import AnalyticsPage from './pages/artist/AnalyticsPage';
-import SubscriptionPage from './pages/artist/SubscriptionPage';
+// import ArtistDashboard from './components/artist/ArtistDashboard';
+import ArtistOverview from './components/artist/pages/ArtistOverview';
+import ArtistPortfolio from './components/artist/pages/ArtistPortfolio';
+import ArtistProposals from './components/artist/pages/ArtistProposals';
+import ArtistCalendar from './components/artist/pages/ArtistCalendar';
+import ArtistAnalytics from './components/artist/pages/ArtistAnalytics';
+import ArtistSubscription from './components/artist/pages/ArtistSubscription';
+
+// Shared components
+import DashboardLayout from './components/shared/DashboardLayout';
 
 // Admin pages
-import AdminDashboard from './components/admin/AdminDashboard';
+import AdminLayout from './components/admin/AdminLayout';
+import AdminOverview from './components/admin/pages/AdminOverview';
+import AdminUsers from './components/admin/pages/AdminUsers';
+import AdminOffers from './components/admin/pages/AdminOffers';
+import AdminShops from './components/admin/pages/AdminShops';
+import AdminContent from './components/admin/pages/AdminContent';
+import AdminPayments from './components/admin/pages/AdminPayments';
+import AdminReports from './components/admin/pages/AdminReports';
+import AdminMessages from './components/admin/pages/AdminMessages';
+import AdminSettings from './components/admin/pages/AdminSettings';
 
 // Public pages
 import ArtistsView from './pages/artists/ArtistsView';
@@ -68,7 +81,9 @@ import Footer from './components/layout/Footer';
 import PageWrapper from './components/layout/PageWrapper';
 
 function App() {
+  console.log('App component loaded');
   const { user, loading } = useAuth();
+  const location = useLocation();
 
   if (loading) {
     return (
@@ -78,10 +93,14 @@ function App() {
     );
   }
 
+  const isAdminRoute = location.pathname.startsWith('/admin');
+  const isArtistRoute = location.pathname.startsWith('/artist');
+  const isDashboardRoute = isAdminRoute || isArtistRoute;
+
   return (
     <div className="App min-h-screen bg-primary-900">
       <Toaster position="top-right" />
-      <Navbar />
+      {!isDashboardRoute && <Navbar />}
       <main>
         <Routes>
           {/* Public routes */}
@@ -117,7 +136,7 @@ function App() {
 
           {/* Protected client routes */}
           <Route path="/feed" element={
-            <ProtectedRoute requiredRole="client">
+            <ProtectedRoute>
               <PageWrapper><FeedView /></PageWrapper>
             </ProtectedRoute>
           } />
@@ -143,36 +162,19 @@ function App() {
           } />
 
           {/* Protected artist routes */}
-          <Route path="/artist/dashboard" element={
+          <Route path="/artist" element={
             <ProtectedRoute requiredRole="artist">
-              <PageWrapper><ArtistDashboard /></PageWrapper>
+              <DashboardLayout />
             </ProtectedRoute>
-          } />
-          <Route path="/artist/proposals" element={
-            <ProtectedRoute requiredRole="artist">
-              <PageWrapper><ProposalsPage /></PageWrapper>
-            </ProtectedRoute>
-          } />
-          <Route path="/artist/portfolio" element={
-            <ProtectedRoute requiredRole="artist">
-              <PageWrapper><PortfolioPage /></PageWrapper>
-            </ProtectedRoute>
-          } />
-          <Route path="/artist/calendar" element={
-            <ProtectedRoute requiredRole="artist">
-              <PageWrapper><CalendarPage /></PageWrapper>
-            </ProtectedRoute>
-          } />
-          <Route path="/artist/analytics" element={
-            <ProtectedRoute requiredRole="artist">
-              <PageWrapper><AnalyticsPage /></PageWrapper>
-            </ProtectedRoute>
-          } />
-          <Route path="/artist/subscription" element={
-            <ProtectedRoute requiredRole="artist">
-              <PageWrapper><SubscriptionPage /></PageWrapper>
-            </ProtectedRoute>
-          } />
+          }>
+            <Route index element={<Navigate to="/artist/dashboard" replace />} />
+            <Route path="dashboard" element={<ArtistOverview />} />
+            <Route path="portfolio" element={<ArtistPortfolio />} />
+            <Route path="proposals" element={<ArtistProposals />} />
+            <Route path="calendar" element={<ArtistCalendar />} />
+            <Route path="analytics" element={<ArtistAnalytics />} />
+            <Route path="subscription" element={<ArtistSubscription />} />
+          </Route>
           <Route path="/proposals/send/:offerId" element={
             <ProtectedRoute requiredRole="artist">
               <PageWrapper><SendProposalPage /></PageWrapper>
@@ -180,11 +182,22 @@ function App() {
           } />
 
           {/* Protected admin routes */}
-          <Route path="/admin/dashboard" element={
+          <Route path="/admin" element={
             <ProtectedRoute requiredRole="admin">
-              <PageWrapper><AdminDashboard /></PageWrapper>
+              <AdminLayout />
             </ProtectedRoute>
-          } />
+          }>
+            <Route index element={<Navigate to="/admin/dashboard" replace />} />
+            <Route path="dashboard" element={<AdminOverview />} />
+            <Route path="users" element={<AdminUsers />} />
+            <Route path="offers" element={<AdminOffers />} />
+            <Route path="shops" element={<AdminShops />} />
+            <Route path="content" element={<AdminContent />} />
+            <Route path="payments" element={<AdminPayments />} />
+            <Route path="reports" element={<AdminReports />} />
+            <Route path="messages" element={<AdminMessages />} />
+            <Route path="settings" element={<AdminSettings />} />
+          </Route>
 
           {/* Unauthorized page */}
           <Route path="/unauthorized" element={
@@ -208,7 +221,7 @@ function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
-      <Footer />
+      {!isDashboardRoute && <Footer />}
     </div>
   );
 }

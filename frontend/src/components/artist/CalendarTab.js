@@ -1,21 +1,35 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { twMerge } from 'tailwind-merge';
 import { Card, Grid } from '../common/Layout';
 import Button from '../common/Button';
 import Input from '../common/Input';
 import Modal from '../common/Modal';
 import { getProfileImageUrl } from '../../utils/imageHelpers';
+import { calendarService } from '../../services/api';
+import toast from 'react-hot-toast';
+import { useAuth } from '../../contexts/AuthContext';
+import { Link } from 'react-router-dom';
+import { hasCalendarAccess, getUserPlanName } from '../../utils/subscriptionHelpers';
 
 const CalendarTab = () => {
+  const { user } = useAuth();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(null);
   const [viewMode, setViewMode] = useState('month');
   const [isAddingAppointment, setIsAddingAppointment] = useState(false);
   const [isManagingAvailability, setIsManagingAvailability] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [operationLoading, setOperationLoading] = useState(false);
 
-  // Mock appointments data with proposals integration
-  const [appointments, setAppointments] = useState([
+  // Check if user has access to calendar (pro or premium plans only)
+  const userHasCalendarAccess = hasCalendarAccess(user);
+
+  // Real appointments data
+  const [appointments, setAppointments] = useState([]);
+  
+  // Mock appointments for development
+  const mockAppointments = [
     {
       id: 1,
       client: {
@@ -76,7 +90,62 @@ const CalendarTab = () => {
       estimatedDuration: '3 horas',
       notes: 'Revisar proceso de curación'
     }
-  ]);
+  ];
+  
+  // Load appointments from backend
+  useEffect(() => {
+    loadAppointments();
+    loadAvailability();
+  }, []);
+  
+  const loadAppointments = async () => {
+    try {
+      setLoading(true);
+      const response = await calendarService.getAppointments();
+      
+      // Transform the data to match the expected structure
+      const appointmentsData = response.data?.data || response.data || [];
+      const transformedAppointments = (Array.isArray(appointmentsData) ? appointmentsData : []).map(apt => ({
+        id: apt.id,
+        client: {
+          name: apt.client_name || 'Cliente',
+          avatar: apt.client_avatar,
+          phone: apt.client_phone,
+          email: apt.client_email
+        },
+        title: apt.request_title || apt.title || 'Cita',
+        type: apt.type || 'session',
+        date: apt.appointment_date ? apt.appointment_date.split('T')[0] : apt.date,
+        startTime: apt.start_time,
+        endTime: apt.end_time,
+        status: apt.status,
+        description: apt.request_description || apt.description || '',
+        proposalId: apt.proposal_id,
+        price: apt.estimated_price || apt.price || 0,
+        estimatedDuration: apt.duration_hours ? `${apt.duration_hours} hora${apt.duration_hours !== 1 ? 's' : ''}` : '1 hora',
+        notes: apt.notes
+      }));
+      
+      setAppointments(transformedAppointments.length > 0 ? transformedAppointments : mockAppointments);
+    } catch (error) {
+      console.error('Error loading appointments:', error);
+      toast.error('Error al cargar las citas');
+      setAppointments(mockAppointments);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const loadAvailability = async () => {
+    try {
+      const response = await calendarService.getAvailability();
+      if (response.data?.weekly_schedule) {
+        setAvailability(response.data.weekly_schedule);
+      }
+    } catch (error) {
+      console.error('Error loading availability:', error);
+    }
+  };
 
   // Availability configuration
   const [availability, setAvailability] = useState({
@@ -219,62 +288,102 @@ const CalendarTab = () => {
   const handleAddAppointment = async () => {
     // Validate form
     if (!newAppointment.clientName || !newAppointment.date || !newAppointment.startTime) {
-      alert('Por favor completa los campos obligatorios');
+      toast.error('Por favor completa los campos obligatorios');
       return;
     }
 
-    // Calculate end time based on appointment type
-    const typeConfig = appointmentTypes.find(t => t.value === newAppointment.type);
-    const startTime = new Date(`2024-01-01 ${newAppointment.startTime}`);
-    startTime.setMinutes(startTime.getMinutes() + typeConfig.duration);
-    const endTime = startTime.toTimeString().substring(0, 5);
+    if (operationLoading) return;
 
-    const appointment = {
-      id: Date.now(),
-      client: {
-        name: newAppointment.clientName,
-        phone: newAppointment.clientPhone,
-        email: newAppointment.clientEmail,
-        avatar: null
-      },
-      title: newAppointment.title,
-      type: newAppointment.type,
-      date: newAppointment.date,
-      startTime: newAppointment.startTime,
-      endTime: newAppointment.endTime || endTime,
-      status: 'confirmed',
-      description: newAppointment.description,
-      price: parseInt(newAppointment.price) || 0,
-      estimatedDuration: `${typeConfig.duration} min`,
-      notes: newAppointment.notes
-    };
+    try {
+      setOperationLoading(true);
+      // Calculate end time based on appointment type
+      const typeConfig = appointmentTypes.find(t => t.value === newAppointment.type);
+      const startTime = new Date(`2024-01-01 ${newAppointment.startTime}`);
+      startTime.setMinutes(startTime.getMinutes() + typeConfig.duration);
+      const endTime = newAppointment.endTime || startTime.toTimeString().substring(0, 5);
 
-    setAppointments(prev => [...prev, appointment]);
-    setNewAppointment({
-      clientName: '',
-      clientPhone: '',
-      clientEmail: '',
-      title: '',
-      type: 'consultation',
-      date: '',
-      startTime: '',
-      endTime: '',
-      description: '',
-      price: '',
-      notes: ''
-    });
-    setIsAddingAppointment(false);
+      const appointmentData = {
+        client_name: newAppointment.clientName,
+        client_phone: newAppointment.clientPhone,
+        client_email: newAppointment.clientEmail,
+        title: newAppointment.title,
+        type: newAppointment.type,
+        date: newAppointment.date,
+        start_time: newAppointment.startTime,
+        end_time: endTime,
+        description: newAppointment.description,
+        price: parseInt(newAppointment.price) || 0,
+        duration: typeConfig.duration,
+        notes: newAppointment.notes
+      };
+      
+      const response = await calendarService.createAppointment(appointmentData);
+      
+      if (response.data) {
+        toast.success('Cita creada exitosamente');
+        await loadAppointments();
+        setNewAppointment({
+          clientName: '',
+          clientPhone: '',
+          clientEmail: '',
+          title: '',
+          type: 'consultation',
+          date: '',
+          startTime: '',
+          endTime: '',
+          description: '',
+          price: '',
+          notes: ''
+        });
+        setIsAddingAppointment(false);
+      }
+    } catch (error) {
+      console.error('Error creating appointment:', error);
+      toast.error('Error al crear la cita');
+    } finally {
+      setOperationLoading(false);
+    }
   };
 
-  const handleUpdateAppointmentStatus = (appointmentId, newStatus) => {
-    setAppointments(prev => prev.map(apt => 
-      apt.id === appointmentId ? { ...apt, status: newStatus } : apt
-    ));
+  const handleUpdateAppointmentStatus = async (appointmentId, newStatus) => {
+    if (operationLoading) return;
+    
+    try {
+      setOperationLoading(true);
+      if (newStatus === 'cancelled') {
+        await calendarService.cancelAppointment(appointmentId, 'Cancelado por el artista');
+        toast.success('Cita cancelada exitosamente');
+      } else if (newStatus === 'completed') {
+        await calendarService.completeAppointment(appointmentId, {});
+        toast.success('Cita marcada como completada');
+      } else {
+        await calendarService.updateAppointment(appointmentId, { status: newStatus });
+        toast.success('Estado actualizado exitosamente');
+      }
+      await loadAppointments();
+    } catch (error) {
+      console.error('Error updating appointment status:', error);
+      toast.error('Error al actualizar el estado de la cita');
+    } finally {
+      setOperationLoading(false);
+    }
   };
 
-  const handleDeleteAppointment = (appointmentId) => {
+  const handleDeleteAppointment = async (appointmentId) => {
     if (window.confirm('¿Estás seguro de que quieres eliminar esta cita?')) {
-      setAppointments(prev => prev.filter(apt => apt.id !== appointmentId));
+      if (operationLoading) return;
+      
+      try {
+        setOperationLoading(true);
+        await calendarService.cancelAppointment(appointmentId, 'Eliminado por el artista');
+        toast.success('Cita eliminada exitosamente');
+        await loadAppointments();
+      } catch (error) {
+        console.error('Error deleting appointment:', error);
+        toast.error('Error al eliminar la cita');
+      } finally {
+        setOperationLoading(false);
+      }
     }
   };
 
@@ -285,6 +394,72 @@ const CalendarTab = () => {
       minimumFractionDigits: 0
     }).format(amount);
   };
+
+  // Show upgrade message for basic plan users
+  if (!userHasCalendarAccess) {
+    return (
+      <div className="flex items-center justify-center min-h-[600px]">
+        <Card className="max-w-2xl mx-auto text-center">
+          <div className="py-12 px-8">
+            <div className="w-20 h-20 bg-accent-600 bg-opacity-20 rounded-full flex items-center justify-center mx-auto mb-6">
+              <svg className="h-10 w-10 text-accent-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </div>
+            
+            <h2 className="text-2xl font-bold text-primary-100 mb-4">
+              Calendario Profesional
+            </h2>
+            
+            <p className="text-primary-300 mb-8 max-w-md mx-auto">
+              Gestiona tus citas y horarios de disponibilidad con nuestro calendario profesional. 
+              Esta función está disponible en los planes Pro y Premium.
+            </p>
+
+            <div className="space-y-4 mb-8">
+              <div className="flex items-center justify-center space-x-2 text-primary-400">
+                <svg className="h-5 w-5 text-accent-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <span>Gestión completa de citas</span>
+              </div>
+              <div className="flex items-center justify-center space-x-2 text-primary-400">
+                <svg className="h-5 w-5 text-accent-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <span>Configuración de horarios disponibles</span>
+              </div>
+              <div className="flex items-center justify-center space-x-2 text-primary-400">
+                <svg className="h-5 w-5 text-accent-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <span>Sincronización con propuestas aceptadas</span>
+              </div>
+              <div className="flex items-center justify-center space-x-2 text-primary-400">
+                <svg className="h-5 w-5 text-accent-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <span>Notificaciones automáticas</span>
+              </div>
+            </div>
+
+            <Link to="/artist/subscription">
+              <Button variant="primary" size="lg" className="min-w-[200px]">
+                <svg className="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                </svg>
+                Actualizar a Pro
+              </Button>
+            </Link>
+
+            <p className="text-primary-500 text-sm mt-4">
+              Tu plan actual: <span className="text-primary-300 font-medium capitalize">{getUserPlanName(user)}</span>
+            </p>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -355,17 +530,23 @@ const CalendarTab = () => {
         {/* Calendar */}
         <div className="lg:col-span-3">
           <Card>
-            {/* Calendar Header */}
-            <div className="grid grid-cols-7 gap-1 mb-4">
-              {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map((day) => (
-                <div key={day} className="p-2 text-center text-sm font-medium text-primary-400">
-                  {day}
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent-500"></div>
+              </div>
+            ) : (
+              <>
+                {/* Calendar Header */}
+                <div className="grid grid-cols-7 gap-1 mb-4">
+                  {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map((day) => (
+                    <div key={day} className="p-2 text-center text-sm font-medium text-primary-400">
+                      {day}
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
 
-            {/* Calendar Grid */}
-            <div className="grid grid-cols-7 gap-1">
+                {/* Calendar Grid */}
+                <div className="grid grid-cols-7 gap-1">
               {getDaysInMonth(currentDate).map((day, index) => {
                 if (!day) {
                   return <div key={`empty-${index}`} className="h-28"></div>;
@@ -424,7 +605,9 @@ const CalendarTab = () => {
                   </div>
                 );
               })}
-            </div>
+                </div>
+              </>
+            )}
           </Card>
         </div>
 
@@ -681,8 +864,12 @@ const CalendarTab = () => {
             <Button variant="ghost" onClick={() => setIsAddingAppointment(false)}>
               Cancelar
             </Button>
-            <Button variant="primary" onClick={handleAddAppointment}>
-              Crear Cita
+            <Button 
+              variant="primary" 
+              onClick={handleAddAppointment}
+              disabled={operationLoading}
+            >
+              {operationLoading ? 'Creando...' : 'Crear Cita'}
             </Button>
           </div>
         </div>
@@ -921,7 +1108,19 @@ const CalendarTab = () => {
             <Button variant="ghost" onClick={() => setIsManagingAvailability(false)}>
               Cancelar
             </Button>
-            <Button variant="primary" onClick={() => setIsManagingAvailability(false)}>
+            <Button 
+              variant="primary" 
+              onClick={async () => {
+                try {
+                  await calendarService.updateAvailability(availability);
+                  toast.success('Disponibilidad actualizada exitosamente');
+                  setIsManagingAvailability(false);
+                } catch (error) {
+                  console.error('Error updating availability:', error);
+                  toast.error('Error al actualizar disponibilidad');
+                }
+              }}
+            >
               Guardar Disponibilidad
             </Button>
           </div>

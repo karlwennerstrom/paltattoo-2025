@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { hasCalendarAccess } from '../../utils/subscriptionHelpers';
 
 const Navbar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -102,7 +103,9 @@ const Navbar = () => {
                 <>
                   <NavLink to="/artist/portfolio">Portafolio</NavLink>
                   <NavLink to="/artist/proposals">Propuestas</NavLink>
-                  <NavLink to="/artist/calendar">Calendario</NavLink>
+                  {hasCalendarAccess(user) && (
+                    <NavLink to="/artist/calendar">Calendario</NavLink>
+                  )}
                 </>
               )}
               
@@ -255,9 +258,11 @@ const Navbar = () => {
                 <NavLink to="/artist/proposals" onClick={() => setIsMobileMenuOpen(false)}>
                   Propuestas
                 </NavLink>
-                <NavLink to="/artist/calendar" onClick={() => setIsMobileMenuOpen(false)}>
-                  Calendario
-                </NavLink>
+                {hasCalendarAccess(user) && (
+                  <NavLink to="/artist/calendar" onClick={() => setIsMobileMenuOpen(false)}>
+                    Calendario
+                  </NavLink>
+                )}
               </>
             )}
             

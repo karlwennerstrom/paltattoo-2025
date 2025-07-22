@@ -2,76 +2,79 @@ import React, { useState } from 'react';
 import { Container, Section, Card } from '../components/common/Layout';
 import { FiCheck, FiX, FiStar, FiTrendingUp, FiShield, FiUsers, FiDollarSign, FiCalendar } from 'react-icons/fi';
 import Button from '../components/common/Button';
+import Modal from '../components/common/Modal';
+import MercadoPagoCheckout from '../components/payments/MercadoPagoCheckout';
+import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 const ArtistPricingPage = () => {
   const [billingCycle, setBillingCycle] = useState('monthly');
+  const [selectedPlan, setSelectedPlan] = useState(null);
+  const [showCheckout, setShowCheckout] = useState(false);
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
   const plans = [
     {
       name: 'Básico',
-      price: billingCycle === 'monthly' ? 29990 : 299990,
-      originalPrice: billingCycle === 'monthly' ? null : 359880,
-      period: billingCycle === 'monthly' ? '/mes' : '/año',
-      description: 'Perfecto para tatuadores que están comenzando',
+      price: 0,
+      period: '',
+      description: 'Plan gratuito para tatuadores que están comenzando',
       popular: false,
       features: [
-        'Perfil profesional verificado',
-        'Hasta 10 propuestas por mes',
-        'Galería de hasta 50 imágenes',
-        'Calendario básico',
-        'Soporte por email',
-        'Comisión del 8% por transacción'
+        'Perfil básico',
+        'Galería de hasta 10 imágenes',
+        'Hasta 5 propuestas por mes',
+        'Soporte por email'
       ],
       limitations: [
-        'Analytics básicos',
-        'Sin promoción especial',
-        'Sin insignias premium'
+        'Sin acceso a calendario',
+        'Sin estadísticas',
+        'Sin promoción en búsquedas'
       ],
       cta: 'Comenzar Gratis'
     },
     {
-      name: 'Profesional',
-      price: billingCycle === 'monthly' ? 59990 : 599990,
-      originalPrice: billingCycle === 'monthly' ? null : 719880,
+      name: 'Premium',
+      price: billingCycle === 'monthly' ? 3990 : 39900,
+      originalPrice: billingCycle === 'monthly' ? null : 47880,
       period: billingCycle === 'monthly' ? '/mes' : '/año',
-      description: 'Para tatuadores establecidos que buscan crecer',
+      description: 'Plan ideal para tatuadores profesionales',
       popular: true,
       features: [
-        'Todo del plan Básico',
         'Propuestas ilimitadas',
+        'Perfil destacado',
         'Galería ilimitada',
-        'Calendario avanzado con automatizaciones',
-        'Analytics detallados',
+        'Calendario de citas completo',
+        'Estadísticas básicas',
         'Soporte prioritario',
-        'Promoción en búsquedas',
-        'Comisión reducida del 5%'
+        'Badge Premium'
       ],
       limitations: [
-        'Sin verificación premium',
-        'Funciones beta limitadas'
+        'Sin múltiples calendarios',
+        'Sin API access'
       ],
-      cta: 'Prueba Gratis 14 Días'
+      cta: 'Obtener Premium'
     },
     {
-      name: 'Premium',
-      price: billingCycle === 'monthly' ? 99990 : 999990,
-      originalPrice: billingCycle === 'monthly' ? null : 1199880,
+      name: 'Pro',
+      price: billingCycle === 'monthly' ? 7990 : 79900,
+      originalPrice: billingCycle === 'monthly' ? null : 95880,
       period: billingCycle === 'monthly' ? '/mes' : '/año',
-      description: 'Para estudios y tatuadores de alto volumen',
+      description: 'Plan avanzado para tatuadores establecidos',
       popular: false,
       features: [
-        'Todo del plan Profesional',
-        'Múltiples perfiles (hasta 5)',
-        'Gestor de equipo',
-        'Verificación premium con insignia',
-        'Promoción destacada',
-        'Acceso a funciones beta',
-        'Soporte telefónico',
-        'Gestor de cuenta dedicado',
-        'Comisión mínima del 3%'
+        'Todo lo incluido en Premium',
+        'Múltiples calendarios',
+        'Estadísticas avanzadas',
+        'Integración con redes sociales',
+        'API access',
+        'Soporte dedicado 24/7',
+        'Badge Pro',
+        'Promoción destacada en búsquedas'
       ],
       limitations: [],
-      cta: 'Contactar Ventas'
+      cta: 'Obtener Pro'
     }
   ];
 
@@ -227,7 +230,16 @@ const ArtistPricingPage = () => {
                     variant={plan.popular ? "primary" : "outline"}
                     size="lg"
                     className="w-full mb-6"
-                    href={plan.name === 'Premium' ? '/contact' : '/join-artist'}
+                    onClick={() => {
+                      if (plan.name === 'Premium') {
+                        window.location.href = '/contact';
+                      } else if (user && user.role === 'artist') {
+                        setSelectedPlan(plan);
+                        setShowCheckout(true);
+                      } else {
+                        window.location.href = '/join-artist';
+                      }
+                    }}
                   >
                     {plan.cta}
                   </Button>
@@ -407,6 +419,27 @@ const ArtistPricingPage = () => {
           </div>
         </Container>
       </Section>
+      
+      {/* MercadoPago Checkout Modal */}
+      <Modal
+        isOpen={showCheckout}
+        onClose={() => setShowCheckout(false)}
+        title={`Suscribirse al Plan ${selectedPlan?.name}`}
+        size="md"
+      >
+        {selectedPlan && (
+          <MercadoPagoCheckout
+            planId={selectedPlan.name.toLowerCase()}
+            planName={selectedPlan.name}
+            planPrice={selectedPlan.price}
+            onSuccess={() => {
+              setShowCheckout(false);
+              navigate('/artist/subscription');
+            }}
+            onCancel={() => setShowCheckout(false)}
+          />
+        )}
+      </Modal>
     </div>
   );
 };

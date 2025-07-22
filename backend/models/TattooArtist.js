@@ -140,27 +140,63 @@ class TattooArtist {
     return rows;
   }
 
-  static async updateStyles(artistId, styleIds, primaryStyleId) {
-    await promisePool.execute(
-      'DELETE FROM artist_styles WHERE artist_id = ?',
-      [artistId]
-    );
-    
-    if (styleIds.length === 0) return true;
-    
-    const values = styleIds.map(styleId => 
-      [artistId, styleId, styleId === primaryStyleId]
-    );
-    
-    const placeholders = values.map(() => '(?, ?, ?)').join(', ');
-    const flatValues = values.flat();
-    
-    const [result] = await promisePool.execute(
-      `INSERT INTO artist_styles (artist_id, style_id, is_primary) VALUES ${placeholders}`,
-      flatValues
-    );
-    
-    return result.affectedRows > 0;
+  static async updateStyles(artistId, styles) {
+    // If styles is an array of names, convert to IDs
+    if (styles.length > 0 && typeof styles[0] === 'string') {
+      // Get style IDs from names
+      const placeholders = styles.map(() => '?').join(', ');
+      const [styleRows] = await promisePool.execute(
+        `SELECT id, name FROM tattoo_styles WHERE name IN (${placeholders})`,
+        styles
+      );
+      
+      const styleIds = styleRows.map(row => row.id);
+      
+      // Delete existing styles
+      await promisePool.execute(
+        'DELETE FROM artist_styles WHERE artist_id = ?',
+        [artistId]
+      );
+      
+      if (styleIds.length === 0) return true;
+      
+      // Insert new styles
+      const values = styleIds.map((styleId, index) => 
+        [artistId, styleId, index === 0] // First style is primary
+      );
+      
+      const insertPlaceholders = values.map(() => '(?, ?, ?)').join(', ');
+      const flatValues = values.flat();
+      
+      const [result] = await promisePool.execute(
+        `INSERT INTO artist_styles (artist_id, style_id, is_primary) VALUES ${insertPlaceholders}`,
+        flatValues
+      );
+      
+      return result.affectedRows > 0;
+    } else {
+      // Original behavior if already IDs
+      await promisePool.execute(
+        'DELETE FROM artist_styles WHERE artist_id = ?',
+        [artistId]
+      );
+      
+      if (styles.length === 0) return true;
+      
+      const values = styles.map((styleId, index) => 
+        [artistId, styleId, index === 0]
+      );
+      
+      const placeholders = values.map(() => '(?, ?, ?)').join(', ');
+      const flatValues = values.flat();
+      
+      const [result] = await promisePool.execute(
+        `INSERT INTO artist_styles (artist_id, style_id, is_primary) VALUES ${placeholders}`,
+        flatValues
+      );
+      
+      return result.affectedRows > 0;
+    }
   }
 
   static async updateRating(artistId) {

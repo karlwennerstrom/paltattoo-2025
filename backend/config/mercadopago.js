@@ -1,40 +1,52 @@
-const { MercadoPagoConfig, Preference, Payment } = require('mercadopago');
+const { MercadoPagoConfig, PreApproval, PreApprovalPlan } = require('mercadopago');
 
-// Initialize MercadoPago with access token
-const client = new MercadoPagoConfig({
+// Configuración de MercadoPago
+const client = new MercadoPagoConfig({ 
   accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN,
   options: {
     timeout: 5000,
-    idempotencyKey: 'abc'
+    idempotencyKey: 'abc' // Para evitar duplicados
   }
 });
 
-// Create instances
-const preference = new Preference(client);
-const payment = new Payment(client);
+// Cliente para planes de suscripción
+const preApprovalPlanClient = new PreApprovalPlan(client);
 
-// MercadoPago configuration
-const mercadoPagoConfig = {
-  // Notification URL for webhooks
-  notificationUrl: `${process.env.BACKEND_URL}/api/payments/webhooks/mercadopago`,
-  
-  // Success and failure URLs
-  successUrl: `${process.env.FRONTEND_URL}/subscription/success`,
-  failureUrl: `${process.env.FRONTEND_URL}/subscription/failure`,
-  pendingUrl: `${process.env.FRONTEND_URL}/subscription/pending`,
+// Cliente para suscripciones
+const preApprovalClient = new PreApproval(client);
 
-  // Default payment methods
-  excludedPaymentMethods: [],
-  excludedPaymentTypes: [],
-  installments: 12,
+// Función para obtener URL válida para MercadoPago
+const getValidUrl = (url) => {
+  // En desarrollo, usar URLs de prueba que redirigen correctamente
+  if (url && url.includes('localhost')) {
+    // Usar httpbin que permite redirecciones con parámetros
+    const baseUrl = 'https://httpbin.org/redirect-to';
+    const encodedUrl = encodeURIComponent(url);
+    return `${baseUrl}?url=${encodedUrl}`;
+  }
+  return url;
+};
 
-  // Auto return
-  autoReturn: 'approved'
+// Configuración de la aplicación
+const config = {
+  appId: process.env.MERCADOPAGO_APP_ID || '5698143216134280',
+  userId: process.env.MERCADOPAGO_USER_ID || '183050733',
+  notificationUrl: process.env.BACKEND_URL?.includes('localhost') 
+    ? 'https://webhook.site/#!/unique-id' // URL de prueba para webhooks
+    : `${process.env.BACKEND_URL}/api/payments/webhook`,
+  backUrls: {
+    success: getValidUrl(`${process.env.FRONTEND_URL}/subscription/success`),
+    failure: getValidUrl(`${process.env.FRONTEND_URL}/subscription/failure`),
+    pending: getValidUrl(`${process.env.FRONTEND_URL}/subscription/pending`)
+  },
+  autoReturn: 'approved',
+  statementDescriptor: 'PALTATTOO',
+  externalReference: 'paltattoo_subscription'
 };
 
 module.exports = {
   client,
-  preference,
-  payment,
-  config: mercadoPagoConfig
+  preApprovalClient,
+  preApprovalPlanClient,
+  config
 };

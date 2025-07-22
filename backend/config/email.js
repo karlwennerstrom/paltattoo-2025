@@ -1,38 +1,42 @@
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 
-// Create transporter based on environment
-const createTransporter = () => {
-  if (process.env.NODE_ENV === 'production') {
-    // Production configuration (e.g., SendGrid, Gmail, etc.)
-    return nodemailer.createTransport({
-      service: process.env.EMAIL_SERVICE || 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-      }
-    });
-  } else {
-    // Development configuration using Ethereal Email
-    return nodemailer.createTransport({
-      host: 'smtp.ethereal.email',
-      port: 587,
-      auth: {
-        user: process.env.EMAIL_USER || 'ethereal.user',
-        pass: process.env.EMAIL_PASS || 'ethereal.pass'
-      }
-    });
+// Initialize Resend with API key
+const resend = new Resend(process.env.RESEND_API_KEY || 're_YnDj7Ztw_Hdufccy6cM9QeSxqjMxKxd3T');
+
+// Wrapper to maintain compatibility with existing code
+const transporter = {
+  sendMail: async (options) => {
+    try {
+      const result = await resend.emails.send({
+        from: options.from || 'PalTattoo <noreply@misterwolf.cl>',
+        to: options.to,
+        subject: options.subject,
+        html: options.html || options.text,
+        reply_to: options.replyTo
+      });
+      
+      console.log('Email sent successfully:', result);
+      return result;
+    } catch (error) {
+      console.error('Error sending email with Resend:', error);
+      throw error;
+    }
+  },
+  
+  verify: async () => {
+    try {
+      // Test the API key by attempting to get domains
+      const response = await resend.domains.list();
+      console.log('Resend email service is ready to send messages');
+      return true;
+    } catch (error) {
+      console.log('Resend configuration error:', error);
+      return false;
+    }
   }
 };
 
-const transporter = createTransporter();
-
-// Verify transporter configuration
-transporter.verify((error, success) => {
-  if (error) {
-    console.log('Email transporter error:', error);
-  } else {
-    console.log('Email server is ready to send messages');
-  }
-});
+// Verify configuration on startup
+transporter.verify();
 
 module.exports = transporter;

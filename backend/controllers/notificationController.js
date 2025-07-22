@@ -171,7 +171,7 @@ const notificationController = {
       const settings = {
         emailEnabled: true,
         smtpConfigured: !!process.env.EMAIL_USER,
-        fromAddress: process.env.EMAIL_FROM || 'noreply@tattooconnect.cl',
+        fromAddress: process.env.EMAIL_FROM || 'PalTattoo <noreply@misterwolf.cl>',
         environment: process.env.NODE_ENV || 'development'
       };
       

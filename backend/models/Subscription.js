@@ -1,108 +1,358 @@
-const promisePool = require('../config/database');
+const db = require('../config/database');
 
 class Subscription {
-  static async create(subscriptionData) {
-    const { userId, planId, mercadoPagoSubscriptionId, status } = subscriptionData;
-    
-    const [result] = await promisePool.execute(
-      `INSERT INTO subscriptions (user_id, plan_id, mercadopago_subscription_id, status, start_date)
-       VALUES (?, ?, ?, ?, NOW())`,
-      [userId, planId, mercadoPagoSubscriptionId, status]
+  // Obtener todos los planes disponibles
+  static async getPlans() {
+    const [rows] = await db.execute(
+      'SELECT * FROM subscription_plans WHERE is_active = TRUE ORDER BY price ASC'
     );
-    
-    return result.insertId;
-  }
-
-  static async findByUserId(userId) {
-    const [rows] = await promisePool.execute(
-      `SELECT s.*, sp.name as plan_name, sp.price, sp.billing_cycle, sp.features 
-       FROM subscriptions s
-       JOIN subscription_plans sp ON s.plan_id = sp.id
-       WHERE s.user_id = ? AND s.status IN ('active', 'pending')
-       ORDER BY s.created_at DESC
-       LIMIT 1`,
-      [userId]
-    );
-    
-    return rows[0];
-  }
-
-  static async findByMercadoPagoId(mercadoPagoSubscriptionId) {
-    const [rows] = await promisePool.execute(
-      'SELECT * FROM subscriptions WHERE mercadopago_subscription_id = ?',
-      [mercadoPagoSubscriptionId]
-    );
-    
-    return rows[0];
-  }
-
-  static async updateStatus(subscriptionId, status, endDate = null) {
-    const fields = ['status = ?'];
-    const values = [status, subscriptionId];
-    
-    if (endDate) {
-      fields.push('end_date = ?');
-      values.splice(1, 0, endDate);
-    }
-    
-    const [result] = await promisePool.execute(
-      `UPDATE subscriptions SET ${fields.join(', ')} WHERE id = ?`,
-      values
-    );
-    
-    return result.affectedRows > 0;
-  }
-
-  static async findById(subscriptionId) {
-    const [rows] = await promisePool.execute(
-      `SELECT s.*, sp.name as plan_name, sp.price, sp.billing_cycle, sp.features,
-              u.email as user_email, up.first_name, up.last_name
-       FROM subscriptions s
-       JOIN subscription_plans sp ON s.plan_id = sp.id
-       JOIN users u ON s.user_id = u.id
-       LEFT JOIN user_profiles up ON u.id = up.user_id
-       WHERE s.id = ?`,
-      [subscriptionId]
-    );
-    
-    return rows[0];
-  }
-
-  static async getActiveSubscriptionsByPlan(planId) {
-    const [rows] = await promisePool.execute(
-      `SELECT COUNT(*) as count 
-       FROM subscriptions 
-       WHERE plan_id = ? AND status = 'active'`,
-      [planId]
-    );
-    
-    return rows[0].count;
-  }
-
-  static async getUserSubscriptionHistory(userId) {
-    const [rows] = await promisePool.execute(
-      `SELECT s.*, sp.name as plan_name, sp.price, sp.billing_cycle
-       FROM subscriptions s
-       JOIN subscription_plans sp ON s.plan_id = sp.id
-       WHERE s.user_id = ?
-       ORDER BY s.created_at DESC`,
-      [userId]
-    );
-    
     return rows;
   }
 
-  static async cancel(subscriptionId) {
-    return this.updateStatus(subscriptionId, 'cancelled', new Date());
+  // Obtener un plan por ID
+  static async getPlanById(planId) {
+    const [rows] = await db.execute(
+      'SELECT * FROM subscription_plans WHERE id = ? AND is_active = TRUE',
+      [planId]
+    );
+    return rows[0];
   }
 
-  static async reactivate(subscriptionId) {
-    const [result] = await promisePool.execute(
-      'UPDATE subscriptions SET status = ?, end_date = NULL WHERE id = ?',
-      ['active', subscriptionId]
+  // Obtener un plan por tipo
+  static async getPlanByType(planType) {
+    const [rows] = await db.execute(
+      'SELECT * FROM subscription_plans WHERE plan_type = ? AND is_active = TRUE',
+      [planType]
     );
-    
+    return rows[0];
+  }
+
+  // Crear una nueva suscripción
+  static async create(subscriptionData) {
+    const {
+      userId,
+      planId,
+      mercadopagoPreapprovalId,
+      status = 'pending',
+      startDate,
+      endDate,
+      nextPaymentDate,
+      externalReference,
+      payerEmail
+    } = subscriptionData;
+
+    // Convert undefined values to null for MySQL compatibility
+    const params = [
+      userId,
+      planId,
+      mercadopagoPreapprovalId || null,
+      status,
+      startDate || null,
+      endDate || null,
+      nextPaymentDate || null,
+      externalReference || null,
+      payerEmail || null
+    ];
+
+    const [result] = await db.execute(
+      `INSERT INTO user_subscriptions 
+       (user_id, plan_id, mercadopago_preapproval_id, status, start_date, end_date, 
+        next_payment_date, external_reference, payer_email) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      params
+    );
+
+    return result.insertId;
+  }
+
+  // Obtener suscripción activa de un usuario
+  static async getActiveByUserId(userId) {
+    const [rows] = await db.execute(
+      `SELECT s.*, p.name as plan_name, p.price, p.features 
+       FROM user_subscriptions s 
+       JOIN subscription_plans p ON s.plan_id = p.id 
+       WHERE s.user_id = ? AND s.status = 'authorized' 
+       AND (s.end_date IS NULL OR s.end_date >= CURDATE())
+       ORDER BY s.created_at DESC LIMIT 1`,
+      [userId]
+    );
+    return rows[0];
+  }
+
+  // Obtener todas las suscripciones de un usuario
+  static async getByUserId(userId) {
+    const [rows] = await db.execute(
+      `SELECT s.*, p.name as plan_name, p.price 
+       FROM user_subscriptions s 
+       JOIN subscription_plans p ON s.plan_id = p.id 
+       WHERE s.user_id = ? 
+       ORDER BY s.created_at DESC`,
+      [userId]
+    );
+    return rows;
+  }
+
+  // Obtener suscripción por ID de preaprobación de MercadoPago
+  static async getByPreapprovalId(preapprovalId) {
+    const [rows] = await db.execute(
+      `SELECT s.*, p.name as plan_name, p.price, u.email as user_email 
+       FROM user_subscriptions s 
+       JOIN subscription_plans p ON s.plan_id = p.id 
+       JOIN users u ON s.user_id = u.id 
+       WHERE s.mercadopago_preapproval_id = ?`,
+      [preapprovalId]
+    );
+    return rows[0];
+  }
+
+  // Actualizar estado de suscripción
+  static async updateStatus(subscriptionId, status, additionalData = {}) {
+    const updates = ['status = ?'];
+    const values = [status];
+
+    if (additionalData.startDate) {
+      updates.push('start_date = ?');
+      values.push(additionalData.startDate);
+    }
+
+    if (additionalData.endDate) {
+      updates.push('end_date = ?');
+      values.push(additionalData.endDate);
+    }
+
+    if (additionalData.nextPaymentDate) {
+      updates.push('next_payment_date = ?');
+      values.push(additionalData.nextPaymentDate);
+    }
+
+    values.push(subscriptionId);
+
+    const [result] = await db.execute(
+      `UPDATE user_subscriptions SET ${updates.join(', ')} WHERE id = ?`,
+      values
+    );
+
     return result.affectedRows > 0;
+  }
+
+  // Cancelar suscripción
+  static async cancel(subscriptionId) {
+    return await this.updateStatus(subscriptionId, 'cancelled', {
+      endDate: new Date().toISOString().split('T')[0]
+    });
+  }
+
+  // Verificar si un usuario puede usar una característica según su plan
+  static async checkFeatureAccess(userId, featureName) {
+    const subscription = await this.getActiveByUserId(userId);
+    
+    if (!subscription) {
+      return false;
+    }
+
+    const features = JSON.parse(subscription.features || '{}');
+    return features[featureName] === true || features[featureName] === -1; // -1 significa ilimitado
+  }
+
+  // Obtener límite de una característica
+  static async getFeatureLimit(userId, featureName) {
+    const subscription = await this.getActiveByUserId(userId);
+    
+    if (!subscription) {
+      return 0;
+    }
+
+    const features = JSON.parse(subscription.features || '{}');
+    return features[featureName] || 0;
+  }
+
+  // Crear registro de pago
+  static async createPaymentRecord(paymentData) {
+    const {
+      subscriptionId,
+      mercadopagoPaymentId,
+      amount,
+      status,
+      paymentType,
+      paymentMethod,
+      statusDetail,
+      transactionDate
+    } = paymentData;
+
+    const [result] = await db.execute(
+      `INSERT INTO payment_history 
+       (subscription_id, mercadopago_payment_id, amount, status, payment_type, 
+        payment_method, status_detail, transaction_date) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [subscriptionId, mercadopagoPaymentId, amount, status, paymentType, 
+       paymentMethod, statusDetail, transactionDate]
+    );
+
+    return result.insertId;
+  }
+
+  // Obtener historial de pagos
+  static async getPaymentHistory(subscriptionId) {
+    const [rows] = await db.execute(
+      `SELECT * FROM payment_history 
+       WHERE subscription_id = ? 
+       ORDER BY transaction_date DESC`,
+      [subscriptionId]
+    );
+    return rows;
+  }
+
+  // Obtener historial de pagos por usuario
+  static async getPaymentHistoryByUser(userId) {
+    const [rows] = await db.execute(
+      `SELECT ph.*, s.plan_id, sp.name as plan_name, sp.plan_type
+       FROM payment_history ph
+       JOIN user_subscriptions s ON ph.subscription_id = s.id
+       JOIN subscription_plans sp ON s.plan_id = sp.id
+       WHERE s.user_id = ? 
+       ORDER BY ph.transaction_date DESC`,
+      [userId]
+    );
+    return rows;
+  }
+
+  // Crear registro de cambio de suscripción
+  static async createSubscriptionChange(changeData) {
+    const {
+      userId,
+      oldPlanId,
+      newPlanId,
+      changeType, // 'upgrade', 'downgrade', 'cancel', 'reactivate'
+      changeReason,
+      effectiveDate,
+      oldEndDate,
+      newEndDate
+    } = changeData;
+
+    const [result] = await db.execute(
+      `INSERT INTO subscription_changes 
+       (user_id, old_plan_id, new_plan_id, change_type, change_reason, 
+        effective_date, old_end_date, new_end_date, created_at) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+      [userId, oldPlanId, newPlanId, changeType, changeReason, 
+       effectiveDate, oldEndDate, newEndDate]
+    );
+
+    return result.insertId;
+  }
+
+  // Obtener historial de cambios de suscripción
+  static async getSubscriptionChanges(userId, limit = 50) {
+    const [rows] = await db.execute(
+      `SELECT sc.*, 
+              op.name as old_plan_name, op.plan_type as old_plan_type,
+              np.name as new_plan_name, np.plan_type as new_plan_type
+       FROM subscription_changes sc
+       LEFT JOIN subscription_plans op ON sc.old_plan_id = op.id
+       LEFT JOIN subscription_plans np ON sc.new_plan_id = np.id
+       WHERE sc.user_id = ?
+       ORDER BY sc.created_at DESC
+       LIMIT ?`,
+      [userId, limit]
+    );
+    return rows;
+  }
+
+  // Obtener analíticas de suscripciones (para admin)
+  static async getSubscriptionAnalytics(startDate = null, endDate = null) {
+    let dateFilter = '';
+    const params = [];
+    
+    if (startDate && endDate) {
+      dateFilter = 'WHERE s.created_at BETWEEN ? AND ?';
+      params.push(startDate, endDate);
+    }
+
+    const [stats] = await db.execute(
+      `SELECT 
+        COUNT(*) as total_subscriptions,
+        COUNT(CASE WHEN s.status = 'authorized' THEN 1 END) as active_subscriptions,
+        COUNT(CASE WHEN s.status = 'cancelled' THEN 1 END) as cancelled_subscriptions,
+        COUNT(CASE WHEN s.status = 'pending' THEN 1 END) as pending_subscriptions,
+        sp.name as plan_name,
+        sp.plan_type,
+        AVG(sp.price) as avg_plan_price,
+        SUM(sp.price) as total_revenue
+       FROM user_subscriptions s
+       JOIN subscription_plans sp ON s.plan_id = sp.id
+       ${dateFilter}
+       GROUP BY sp.id, sp.name, sp.plan_type`,
+      params
+    );
+
+    const [changes] = await db.execute(
+      `SELECT 
+        change_type,
+        COUNT(*) as change_count,
+        DATE(created_at) as change_date
+       FROM subscription_changes
+       ${dateFilter ? 'WHERE created_at BETWEEN ? AND ?' : ''}
+       GROUP BY change_type, DATE(created_at)
+       ORDER BY change_date DESC`,
+      dateFilter ? params : []
+    );
+
+    return { subscriptionStats: stats, changeStats: changes };
+  }
+
+  // Actualizar suscripción con registro de cambio
+  static async updateSubscriptionWithChange(userId, oldSubscription, newPlanId, changeType, changeReason = null) {
+    const connection = await db.getConnection();
+    
+    try {
+      await connection.beginTransaction();
+      
+      // Obtener información del nuevo plan
+      const [newPlanRows] = await connection.execute(
+        'SELECT * FROM subscription_plans WHERE id = ?',
+        [newPlanId]
+      );
+      const newPlan = newPlanRows[0];
+      
+      if (!newPlan) {
+        throw new Error('Plan no encontrado');
+      }
+      
+      // Crear registro de cambio
+      await connection.execute(
+        `INSERT INTO subscription_changes 
+         (user_id, old_plan_id, new_plan_id, change_type, change_reason, 
+          effective_date, old_end_date, new_end_date, created_at) 
+         VALUES (?, ?, ?, ?, ?, NOW(), ?, DATE_ADD(NOW(), INTERVAL 30 DAY), NOW())`,
+        [userId, oldSubscription ? oldSubscription.plan_id : null, newPlanId, 
+         changeType, changeReason, oldSubscription ? oldSubscription.end_date : null]
+      );
+      
+      // Cancelar suscripción anterior si existe
+      if (oldSubscription) {
+        await connection.execute(
+          'UPDATE user_subscriptions SET status = "cancelled", end_date = NOW() WHERE id = ?',
+          [oldSubscription.id]
+        );
+      }
+      
+      // Crear nueva suscripción
+      const [result] = await connection.execute(
+        `INSERT INTO user_subscriptions 
+         (user_id, plan_id, status, start_date, end_date, next_payment_date) 
+         VALUES (?, ?, 'pending', NOW(), DATE_ADD(NOW(), INTERVAL 30 DAY), DATE_ADD(NOW(), INTERVAL 30 DAY))`,
+        [userId, newPlanId]
+      );
+      
+      await connection.commit();
+      return result.insertId;
+      
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
   }
 }
 

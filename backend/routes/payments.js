@@ -1,43 +1,36 @@
 const express = require('express');
 const router = express.Router();
 const paymentController = require('../controllers/paymentController');
-const { authenticate, authorizeArtist, authorizeAdmin } = require('../middleware/auth');
-const { body } = require('express-validator');
-const { handleValidationErrors } = require('../middleware/validation');
+const { authenticate, authorizeArtist } = require('../middleware/auth');
 
-// Validation middleware
-const createSubscriptionValidation = [
-  body('planId').isInt({ min: 1 }).withMessage('Plan ID inválido'),
-  handleValidationErrors
-];
-
-const refundValidation = [
-  body('amount').optional().isFloat({ min: 1 }).withMessage('Monto inválido'),
-  body('reason').notEmpty().withMessage('Razón del reembolso es requerida'),
-  handleValidationErrors
-];
-
-// Public routes
+// Rutas públicas
 router.get('/plans', paymentController.getPlans);
 
-// Webhook endpoint (no authentication required)
-router.post('/webhooks/mercadopago', paymentController.handleWebhook);
+// Webhook de MercadoPago (sin autenticación)
+router.post('/webhook', paymentController.webhook);
 
-// Protected routes - require authentication
+// Rutas protegidas - requieren autenticación
 router.use(authenticate);
 
-// Subscription management
-router.get('/subscription', paymentController.getMySubscription);
-router.post('/subscription', authorizeArtist, createSubscriptionValidation, paymentController.createSubscription);
-router.delete('/subscription', authorizeArtist, paymentController.cancelSubscription);
+// Obtener suscripción activa
+router.get('/subscription/active', paymentController.getActiveSubscription);
 
-// Payment history
-router.get('/history', paymentController.getPaymentHistory);
-router.get('/payment/:paymentId', paymentController.getPaymentDetails);
-router.post('/payment/:paymentId/retry', paymentController.retryPayment);
+// Obtener historial de suscripciones
+router.get('/subscription/history', paymentController.getSubscriptionHistory);
 
-// Admin routes
-router.get('/stats', authorizeAdmin, paymentController.getPaymentStats);
-router.post('/payment/:paymentId/refund', authorizeAdmin, refundValidation, paymentController.createRefund);
+// Obtener historial de pagos del usuario
+router.get('/payments/history', paymentController.getPaymentHistory);
+
+// Obtener cambios de suscripción
+router.get('/subscription/changes', paymentController.getSubscriptionChanges);
+
+// Rutas para artistas solamente
+router.post('/subscription', authorizeArtist, paymentController.createSubscription);
+router.delete('/subscription/:subscriptionId', authorizeArtist, paymentController.cancelSubscription);
+router.get('/subscription/:subscriptionId/payments', authorizeArtist, paymentController.getPaymentHistory);
+
+// Utilidades para pagos
+router.post('/card-token', paymentController.createCardToken);
+router.post('/sync-plans', paymentController.syncPlans);
 
 module.exports = router;

@@ -57,9 +57,13 @@ export const authService = {
   logout: () => api.post('/auth/logout'),
   getProfile: () => api.get('/auth/profile'),
   updateProfile: (data) => api.put('/auth/profile', data),
+  completeProfile: (data) => api.post('/auth/complete-profile', data),
   forgotPassword: (email) => api.post('/auth/forgot-password', { email }),
   resetPassword: (token, password) => api.post('/auth/reset-password', { token, password }),
 };
+
+// Legacy alias for backwards compatibility
+export const authAPI = authService;
 
 // Catalog services
 export const catalogService = {
@@ -157,12 +161,12 @@ export const portfolioService = {
     const formData = new FormData();
     Object.entries(data).forEach(([key, value]) => {
       if (key === 'file') {
-        formData.append('file', value);
+        formData.append('media', value);
       } else {
         formData.append(key, value);
       }
     });
-    return api.post('/portfolio', formData, {
+    return api.post('/portfolio/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
@@ -170,6 +174,23 @@ export const portfolioService = {
   delete: (id) => api.delete(`/portfolio/${id}`),
   toggleFeatured: (id) => api.post(`/portfolio/${id}/feature`),
   incrementViews: (id) => api.post(`/portfolio/${id}/views`),
+};
+
+// Collection services
+export const collectionService = {
+  getAll: (artistId) => api.get(`/collections/${artistId || 'my'}`),
+  getById: (id) => api.get(`/collections/${id}`),
+  create: (data) => api.post('/collections', data),
+  update: (id, data) => api.put(`/collections/${id}`, data),
+  delete: (id) => api.delete(`/collections/${id}`),
+  addImage: (collectionId, imageId, sortOrder = 0) => 
+    api.post(`/collections/${collectionId}/images`, { imageId, sortOrder }),
+  removeImage: (collectionId, imageId) => 
+    api.delete(`/collections/${collectionId}/images/${imageId}`),
+  reorderCollections: (collectionOrders) => 
+    api.put('/collections/reorder', { collectionOrders }),
+  reorderImages: (collectionId, imageOrders) => 
+    api.put(`/collections/${collectionId}/images/reorder`, { imageOrders }),
 };
 
 // File upload service
@@ -191,13 +212,27 @@ export const paymentService = {
   getPlans: () => api.get('/payments/plans'),
   
   // Subscription management
-  getMySubscription: () => api.get('/payments/subscription'),
-  createSubscription: (planId) => api.post('/payments/subscription', { planId }),
-  cancelSubscription: () => api.delete('/payments/subscription'),
+  getActiveSubscription: () => api.get('/payments/subscription/active'),
+  getSubscriptionHistory: () => api.get('/payments/subscription/history'),
+  createSubscription: (data) => api.post('/payments/subscription', data),
+  cancelSubscription: (subscriptionId) => api.delete(`/payments/subscription/${subscriptionId}`),
   
-  // Payment history
-  getPaymentHistory: (page = 1, limit = 10) => 
-    api.get(`/payments/history?page=${page}&limit=${limit}`),
+  // Card tokenization
+  createCardToken: (data) => api.post('/payments/card-token', data),
+  
+  // Payment history for a specific subscription
+  getPaymentHistory: (subscriptionId) => 
+    api.get(`/payments/subscription/${subscriptionId}/payments`),
+    
+  // Get payment history for current user
+  getPaymentHistoryByUser: () => api.get('/payments/payments/history'),
+  
+  // Get subscription changes
+  getSubscriptionChanges: (limit = 50) => 
+    api.get(`/payments/subscription/changes?limit=${limit}`),
+  
+  // Legacy methods for compatibility
+  getMySubscription: () => api.get('/payments/subscription/active'),
   getPaymentDetails: (paymentId) => api.get(`/payments/payment/${paymentId}`),
   retryPayment: (paymentId) => api.post(`/payments/payment/${paymentId}/retry`),
   
@@ -210,6 +245,12 @@ export const paymentService = {
   },
   createRefund: (paymentId, amount, reason) => 
     api.post(`/payments/payment/${paymentId}/refund`, { amount, reason }),
+
+  // Email notifications
+  sendSubscriptionChangeEmail: (data) => 
+    api.post('/payments/subscription/send-change-email', data),
+  downloadInvoice: (paymentId) => 
+    api.get(`/payments/invoice/${paymentId}/download`, { responseType: 'blob' }),
 };
 
 // Statistics services
@@ -233,6 +274,7 @@ export const calendarService = {
   },
   getAppointmentById: (id) => api.get(`/calendar/appointments/${id}`),
   createAppointment: (data) => api.post('/calendar/appointments', data),
+  createStandaloneAppointment: (data) => api.post('/calendar/appointments/standalone', data),
   updateAppointment: (id, data) => api.put(`/calendar/appointments/${id}`, data),
   cancelAppointment: (id, reason) => api.put(`/calendar/appointments/${id}/cancel`, { cancellation_reason: reason }),
   completeAppointment: (id, data) => api.put(`/calendar/appointments/${id}/complete`, data),
@@ -394,6 +436,7 @@ export const subscriptionsAPI = {
   getInvoices: () => api.get('/subscriptions/invoices'),
   updatePaymentMethod: (data) => api.put('/subscriptions/payment-method', data),
 };
+
 
 // Default export
 export default api;

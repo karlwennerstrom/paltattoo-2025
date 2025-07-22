@@ -8,6 +8,25 @@ router.get('/artist', authenticate, authorizeArtist, async (req, res) => {
   try {
     const artistId = req.user.id;
     
+    // First check if the artist profile exists
+    const [artistCheck] = await db.execute(
+      'SELECT id FROM tattoo_artists WHERE user_id = ?',
+      [artistId]
+    );
+    
+    if (!artistCheck || artistCheck.length === 0) {
+      // Return default stats if no artist profile exists
+      return res.json({
+        totalProposals: 0,
+        acceptedProposals: 0,
+        totalAppointments: 0,
+        portfolioItems: 0,
+        averageRating: 0,
+        acceptanceRate: 0,
+        monthlyStats: []
+      });
+    }
+    
     // Get basic stats
     const [statsResults] = await db.execute(`
       SELECT 
@@ -20,10 +39,10 @@ router.get('/artist', authenticate, authorizeArtist, async (req, res) => {
         (SELECT COUNT(*) FROM appointments a 
          JOIN tattoo_artists ta ON a.artist_id = ta.id 
          WHERE ta.user_id = ?) as total_appointments,
-        (SELECT COUNT(*) FROM portfolio p 
+        (SELECT COUNT(*) FROM portfolio_images p 
          JOIN tattoo_artists ta ON p.artist_id = ta.id 
          WHERE ta.user_id = ?) as portfolio_items,
-        (SELECT AVG(rating) FROM reviews r 
+        (SELECT COALESCE(AVG(r.rating), 0) FROM reviews r 
          JOIN tattoo_artists ta ON r.artist_id = ta.id 
          WHERE ta.user_id = ?) as average_rating
     `, [artistId, artistId, artistId, artistId, artistId]);
@@ -44,13 +63,13 @@ router.get('/artist', authenticate, authorizeArtist, async (req, res) => {
     // Get monthly stats for the last 6 months
     const [monthlyResults] = await db.execute(`
       SELECT 
-        DATE_FORMAT(created_at, '%Y-%m') as month,
+        DATE_FORMAT(p.created_at, '%Y-%m') as month,
         COUNT(*) as count
       FROM proposals p
       JOIN tattoo_artists ta ON p.artist_id = ta.id
       WHERE ta.user_id = ? 
-        AND created_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
-      GROUP BY DATE_FORMAT(created_at, '%Y-%m')
+        AND p.created_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+      GROUP BY DATE_FORMAT(p.created_at, '%Y-%m')
       ORDER BY month DESC
     `, [artistId]);
     

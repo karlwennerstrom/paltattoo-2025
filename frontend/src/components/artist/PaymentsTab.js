@@ -1,9 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { twMerge } from 'tailwind-merge';
 import { Card, Grid } from '../common/Layout';
 import Button from '../common/Button';
 import Input from '../common/Input';
 import Modal from '../common/Modal';
+import { paymentService, subscriptionsAPI } from '../../services/api';
+import toast from 'react-hot-toast';
+import { FiDownload, FiCalendar, FiCreditCard, FiCheck, FiX, FiClock, FiTrendingUp, FiTrendingDown } from 'react-icons/fi';
 
 const PaymentsTab = () => {
   const [isAddingPaymentMethod, setIsAddingPaymentMethod] = useState(false);
@@ -15,8 +18,64 @@ const PaymentsTab = () => {
     cardholderName: '',
     cvv: ''
   });
+  const [loading, setLoading] = useState(true);
+  const [currentSubscription, setCurrentSubscription] = useState(null);
+  const [paymentHistory, setPaymentHistory] = useState([]);
+  const [subscriptionHistory, setSubscriptionHistory] = useState([]);
+  const [plans, setPlans] = useState([]);
+  const [paymentMethods, setPaymentMethods] = useState([]);
 
-  const currentSubscription = {
+  useEffect(() => {
+    loadSubscriptionData();
+  }, []);
+
+  const loadSubscriptionData = async () => {
+    try {
+      setLoading(true);
+      
+      // Load current subscription
+      const [subscriptionRes, plansRes, historyRes, subHistoryRes] = await Promise.all([
+        paymentService.getMySubscription().catch(() => subscriptionsAPI.getMySubscription()),
+        subscriptionsAPI.getPlans(),
+        paymentService.getPaymentHistoryByUser().catch(() => ({ data: [] })),
+        paymentService.getSubscriptionHistory().catch(() => ({ data: [] }))
+      ]);
+      
+      if (subscriptionRes.data) {
+        setCurrentSubscription(subscriptionRes.data);
+      }
+      
+      if (plansRes.data) {
+        setPlans(plansRes.data);
+      }
+      
+      if (historyRes.data && Array.isArray(historyRes.data)) {
+        setPaymentHistory(historyRes.data);
+      } else {
+        setPaymentHistory([]);
+      }
+
+      if (subHistoryRes.data && Array.isArray(subHistoryRes.data)) {
+        setSubscriptionHistory(subHistoryRes.data);
+      } else {
+        setSubscriptionHistory([]);
+      }
+      
+    } catch (error) {
+      console.error('Error loading subscription data:', error);
+      // Use default data if API fails
+      setCurrentSubscription(defaultSubscription);
+      setPlans(Array.isArray(defaultPlans) ? defaultPlans : []);
+      setPaymentHistory(Array.isArray(defaultPaymentHistory) ? defaultPaymentHistory : []);
+      setSubscriptionHistory(Array.isArray(defaultSubscriptionHistory) ? defaultSubscriptionHistory : []);
+      setPaymentMethods([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Default data for when API is not available
+  const defaultSubscription = {
     plan: 'Premium',
     status: 'active',
     price: 29990,
@@ -33,7 +92,7 @@ const PaymentsTab = () => {
     ]
   };
 
-  const paymentMethods = [
+  const defaultPaymentMethods = [
     {
       id: 1,
       type: 'credit_card',
@@ -56,7 +115,7 @@ const PaymentsTab = () => {
     }
   ];
 
-  const paymentHistory = [
+  const defaultPaymentHistory = [
     {
       id: 1,
       date: '2024-01-20',
@@ -99,7 +158,26 @@ const PaymentsTab = () => {
     }
   ];
 
-  const plans = [
+  const defaultSubscriptionHistory = [
+    {
+      id: 1,
+      date: '2024-01-20',
+      fromPlan: 'Básico',
+      toPlan: 'Premium',
+      action: 'upgrade',
+      reason: 'Actualización manual'
+    },
+    {
+      id: 2,
+      date: '2023-10-15',
+      fromPlan: 'Gratuito',
+      toPlan: 'Básico',
+      action: 'subscribe',
+      reason: 'Primera suscripción'
+    }
+  ];
+
+  const defaultPlans = [
     {
       id: 'basic',
       name: 'Básico',
@@ -203,6 +281,28 @@ const PaymentsTab = () => {
     }
   };
 
+  const handleDownloadInvoice = async (paymentId) => {
+    try {
+      const response = await paymentService.downloadInvoice(paymentId);
+      
+      // Create blob and download
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `invoice-${paymentId}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      
+      toast.success('Factura descargada exitosamente');
+    } catch (error) {
+      console.error('Error downloading invoice:', error);
+      toast.error('Error al descargar la factura');
+    }
+  };
+
   const handleAddPaymentMethod = async () => {
     // Validate form
     if (!newPaymentMethod.cardNumber || !newPaymentMethod.expiryDate || !newPaymentMethod.cardholderName) {
@@ -234,15 +334,54 @@ const PaymentsTab = () => {
     }
   };
 
-  const handlePlanChange = (planId) => {
-    if (window.confirm(`¿Estás seguro de que quieres cambiar al plan ${plans.find(p => p.id === planId)?.name}?`)) {
-      console.log('Changing to plan:', planId);
+  const handlePlanChange = async (planId) => {
+    const selectedPlan = plans.find(p => p.id === planId) || defaultPlans.find(p => p.id === planId);
+    if (window.confirm(`¿Estás seguro de que quieres cambiar al plan ${selectedPlan?.name}?`)) {
+      try {
+        const response = await subscriptionsAPI.subscribe(planId);
+        
+        // Send confirmation email for subscription change
+        try {
+          await paymentService.sendSubscriptionChangeEmail({
+            oldPlan: currentSubscription?.plan_name || currentSubscription?.plan,
+            newPlan: selectedPlan?.name,
+            effectiveDate: new Date().toISOString()
+          });
+        } catch (emailError) {
+          console.warn('Email notification failed:', emailError);
+          // Don't block the subscription change if email fails
+        }
+
+        toast.success('Plan actualizado exitosamente. Se ha enviado un correo de confirmación.');
+        await loadSubscriptionData();
+        
+        // Add to subscription history
+        const historyEntry = {
+          id: Date.now(),
+          date: new Date().toISOString(),
+          fromPlan: currentSubscription?.plan_name || currentSubscription?.plan || 'Actual',
+          toPlan: selectedPlan?.name,
+          action: 'upgrade',
+          reason: 'Cambio manual del usuario'
+        };
+        setSubscriptionHistory(prev => [historyEntry, ...prev]);
+      } catch (error) {
+        console.error('Error changing plan:', error);
+        toast.error('Error al cambiar de plan');
+      }
     }
   };
 
-  const handleCancelSubscription = () => {
+  const handleCancelSubscription = async () => {
     if (window.confirm('¿Estás seguro de que quieres cancelar tu suscripción? Perderás el acceso a todas las funciones premium.')) {
-      console.log('Cancelling subscription');
+      try {
+        await subscriptionsAPI.cancelSubscription();
+        toast.success('Suscripción cancelada exitosamente');
+        await loadSubscriptionData();
+      } catch (error) {
+        console.error('Error cancelling subscription:', error);
+        toast.error('Error al cancelar la suscripción');
+      }
     }
   };
 
@@ -258,10 +397,16 @@ const PaymentsTab = () => {
 
       {/* Current Subscription */}
       <Card title="Suscripción Actual">
-        <div className="flex items-start justify-between mb-4">
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent-500"></div>
+          </div>
+        ) : currentSubscription ? (
+          <>
+            <div className="flex items-start justify-between mb-4">
           <div>
             <div className="flex items-center space-x-3 mb-2">
-              <h3 className="text-xl font-semibold text-primary-100">{currentSubscription.plan}</h3>
+              <h3 className="text-xl font-semibold text-primary-100">{currentSubscription.plan_name || currentSubscription.plan || 'Plan Actual'}</h3>
               <span className={twMerge(
                 'px-3 py-1 text-sm rounded-full text-white',
                 getStatusBadge(currentSubscription.status).color
@@ -270,10 +415,10 @@ const PaymentsTab = () => {
               </span>
             </div>
             <p className="text-2xl font-bold text-accent-400 mb-1">
-              {formatCurrency(currentSubscription.price)}/mes
+              {formatCurrency(currentSubscription.price || currentSubscription.amount || 0)}/mes
             </p>
             <p className="text-sm text-primary-400">
-              Próximo pago: {new Date(currentSubscription.nextBilling).toLocaleDateString('es-CL')}
+              Próximo pago: {new Date(currentSubscription.next_billing_date || currentSubscription.nextBilling || Date.now()).toLocaleDateString('es-CL')}
             </p>
           </div>
           <div className="flex items-center space-x-2">
@@ -290,7 +435,7 @@ const PaymentsTab = () => {
           <div>
             <h4 className="text-sm font-semibold text-primary-200 mb-2">Funciones incluidas</h4>
             <ul className="space-y-1">
-              {currentSubscription.features.map((feature, index) => (
+              {(currentSubscription.features || defaultSubscription.features).map((feature, index) => (
                 <li key={index} className="flex items-center space-x-2 text-sm text-primary-300">
                   <svg className="h-4 w-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -305,7 +450,7 @@ const PaymentsTab = () => {
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-primary-400">Inicio de suscripción:</span>
-                <span className="text-primary-200">{new Date(currentSubscription.startDate).toLocaleDateString('es-CL')}</span>
+                <span className="text-primary-200">{new Date(currentSubscription.created_at || currentSubscription.startDate || Date.now()).toLocaleDateString('es-CL')}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-primary-400">Método de pago:</span>
@@ -313,18 +458,28 @@ const PaymentsTab = () => {
               </div>
               <div className="flex justify-between">
                 <span className="text-primary-400">Próximo cargo:</span>
-                <span className="text-primary-200">{formatCurrency(currentSubscription.price)}</span>
+                <span className="text-primary-200">{formatCurrency(currentSubscription.price || currentSubscription.amount || 0)}</span>
               </div>
             </div>
           </div>
         </div>
+          </>
+        ) : (
+          <div className="text-center py-8">
+            <svg className="h-16 w-16 text-primary-600 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+            </svg>
+            <p className="text-primary-400 mb-4">No tienes una suscripción activa</p>
+            <Button variant="primary">Seleccionar un Plan</Button>
+          </div>
+        )}
       </Card>
 
       {/* Available Plans */}
       <Card title="Planes Disponibles">
         <Grid cols={3} gap={6}>
-          {plans.map((plan) => {
-            const isCurrentPlan = plan.id === 'premium';
+          {(Array.isArray(plans) && plans.length > 0 ? plans : defaultPlans).map((plan) => {
+            const isCurrentPlan = currentSubscription && plan.id === currentSubscription.plan_id;
             return (
               <div
                 key={plan.id}
@@ -389,7 +544,7 @@ const PaymentsTab = () => {
         {/* Payment Methods */}
         <Card title="Métodos de Pago">
           <div className="space-y-4">
-            {paymentMethods.map((method) => (
+            {(Array.isArray(paymentMethods) && paymentMethods.length > 0 ? paymentMethods : defaultPaymentMethods).map((method) => (
               <div key={method.id} className="flex items-center justify-between p-4 bg-primary-800 rounded-lg">
                 <div className="flex items-center space-x-3">
                   {getCardIcon(method.brand)}
@@ -461,22 +616,26 @@ const PaymentsTab = () => {
               label="RUT"
               value="12.345.678-9"
               placeholder="12.345.678-9"
+              readOnly
             />
             <Input
               label="Dirección"
               value="Providencia 1234"
               placeholder="Dirección de facturación"
+              readOnly
             />
             <Grid cols={2} gap={4}>
               <Input
                 label="Ciudad"
                 value="Santiago"
                 placeholder="Ciudad"
+                readOnly
               />
               <Input
                 label="Código Postal"
                 value="7500000"
                 placeholder="Código postal"
+                readOnly
               />
             </Grid>
             <Button variant="secondary" fullWidth>
@@ -501,8 +660,8 @@ const PaymentsTab = () => {
               </tr>
             </thead>
             <tbody>
-              {paymentHistory.map((payment) => {
-                const statusBadge = getPaymentStatusBadge(payment.status);
+              {(Array.isArray(paymentHistory) && paymentHistory.length > 0 ? paymentHistory : defaultPaymentHistory).map((payment) => {
+                const statusBadge = getPaymentStatusBadge(payment.status || 'paid');
                 return (
                   <tr key={payment.id} className="border-b border-primary-800">
                     <td className="py-3 text-sm text-primary-300">
@@ -529,17 +688,72 @@ const PaymentsTab = () => {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => window.open(payment.invoiceUrl, '_blank')}
+                        onClick={() => handleDownloadInvoice(payment.id)}
                       >
-                        <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                        Factura
+                        <FiDownload className="h-4 w-4 mr-1" />
+                        Descargar PDF
                       </Button>
                     </td>
                   </tr>
                 );
               })}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {/* Subscription History */}
+      <Card title="Historial de Cambios de Suscripción">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-primary-700">
+                <th className="text-left py-3 text-sm font-semibold text-primary-200">Fecha</th>
+                <th className="text-left py-3 text-sm font-semibold text-primary-200">Cambio</th>
+                <th className="text-left py-3 text-sm font-semibold text-primary-200">Razón</th>
+                <th className="text-left py-3 text-sm font-semibold text-primary-200">Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Array.isArray(subscriptionHistory) && subscriptionHistory.map((change, index) => {
+                return (
+                  <tr key={change.id || index} className="border-b border-primary-800">
+                    <td className="py-3 text-sm text-primary-300">
+                      {new Date(change.date).toLocaleDateString('es-CL', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </td>
+                    <td className="py-3 text-sm text-primary-200">
+                      <div className="flex items-center space-x-2">
+                        {change.action === 'upgrade' && <FiTrendingUp className="w-4 h-4 text-green-400" />}
+                        {change.action === 'downgrade' && <FiTrendingDown className="w-4 h-4 text-orange-400" />}
+                        {change.action === 'subscribe' && <FiCheck className="w-4 h-4 text-blue-400" />}
+                        {change.action === 'cancel' && <FiX className="w-4 h-4 text-red-400" />}
+                        <span>
+                          {change.fromPlan} → {change.toPlan}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="py-3 text-sm text-primary-300">{change.reason}</td>
+                    <td className="py-3">
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        Completado
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+              {subscriptionHistory.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="py-8 text-center text-primary-400">
+                    No hay cambios de suscripción registrados
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

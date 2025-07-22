@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Perfil actualizado - PalTattoo</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: #333333;
+            background-color: #f8fafc;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            padding: 30px 20px;
+            text-align: center;
+            color: white;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 700;
+        }
+        .header .icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+            display: block;
+        }
+        .content {
+            padding: 30px 20px;
+        }
+        .greeting {
+            font-size: 18px;
+            margin-bottom: 20px;
+            color: #1f2937;
+        }
+        .message {
+            font-size: 16px;
+            margin-bottom: 25px;
+            color: #4b5563;
+        }
+        .info-box {
+            background-color: #f0fdf4;
+            border: 1px solid #86efac;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 25px 0;
+        }
+        .info-box h3 {
+            margin: 0 0 15px 0;
+            color: #16a34a;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        .info-item {
+            margin-bottom: 10px;
+            color: #374151;
+        }
+        .info-item strong {
+            color: #1f2937;
+        }
+        .security-notice {
+            background-color: #fef3c7;
+            border: 1px solid #fbbf24;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 25px 0;
+        }
+        .security-notice p {
+            margin: 0;
+            color: #92400e;
+            font-weight: 500;
+        }
+        .cta-button {
+            display: inline-block;
+            padding: 14px 28px;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white !important;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 16px;
+            text-align: center;
+            margin: 20px 0;
+            transition: transform 0.2s ease;
+        }
+        .cta-button:hover {
+            transform: translateY(-2px);
+        }
+        .footer {
+            background-color: #f9fafb;
+            padding: 20px;
+            text-align: center;
+            border-top: 1px solid #e5e7eb;
+        }
+        .footer p {
+            margin: 0;
+            color: #6b7280;
+            font-size: 14px;
+        }
+        .brand {
+            font-weight: 700;
+            color: #10b981;
+        }
+        @media only screen and (max-width: 600px) {
+            .container {
+                margin: 10px;
+                border-radius: 8px;
+            }
+            .content {
+                padding: 20px 15px;
+            }
+            .header {
+                padding: 25px 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <span class="icon">✅</span>
+            <h1>Perfil Actualizado</h1>
+        </div>
+        
+        <div class="content">
+            <p class="greeting">¡Hola {{userName}}!</p>
+            
+            <p class="message">
+                Te confirmamos que tu información de {{userType}} ha sido actualizada exitosamente en tu perfil de <span class="brand">PalTattoo</span>.
+            </p>
+            
+            <div class="info-box">
+                <h3>📝 Detalles de la actualización</h3>
+                <div class="info-item">
+                    <strong>Fecha:</strong> {{updateDate}}
+                </div>
+                <div class="info-item">
+                    <strong>Campos actualizados:</strong> {{changedFields}}
+                </div>
+            </div>
+            
+            <div class="security-notice">
+                <p>
+                    🔒 <strong>Nota de seguridad:</strong> Si no realizaste estos cambios, por favor contacta inmediatamente a nuestro equipo de soporte.
+                </p>
+            </div>
+            
+            <div style="text-align: center;">
+                <a href="{{dashboardUrl}}" class="cta-button">
+                    Ver mi perfil
+                </a>
+            </div>
+            
+            <p style="color: #6b7280; font-size: 14px; margin-top: 25px;">
+                Gracias por mantener tu perfil actualizado. Esto nos ayuda a brindarte una mejor experiencia y conectarte con las personas adecuadas.
+            </p>
+        </div>
+        
+        <div class="footer">
+            <p>
+                Si tienes alguna pregunta, puedes contactarnos en 
+                <a href="mailto:{{supportEmail}}" style="color: #10b981; text-decoration: none;">{{supportEmail}}</a>
+            </p>
+            <p style="margin-top: 10px;">
+                © 2024 <span class="brand">PalTattoo</span> - Conectando artistas y clientes
+            </p>
+        </div>
+    </div>
+</body>
+</html>

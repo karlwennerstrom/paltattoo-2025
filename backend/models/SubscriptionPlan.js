@@ -53,6 +53,19 @@ class SubscriptionPlan {
     return result.affectedRows > 0;
   }
 
+  static async getById(planId) {
+    return this.findById(planId);
+  }
+
+  static async updateMercadoPagoId(planId, mercadoPagoId) {
+    const [result] = await promisePool.execute(
+      'UPDATE subscription_plans SET mercadopago_plan_id = ? WHERE id = ?',
+      [mercadoPagoId, planId]
+    );
+    
+    return result.affectedRows > 0;
+  }
+
   static async getPopularPlans() {
     const [rows] = await promisePool.execute(
       `SELECT sp.*, COUNT(s.id) as subscriber_count
@@ -87,46 +100,49 @@ class SubscriptionPlan {
   static getDefaultPlans() {
     return [
       {
-        name: 'Básico',
-        description: 'Plan básico para tatuadores que están comenzando',
-        price: 9990,
+        name: 'basico',
+        description: 'Plan gratuito para tatuadores que están comenzando',
+        price: 0,
         billingCycle: 'monthly',
         features: [
-          'Hasta 5 propuestas por mes',
           'Perfil básico',
           'Galería de hasta 10 imágenes',
+          'Hasta 5 propuestas por mes',
+          'Sin acceso a calendario',
           'Soporte por email'
         ],
         isActive: true
       },
       {
-        name: 'Profesional',
-        description: 'Plan ideal para tatuadores establecidos',
-        price: 19990,
+        name: 'premium',
+        description: 'Plan ideal para tatuadores profesionales',
+        price: 3990,
         billingCycle: 'monthly',
         features: [
           'Propuestas ilimitadas',
           'Perfil destacado',
           'Galería ilimitada',
-          'Calendario de citas',
-          'Estadísticas avanzadas',
-          'Soporte prioritario'
+          'Calendario de citas completo',
+          'Estadísticas básicas',
+          'Soporte prioritario',
+          'Badge Premium'
         ],
         isActive: true
       },
       {
-        name: 'Estudio',
-        description: 'Plan para estudios de tatuajes con múltiples artistas',
-        price: 49990,
+        name: 'pro',
+        description: 'Plan avanzado para tatuadores establecidos',
+        price: 7990,
         billingCycle: 'monthly',
         features: [
-          'Múltiples perfiles de artistas',
-          'Gestión de equipo',
-          'Calendario compartido',
-          'Reportes detallados',
+          'Todo lo incluido en Premium',
+          'Múltiples calendarios',
+          'Estadísticas avanzadas',
           'Integración con redes sociales',
-          'Soporte dedicado',
-          'API access'
+          'API access',
+          'Soporte dedicado 24/7',
+          'Badge Pro',
+          'Promoción destacada en búsquedas'
         ],
         isActive: true
       }

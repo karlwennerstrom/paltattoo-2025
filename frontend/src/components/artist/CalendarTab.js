@@ -307,17 +307,16 @@ const CalendarTab = () => {
         client_phone: newAppointment.clientPhone,
         client_email: newAppointment.clientEmail,
         title: newAppointment.title,
-        type: newAppointment.type,
-        date: newAppointment.date,
+        appointment_date: newAppointment.date,
         start_time: newAppointment.startTime,
         end_time: endTime,
-        description: newAppointment.description,
-        price: parseInt(newAppointment.price) || 0,
-        duration: typeConfig.duration,
-        notes: newAppointment.notes
+        duration_hours: typeConfig.duration / 60, // Convert minutes to hours
+        estimated_price: parseInt(newAppointment.price) || null,
+        notes: newAppointment.notes,
+        location: null
       };
       
-      const response = await calendarService.createAppointment(appointmentData);
+      const response = await calendarService.createStandaloneAppointment(appointmentData);
       
       if (response.data) {
         toast.success('Cita creada exitosamente');

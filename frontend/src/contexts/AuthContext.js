@@ -26,14 +26,20 @@ export const AuthProvider = ({ children }) => {
         const token = localStorage.getItem('authToken');
         if (token) {
           const response = await authService.getProfile();
-          setUser(response.data);
+          // Extract user data from response
+          const userData = response.data.user || response.data;
+          setUser(userData);
+          // Update localStorage with correct user data
+          localStorage.setItem('user', JSON.stringify(userData));
         } else {
           // Auto-login for development
           console.log('No token found, attempting auto-login...');
           const autoLoginSuccess = await autoLoginForDev();
           if (autoLoginSuccess) {
             const response = await authService.getProfile();
-            setUser(response.data);
+            const userData = response.data.user || response.data;
+            setUser(userData);
+            localStorage.setItem('user', JSON.stringify(userData));
           }
         }
       } catch (error) {
@@ -187,9 +193,9 @@ export const AuthProvider = ({ children }) => {
     resetPassword,
     getAuthHeader,
     isAuthenticated: !!user,
-    isArtist: user?.userType === 'artist',
-    isClient: user?.userType === 'client',
-    isAdmin: user?.userType === 'admin',
+    isArtist: user?.userType === 'artist' || user?.user_type === 'artist',
+    isClient: user?.userType === 'client' || user?.user_type === 'client',
+    isAdmin: user?.userType === 'admin' || user?.user_type === 'admin',
   };
 
   return (

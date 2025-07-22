@@ -9,14 +9,14 @@ class CalendarController {
   // Get all appointments for an artist or client
   static async getAppointments(req, res) {
     try {
-      const { type } = req.user;
+      const userType = req.user.user_type;
       const userId = req.user.id;
       
       const filters = {};
       
-      if (type === 'artist') {
+      if (userType === 'artist') {
         filters.artist_id = userId;
-      } else if (type === 'client') {
+      } else if (userType === 'client') {
         filters.client_id = userId;
       }
       
@@ -118,7 +118,7 @@ class CalendarController {
       }
       
       // Only artist can create appointments
-      if (req.user.type !== 'artist' || proposal.artist_id !== req.user.id) {
+      if (req.user.user_type !== 'artist' || proposal.artist_id !== req.user.id) {
         return res.status(403).json({
           success: false,
           message: 'No tienes permisos para crear esta cita'
@@ -191,6 +191,130 @@ class CalendarController {
     }
   }
 
+  // Create standalone appointment (without proposal)
+  static async createStandaloneAppointment(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Datos inválidos',
+          errors: errors.array()
+        });
+      }
+      
+      const { 
+        appointment_date, 
+        start_time, 
+        end_time, 
+        duration_hours,
+        title,
+        client_name,
+        client_email,
+        client_phone,
+        notes, 
+        location, 
+        estimated_price, 
+        deposit_amount 
+      } = req.body;
+      
+      // Only artists can create appointments
+      if (req.user.user_type !== 'artist') {
+        return res.status(403).json({
+          success: false,
+          message: 'Solo los artistas pueden crear citas'
+        });
+      }
+      
+      // Check for conflicts
+      const conflicts = await Appointment.checkConflicts(
+        req.user.id, 
+        appointment_date, 
+        start_time, 
+        end_time
+      );
+      
+      if (conflicts.length > 0) {
+        return res.status(409).json({
+          success: false,
+          message: 'Ya tienes una cita programada en este horario',
+          conflicts
+        });
+      }
+      
+      // Create appointment data
+      const appointmentData = {
+        artist_id: req.user.id,
+        client_id: null, // External client (not in system)
+        proposal_id: null, // Standalone appointment
+        appointment_date,
+        start_time,
+        end_time,
+        duration_hours,
+        title,
+        client_name,
+        client_email,
+        client_phone,
+        status: 'scheduled',
+        notes: notes || null,
+        location: location || null,
+        estimated_price: estimated_price || null,
+        deposit_amount: deposit_amount || null,
+        deposit_paid: false
+      };
+      
+      const appointmentId = await Appointment.create(appointmentData);
+      const appointment = await Appointment.findById(appointmentId);
+      
+      // Send notifications (email to client if email provided)
+      if (client_email && emailService) {
+        try {
+          await emailService.sendAppointmentConfirmation({
+            email: client_email,
+            clientName: client_name,
+            appointmentDate: appointment_date,
+            startTime: start_time,
+            endTime: end_time,
+            artistName: `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim() || 'Tu Artista',
+            title: title,
+            location: location,
+            notes: notes
+          });
+        } catch (emailError) {
+          console.error('Error sending appointment email:', emailError);
+          // Don't fail the appointment creation if email fails
+        }
+      }
+
+      // Send in-app notification to artist (confirmation of created appointment)
+      try {
+        // This could be extended to use a real-time notification system like Socket.io
+        console.log(`[NOTIFICATION] New appointment created for artist ${req.user.id}:`, {
+          title,
+          clientName: client_name,
+          date: appointment_date,
+          time: `${start_time} - ${end_time}`,
+          appointmentId: appointmentId
+        });
+      } catch (notificationError) {
+        console.error('Error sending in-app notification:', notificationError);
+      }
+      
+      res.status(201).json({
+        success: true,
+        message: 'Cita creada exitosamente',
+        data: appointment
+      });
+    } catch (error) {
+      console.error('Error creating standalone appointment:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al crear la cita',
+        error: error.message
+      });
+    }
+  }
+
   // Update appointment
   static async updateAppointment(req, res) {
     try {
@@ -223,7 +347,7 @@ class CalendarController {
       
       // Some fields can only be updated by artist
       const artistOnlyFields = ['appointment_date', 'start_time', 'end_time', 'duration_hours', 'estimated_price', 'deposit_amount'];
-      if (req.user.type === 'client') {
+      if (req.user.user_type === 'client') {
         for (const field of artistOnlyFields) {
           if (req.body[field] !== undefined) {
             return res.status(403).json({
@@ -333,6 +457,43 @@ class CalendarController {
     }
   }
 
+  // Get my own availability (for artists)
+  static async getMyAvailability(req, res) {
+    try {
+      if (req.user.user_type !== 'artist') {
+        return res.status(403).json({
+          success: false,
+          message: 'Solo los artistas pueden ver su disponibilidad'
+        });
+      }
+      
+      // Get the artist record to get the artist_id
+      const TattooArtist = require('../models/TattooArtist');
+      const artist = await TattooArtist.findByUserId(req.user.id);
+      
+      if (!artist) {
+        return res.status(404).json({
+          success: false,
+          message: 'Perfil de artista no encontrado'
+        });
+      }
+      
+      const availability = await Availability.findByArtistId(artist.id);
+      
+      res.json({
+        success: true,
+        data: availability
+      });
+    } catch (error) {
+      console.error('Error getting my availability:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al obtener la disponibilidad',
+        error: error.message
+      });
+    }
+  }
+
   // Get artist availability
   static async getAvailability(req, res) {
     try {
@@ -356,7 +517,7 @@ class CalendarController {
   // Update artist availability (only for artists)
   static async updateAvailability(req, res) {
     try {
-      if (req.user.type !== 'artist') {
+      if (req.user.user_type !== 'artist') {
         return res.status(403).json({
           success: false,
           message: 'Solo los artistas pueden actualizar su disponibilidad'
@@ -423,7 +584,7 @@ class CalendarController {
     try {
       const { days = 7 } = req.query;
       
-      if (req.user.type !== 'artist') {
+      if (req.user.user_type !== 'artist') {
         return res.status(403).json({
           success: false,
           message: 'Solo los artistas pueden ver sus próximas citas'
@@ -449,7 +610,7 @@ class CalendarController {
   // Get appointment statistics
   static async getAppointmentStats(req, res) {
     try {
-      if (req.user.type !== 'artist') {
+      if (req.user.user_type !== 'artist') {
         return res.status(403).json({
           success: false,
           message: 'Solo los artistas pueden ver sus estadísticas'
@@ -488,7 +649,7 @@ class CalendarController {
       }
       
       // Only artist can mark as completed
-      if (req.user.type !== 'artist' || appointment.artist_id !== req.user.id) {
+      if (req.user.user_type !== 'artist' || appointment.artist_id !== req.user.id) {
         return res.status(403).json({
           success: false,
           message: 'Solo el artista puede marcar la cita como completada'

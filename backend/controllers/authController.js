@@ -39,22 +39,28 @@ const register = async (req, res) => {
     });
     
     if (userType === 'artist') {
-      await TattooArtist.create({ 
-        userId,
-        studioName: null,
-        comunaId: null,
-        address: null,
-        yearsExperience: 0,
-        minPrice: null,
-        maxPrice: null,
-        instagramUrl: null
-      });
+      const existingArtist = await TattooArtist.findByUserId(userId);
+      if (!existingArtist) {
+        await TattooArtist.create({ 
+          userId,
+          studioName: null,
+          comunaId: null,
+          address: null,
+          yearsExperience: 0,
+          minPrice: null,
+          maxPrice: null,
+          instagramUrl: null
+        });
+      }
     } else if (userType === 'client') {
-      await Client.create({ 
-        userId,
-        comunaId: null,
-        birthDate: null
-      });
+      const existingClient = await Client.findByUserId(userId);
+      if (!existingClient) {
+        await Client.create({ 
+          userId,
+          comunaId: null,
+          birthDate: null
+        });
+      }
     }
     
     const token = generateToken(userId, userType);
@@ -73,6 +79,7 @@ const register = async (req, res) => {
         id: user.id,
         email: user.email,
         userType: user.user_type,
+        user_type: user.user_type, // Keep both for compatibility
         firstName: user.first_name,
         lastName: user.last_name,
         phone: user.phone,
@@ -109,10 +116,17 @@ const login = async (req, res) => {
         id: profile.id,
         email: profile.email,
         userType: profile.user_type,
+        user_type: profile.user_type, // Keep both for compatibility
         firstName: profile.first_name,
         lastName: profile.last_name,
         phone: profile.phone,
-        profileImage: profile.profile_image
+        profileImage: profile.profile_image,
+        subscription: profile.subscription_plan_name ? {
+          planId: profile.subscription_plan_id,
+          planName: profile.subscription_plan_name,
+          status: profile.subscription_status,
+          price: profile.subscription_plan_price
+        } : null
       },
       token
     });
@@ -131,11 +145,18 @@ const getProfile = async (req, res) => {
         id: profile.id,
         email: profile.email,
         userType: profile.user_type,
+        user_type: profile.user_type, // Keep both for compatibility
         firstName: profile.first_name,
         lastName: profile.last_name,
         phone: profile.phone,
         bio: profile.bio,
-        profileImage: profile.profile_image
+        profileImage: profile.profile_image,
+        subscription: profile.subscription_plan_name ? {
+          planId: profile.subscription_plan_id,
+          planName: profile.subscription_plan_name,
+          status: profile.subscription_status,
+          price: profile.subscription_plan_price
+        } : null
       }
     });
   } catch (error) {
@@ -169,6 +190,7 @@ const updateProfile = async (req, res) => {
         id: profile.id,
         email: profile.email,
         userType: profile.user_type,
+        user_type: profile.user_type, // Keep both for compatibility
         firstName: profile.first_name,
         lastName: profile.last_name,
         phone: profile.phone,
@@ -214,7 +236,23 @@ const googleCallback = (req, res, next) => {
     }
     
     try {
-      // Generate JWT token
+      // Check if user needs to complete profile
+      let isCompleted = await User.isProfileCompleted(user.id);
+      
+      // If profile is not marked as completed but user has a type, fix it
+      if (!isCompleted && user.user_type) {
+        console.log(`Profile completion issue detected for user ${user.id}, attempting to fix...`);
+        await User.fixIncompleteProfiles();
+        isCompleted = await User.isProfileCompleted(user.id);
+      }
+      
+      if (!isCompleted) {
+        // Generate temporary token for profile completion
+        const tempToken = generateToken(user.id, 'incomplete');
+        return res.redirect(`${process.env.FRONTEND_URL}/complete-profile?token=${tempToken}`);
+      }
+      
+      // Generate JWT token for completed profile
       const token = generateToken(user.id, user.user_type);
       
       // Redirect to frontend with token
@@ -283,6 +321,89 @@ const resetPassword = async (req, res) => {
   }
 };
 
+const completeProfile = async (req, res) => {
+  try {
+    const { userType, firstName, lastName, phone, bio } = req.body;
+    
+    if (!userType || !['client', 'artist'].includes(userType)) {
+      return res.status(400).json({ error: 'Tipo de usuario inválido' });
+    }
+    
+    if (!firstName || !lastName) {
+      return res.status(400).json({ error: 'Nombre y apellido son requeridos' });
+    }
+    
+    // Complete the profile
+    const success = await User.completeGoogleProfile(req.user.id, {
+      userType,
+      firstName,
+      lastName,
+      phone,
+      bio
+    });
+    
+    if (!success) {
+      return res.status(400).json({ error: 'Error al completar perfil' });
+    }
+    
+    // Create artist or client specific record if it doesn't exist
+    if (userType === 'artist') {
+      const existingArtist = await TattooArtist.findByUserId(req.user.id);
+      if (!existingArtist) {
+        await TattooArtist.create({ 
+          userId: req.user.id,
+          studioName: null,
+          comunaId: null,
+          address: null,
+          yearsExperience: 0,
+          minPrice: null,
+          maxPrice: null,
+          instagramUrl: null
+        });
+      }
+    } else if (userType === 'client') {
+      const existingClient = await Client.findByUserId(req.user.id);
+      if (!existingClient) {
+        await Client.create({ 
+          userId: req.user.id,
+          comunaId: null,
+          birthDate: null
+        });
+      }
+    }
+    
+    // Generate new token with correct user type
+    const token = generateToken(req.user.id, userType);
+    const profile = await User.getProfile(req.user.id);
+    
+    // Send welcome email
+    emailService.sendWelcome({
+      email: profile.email,
+      firstName: profile.first_name,
+      type: profile.user_type
+    }).catch(err => console.error('Welcome email error:', err));
+    
+    res.json({
+      message: 'Perfil completado exitosamente',
+      user: {
+        id: profile.id,
+        email: profile.email,
+        userType: profile.user_type,
+        user_type: profile.user_type, // Keep both for compatibility
+        firstName: profile.first_name,
+        lastName: profile.last_name,
+        phone: profile.phone,
+        bio: profile.bio,
+        profileImage: profile.profile_image
+      },
+      token
+    });
+  } catch (error) {
+    console.error('Complete profile error:', error);
+    res.status(500).json({ error: 'Error al completar perfil' });
+  }
+};
+
 module.exports = {
   register: [registerValidation, handleValidationErrors, register],
   login: [loginValidation, handleValidationErrors, login],
@@ -291,6 +412,7 @@ module.exports = {
   updateProfile,
   googleAuth,
   googleCallback,
+  completeProfile,
   forgotPassword,
   resetPassword
 };

@@ -124,15 +124,16 @@ const Modal = ({
   const modalClasses = twMerge(
     'relative w-full',
     sizes[size],
-    'bg-white rounded-lg shadow-xl',
+    'bg-background-card rounded-lg shadow-neon',
     'transform transition-all duration-300',
     'max-h-[90vh] flex flex-col',
+    'border border-border',
     className
   );
 
   const headerClasses = twMerge(
     'flex items-center justify-between',
-    'px-6 py-4 border-b border-gray-200',
+    'px-6 py-4 border-b border-border',
     'flex-shrink-0',
     headerClassName
   );
@@ -143,7 +144,7 @@ const Modal = ({
   );
 
   const footerClasses = twMerge(
-    'px-6 py-4 border-t border-gray-200',
+    'px-6 py-4 border-t border-border',
     'flex justify-end space-x-2',
     'flex-shrink-0',
     footerClassName
@@ -187,7 +188,7 @@ const Modal = ({
             {title && (
               <h2 
                 id="modal-title"
-                className="text-lg font-semibold text-gray-900"
+                className="text-lg font-semibold text-white"
               >
                 {title}
               </h2>
@@ -195,7 +196,7 @@ const Modal = ({
             {showCloseButton && (
               <button
                 type="button"
-                className="text-gray-400 hover:text-gray-600 transition-colors"
+                className="text-gray-400 hover:text-accent-500 transition-colors"
                 onClick={onClose}
                 aria-label="Cerrar modal"
               >
@@ -290,7 +291,7 @@ export const ConfirmModal = ({
       size="sm"
       {...props}
     >
-      <p className="text-sm text-gray-500">
+      <p className="text-sm text-gray-300">
         {message}
       </p>
     </Modal>

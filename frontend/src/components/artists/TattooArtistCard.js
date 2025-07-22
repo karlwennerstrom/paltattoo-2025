@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { twMerge } from 'tailwind-merge';
 import Button from '../common/Button';
+import SubscriptionBadge from '../common/SubscriptionBadge';
 import { getProfileImageUrl, getTattooImageUrl } from '../../utils/imageHelpers';
 
 const TattooArtistCard = ({ artist, onFavorite, onContact, className = '' }) => {
@@ -99,9 +100,15 @@ const TattooArtistCard = ({ artist, onFavorite, onContact, className = '' }) => 
               )}
             </div>
             <div className="flex-1">
-              <h3 className="text-lg font-semibold text-primary-100 hover:text-accent-400 transition-colors">
-                {artist.name}
-              </h3>
+              <div className="flex items-center space-x-2 mb-1">
+                <h3 className="text-lg font-semibold text-primary-100 hover:text-accent-400 transition-colors">
+                  {artist.name}
+                </h3>
+                <SubscriptionBadge 
+                  subscriptionType={artist.subscriptionType || artist.subscription?.plan_type} 
+                  size="xs" 
+                />
+              </div>
               <p className="text-sm text-primary-400">{getLocationDisplay(artist.location)}</p>
               <div className="flex items-center space-x-1 mt-1">
                 {getRatingStars(artist.rating || 5)}

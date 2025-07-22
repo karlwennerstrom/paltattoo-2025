@@ -6,6 +6,7 @@ import { useAuth } from './contexts/AuthContext';
 // Auth pages
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
+import CompleteProfile from './pages/auth/CompleteProfile';
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
 import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 import AuthCallback from './pages/auth/AuthCallback';
@@ -21,13 +22,7 @@ import FavoritesPage from './pages/client/FavoritesPage';
 import MyAppointmentsPage from './pages/client/MyAppointmentsPage';
 
 // Artist pages
-// import ArtistDashboard from './components/artist/ArtistDashboard';
-import ArtistOverview from './components/artist/pages/ArtistOverview';
-import ArtistPortfolio from './components/artist/pages/ArtistPortfolio';
-import ArtistProposals from './components/artist/pages/ArtistProposals';
-import ArtistCalendar from './components/artist/pages/ArtistCalendar';
-import ArtistAnalytics from './components/artist/pages/ArtistAnalytics';
-import ArtistSubscription from './components/artist/pages/ArtistSubscription';
+import ArtistDashboard from './components/artist/ArtistDashboard';
 
 // Shared components
 import DashboardLayout from './components/shared/DashboardLayout';
@@ -75,6 +70,11 @@ import SafetyQualityPage from './pages/SafetyQualityPage';
 import TattooAftercarePage from './pages/TattooAftercarePage';
 import InspirationGalleryPage from './pages/InspirationGalleryPage';
 
+// Subscription pages
+import SubscriptionSuccess from './pages/SubscriptionSuccess';
+import SubscriptionFailure from './pages/SubscriptionFailure';
+import SubscriptionPending from './pages/SubscriptionPending';
+
 // Layout components
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
@@ -107,6 +107,7 @@ function App() {
           <Route path="/" element={<PageWrapper fullScreen><HomePage /></PageWrapper>} />
           <Route path="/login" element={<PageWrapper><Login /></PageWrapper>} />
           <Route path="/register" element={<PageWrapper><Register /></PageWrapper>} />
+          <Route path="/complete-profile" element={<PageWrapper><CompleteProfile /></PageWrapper>} />
           <Route path="/forgot-password" element={<PageWrapper><ForgotPasswordPage /></PageWrapper>} />
           <Route path="/reset-password" element={<PageWrapper><ResetPasswordPage /></PageWrapper>} />
           <Route path="/auth/callback" element={<PageWrapper><AuthCallback /></PageWrapper>} />
@@ -115,6 +116,11 @@ function App() {
           <Route path="/offers/:id" element={<PageWrapper><OfferDetailPage /></PageWrapper>} />
           <Route path="/shops" element={<PageWrapper><ShopsListPage /></PageWrapper>} />
           <Route path="/shops/:id" element={<PageWrapper><ShopDetailPage /></PageWrapper>} />
+          
+          {/* Subscription result pages */}
+          <Route path="/subscription/success" element={<PageWrapper><SubscriptionSuccess /></PageWrapper>} />
+          <Route path="/subscription/failure" element={<PageWrapper><SubscriptionFailure /></PageWrapper>} />
+          <Route path="/subscription/pending" element={<PageWrapper><SubscriptionPending /></PageWrapper>} />
           
           {/* Static pages */}
           <Route path="/about" element={<PageWrapper><AboutPage /></PageWrapper>} />
@@ -164,17 +170,14 @@ function App() {
           {/* Protected artist routes */}
           <Route path="/artist" element={
             <ProtectedRoute requiredRole="artist">
-              <DashboardLayout />
+              <ArtistDashboard />
             </ProtectedRoute>
-          }>
-            <Route index element={<Navigate to="/artist/dashboard" replace />} />
-            <Route path="dashboard" element={<ArtistOverview />} />
-            <Route path="portfolio" element={<ArtistPortfolio />} />
-            <Route path="proposals" element={<ArtistProposals />} />
-            <Route path="calendar" element={<ArtistCalendar />} />
-            <Route path="analytics" element={<ArtistAnalytics />} />
-            <Route path="subscription" element={<ArtistSubscription />} />
-          </Route>
+          } />
+          <Route path="/artist/*" element={
+            <ProtectedRoute requiredRole="artist">
+              <ArtistDashboard />
+            </ProtectedRoute>
+          } />
           <Route path="/proposals/send/:offerId" element={
             <ProtectedRoute requiredRole="artist">
               <PageWrapper><SendProposalPage /></PageWrapper>

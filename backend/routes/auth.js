@@ -14,6 +14,7 @@ router.put('/profile', authenticate, uploadProfile.single('profileImage'), authC
 // Google OAuth routes
 router.get('/google', authController.googleAuth);
 router.get('/google/callback', authController.googleCallback);
+router.post('/complete-profile', authenticate, authController.completeProfile);
 
 // Password reset routes
 router.post('/forgot-password', authController.forgotPassword);

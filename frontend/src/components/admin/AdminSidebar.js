@@ -9,10 +9,12 @@ import {
   FiBarChart2,
   FiSettings,
   FiTag,
-  FiMessageSquare
+  FiMessageSquare,
+  FiX
 } from 'react-icons/fi';
+import { twMerge } from 'tailwind-merge';
 
-const AdminSidebar = () => {
+const AdminSidebar = ({ isOpen, onClose }) => {
   const location = useLocation();
 
   const menuItems = [
@@ -40,18 +42,30 @@ const AdminSidebar = () => {
   const isActive = (path) => location.pathname === path;
 
   return (
-    <div className="w-64 bg-black border-r border-gray-800 h-screen flex flex-col">
+    <aside className={twMerge(
+      'fixed inset-y-0 left-0 z-50 w-72 bg-black border-r border-gray-800 transform transition-transform duration-200 ease-in-out lg:translate-x-0 lg:static lg:inset-0 lg:w-64 flex flex-col h-screen',
+      isOpen ? 'translate-x-0' : '-translate-x-full'
+    )}>
       {/* Logo/Header */}
       <div className="px-6 py-5 border-b border-gray-800">
-        <Link to="/admin/dashboard" className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-accent-500 to-accent-600 rounded-xl flex items-center justify-center shadow-lg">
-            <span className="text-white font-bold text-lg">P</span>
-          </div>
-          <div>
-            <h2 className="text-white font-semibold text-sm">PalTattoo</h2>
-            <p className="text-xs text-gray-400">Panel Admin</p>
-          </div>
-        </Link>
+        <div className="flex items-center justify-between">
+          <Link to="/admin/dashboard" className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-accent-500 to-accent-600 rounded-xl flex items-center justify-center shadow-lg">
+              <span className="text-white font-bold text-lg">P</span>
+            </div>
+            <div>
+              <h2 className="text-white font-semibold text-sm">PalTattoo</h2>
+              <p className="text-xs text-gray-400">Panel Admin</p>
+            </div>
+          </Link>
+          {/* Mobile close button */}
+          <button 
+            className="lg:hidden text-gray-400 hover:text-white p-1"
+            onClick={onClose}
+          >
+            <FiX size={20} />
+          </button>
+        </div>
       </div>
 
       {/* Navigation */}
@@ -70,6 +84,12 @@ const AdminSidebar = () => {
                   <Link
                     key={item.path}
                     to={item.path}
+                    onClick={() => {
+                      // Close sidebar on mobile when link is clicked
+                      if (onClose && window.innerWidth < 1024) {
+                        onClose();
+                      }
+                    }}
                     className={`
                       flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 group
                       ${active 
@@ -100,7 +120,7 @@ const AdminSidebar = () => {
           </div>
         </div>
       </div>
-    </div>
+    </aside>
   );
 };
 

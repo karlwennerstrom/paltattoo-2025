@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { artistService, profileService, portfolioService, paymentService } from '../../../services/api';
+import { artistService, profileService, portfolioService, paymentService, statsService } from '../../../services/api';
 import { 
   FiUsers, 
   FiEye, 
@@ -69,6 +69,18 @@ const ArtistOverview = () => {
         }
       };
 
+      // Check authentication first
+      console.log('Auth token available:', !!token);
+      
+      if (!token) {
+        console.log('No authentication token found, using mock data');
+        setStats(mockData.artistStatsRes.data);
+        setProposals(mockData.proposalsRes.data || []);
+        setAppointments(mockData.appointmentsRes.data || []);
+        generateRecentActivity(mockData.proposalsRes.data || [], mockData.appointmentsRes.data || []);
+        return;
+      }
+      
       // Try to load real data, but fallback to mock data
       const [
         artistStatsRes,
@@ -76,19 +88,17 @@ const ArtistOverview = () => {
         appointmentsRes,
         subscriptionRes
       ] = await Promise.all([
-        artistService.getStats().catch((error) => {
+        statsService.getArtistStats().catch((error) => {
           console.log('Stats API error:', error.response?.status || error.message);
-          const token = localStorage.getItem('authToken');
-          if (!token) {
-            console.log('Using mock stats data - no auth token');
+          if (error.response?.status === 401) {
+            console.log('Authentication failed, using mock data');
             return mockData.artistStatsRes;
           }
-          console.log('Stats API failed but user is authenticated, using default stats');
+          console.log('Stats API failed, using default stats');
           return { data: { profile_views: 0, total_likes: 0, monthly_earnings: 0, portfolio_count: 0 } };
         }),
         profileService.getMyProposals().catch((error) => {
           console.log('Proposals API error:', error.response?.status || error.message);
-          const token = localStorage.getItem('authToken');
           if (!token) {
             console.log('Using mock proposals data - no auth token');
             return mockData.proposalsRes;
@@ -98,7 +108,6 @@ const ArtistOverview = () => {
         }),
         profileService.getAppointments().catch((error) => {
           console.log('Appointments API error:', error.response?.status || error.message);
-          const token = localStorage.getItem('authToken');
           if (!token) {
             console.log('Using mock appointments data - no auth token');
             return mockData.appointmentsRes;
@@ -108,7 +117,6 @@ const ArtistOverview = () => {
         }),
         paymentService.getMySubscription().catch((error) => {
           console.log('Subscription API error:', error.response?.status || error.message);
-          const token = localStorage.getItem('authToken');
           if (!token) {
             console.log('Using mock subscription data - no auth token');
             return mockData.subscriptionRes;

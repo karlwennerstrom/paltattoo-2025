@@ -4,15 +4,15 @@ class Portfolio {
   static async create(portfolioData) {
     const { 
       artistId, imageUrl, title, description, styleId, isFeatured, 
-      mediaType, thumbnailUrl, duration, fileSize 
+      mediaType, thumbnailUrl, duration, fileSize, category 
     } = portfolioData;
     
     const [result] = await promisePool.execute(
       `INSERT INTO portfolio_images 
-       (artist_id, image_url, title, description, style_id, is_featured, media_type, thumbnail_url, duration, file_size)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [artistId, imageUrl, title, description, styleId, isFeatured || false, 
-       mediaType || 'image', thumbnailUrl, duration, fileSize]
+       (artist_id, image_url, title, description, style_id, is_featured, media_type, thumbnail_url, duration, file_size, category)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [artistId, imageUrl || null, title || null, description || null, styleId || null, isFeatured || false, 
+       mediaType || 'image', thumbnailUrl || null, duration || null, fileSize || null, category || null]
     );
     
     return result.insertId;
@@ -54,11 +54,23 @@ class Portfolio {
     const fields = [];
     const values = [];
     
-    const allowedFields = ['title', 'description', 'style_id', 'is_featured'];
+    const fieldMapping = {
+      'title': 'title',
+      'description': 'description', 
+      'styleId': 'style_id',
+      'isFeatured': 'is_featured',
+      'imageUrl': 'image_url',
+      'thumbnailUrl': 'thumbnail_url',
+      'mediaType': 'media_type',
+      'duration': 'duration',
+      'fileSize': 'file_size',
+      'category': 'category'
+    };
     
     Object.entries(updateData).forEach(([key, value]) => {
-      if (allowedFields.includes(key) && value !== undefined) {
-        fields.push(`${key} = ?`);
+      const dbField = fieldMapping[key];
+      if (dbField && value !== undefined) {
+        fields.push(`${dbField} = ?`);
         values.push(value);
       }
     });

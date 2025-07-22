@@ -12,6 +12,7 @@ import {
   FiX
 } from 'react-icons/fi';
 import { portfolioService, fileService } from '../../../services/api';
+import { getTattooImageUrl } from '../../../utils/imageHelpers';
 import toast from 'react-hot-toast';
 
 const ArtistPortfolio = () => {
@@ -74,7 +75,7 @@ const ArtistPortfolio = () => {
         }
       ];
 
-      const response = await portfolioService.getAll().catch((error) => {
+      const response = await portfolioService.getAll('my').catch((error) => {
         console.log('Portfolio API error:', error.response?.status || error.message);
         // Only use mock data if not authenticated
         const token = localStorage.getItem('authToken');
@@ -87,7 +88,14 @@ const ArtistPortfolio = () => {
         return { data: [] };
       });
       
-      setPortfolioItems(response.data || []);
+      // Process the response data to handle image URLs correctly
+      const items = response.data?.items || response.data || [];
+      const processedItems = items.map(item => ({
+        ...item,
+        // Use the helper to properly construct image URLs
+        image_url: getTattooImageUrl(item.imageUrl || item.image_url)
+      }));
+      setPortfolioItems(processedItems);
     } catch (error) {
       console.error('Error loading portfolio:', error);
       toast.error('Error al cargar el portafolio');

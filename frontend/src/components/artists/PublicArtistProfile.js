@@ -5,6 +5,7 @@ import Button from '../common/Button';
 import PortfolioGallery from './PortfolioGallery';
 import ContactInfo from './ContactInfo';
 import SpecialtiesDisplay from './SpecialtiesDisplay';
+import SubscriptionBadge from '../common/SubscriptionBadge';
 import { getProfileImageUrl } from '../../utils/imageHelpers';
 
 const PublicArtistProfile = ({ artist, className = '' }) => {
@@ -199,7 +200,13 @@ const PublicArtistProfile = ({ artist, className = '' }) => {
           <div className="flex-1">
             <div className="flex items-start justify-between">
               <div>
-                <h1 className="text-2xl font-bold text-primary-100 mb-1">{artist?.name}</h1>
+                <div className="flex items-center space-x-3 mb-1">
+                  <h1 className="text-2xl font-bold text-primary-100">{artist?.name}</h1>
+                  <SubscriptionBadge 
+                    subscriptionType={artist?.subscriptionType || artist?.subscription?.plan_type} 
+                    size="sm" 
+                  />
+                </div>
                 <p className="text-primary-400 mb-2">{artist?.location}</p>
                 <div className="flex items-center space-x-1 mb-3">
                   {getRatingStars(artist?.rating || 5)}

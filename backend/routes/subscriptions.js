@@ -18,7 +18,7 @@ router.get('/plans', async (req, res) => {
 // Get user's current subscription
 router.get('/my-subscription', authenticate, async (req, res) => {
   try {
-    const subscription = await Subscription.findByUserId(req.user.id);
+    const subscription = await Subscription.getActiveByUserId(req.user.id);
     res.json(subscription);
   } catch (error) {
     console.error('Get my subscription error:', error);
@@ -36,14 +36,14 @@ router.post('/subscribe', authenticate, async (req, res) => {
     }
     
     // Check if user already has an active subscription
-    const existingSubscription = await Subscription.findActiveByUserId(req.user.id);
+    const existingSubscription = await Subscription.getActiveByUserId(req.user.id);
     
     if (existingSubscription) {
       return res.status(409).json({ error: 'Ya tienes una suscripción activa' });
     }
     
     // Get plan details
-    const plan = await SubscriptionPlan.findById(planId);
+    const plan = await Subscription.getPlanById(planId);
     
     if (!plan) {
       return res.status(404).json({ error: 'Plan no encontrado' });
@@ -53,11 +53,12 @@ router.post('/subscribe', authenticate, async (req, res) => {
     const subscriptionId = await Subscription.create({
       userId: req.user.id,
       planId: planId,
-      mercadoPagoSubscriptionId: null, // Would be set by MercadoPago
+      mercadopagoPreapprovalId: null, // Would be set by MercadoPago
       status: 'pending'
     });
     
-    const subscription = await Subscription.findById(subscriptionId);
+    const subscriptions = await Subscription.getByUserId(req.user.id);
+    const subscription = subscriptions.find(s => s.id === subscriptionId);
     
     res.status(201).json({
       message: 'Suscripción creada exitosamente',
@@ -74,7 +75,7 @@ router.post('/subscribe', authenticate, async (req, res) => {
 // Cancel subscription
 router.post('/cancel', authenticate, async (req, res) => {
   try {
-    const subscription = await Subscription.findActiveByUserId(req.user.id);
+    const subscription = await Subscription.getActiveByUserId(req.user.id);
     
     if (!subscription) {
       return res.status(404).json({ error: 'No tienes una suscripción activa' });
@@ -93,29 +94,30 @@ router.post('/cancel', authenticate, async (req, res) => {
   }
 });
 
-// Renew subscription
+// Renew subscription - simplified version
 router.post('/renew', authenticate, async (req, res) => {
   try {
-    const subscription = await Subscription.findByUserId(req.user.id);
+    const subscriptions = await Subscription.getByUserId(req.user.id);
+    const latestSubscription = subscriptions[0]; // Most recent subscription
     
-    if (!subscription) {
+    if (!latestSubscription) {
       return res.status(404).json({ error: 'No tienes una suscripción' });
     }
     
-    if (subscription.status === 'active') {
+    if (latestSubscription.status === 'authorized') {
       return res.status(409).json({ error: 'La suscripción ya está activa' });
     }
     
-    const success = await Subscription.renew(subscription.id);
+    // Simple renewal - just update status to pending for manual processing
+    const success = await Subscription.updateStatus(latestSubscription.id, 'pending');
     
     if (success) {
-      const renewedSubscription = await Subscription.findById(subscription.id);
       res.json({
-        message: 'Suscripción renovada exitosamente',
-        subscription: renewedSubscription
+        message: 'Solicitud de renovación procesada. Te contactaremos pronto.',
+        subscription: latestSubscription
       });
     } else {
-      res.status(500).json({ error: 'Error al renovar suscripción' });
+      res.status(500).json({ error: 'Error al procesar renovación' });
     }
   } catch (error) {
     console.error('Renew subscription error:', error);
@@ -123,10 +125,21 @@ router.post('/renew', authenticate, async (req, res) => {
   }
 });
 
-// Get subscription invoices
+// Get subscription invoices - simplified version
 router.get('/invoices', authenticate, async (req, res) => {
   try {
-    const invoices = await Subscription.getInvoices(req.user.id);
+    const subscriptions = await Subscription.getByUserId(req.user.id);
+    
+    // For now, return subscription history as "invoices"
+    const invoices = subscriptions.map(sub => ({
+      id: sub.id,
+      date: sub.created_at,
+      amount: sub.price,
+      status: sub.status,
+      plan_name: sub.plan_name,
+      description: `Suscripción ${sub.plan_name}`
+    }));
+    
     res.json(invoices);
   } catch (error) {
     console.error('Get invoices error:', error);
@@ -134,28 +147,12 @@ router.get('/invoices', authenticate, async (req, res) => {
   }
 });
 
-// Update payment method
+// Update payment method - placeholder for future implementation
 router.put('/payment-method', authenticate, async (req, res) => {
   try {
-    const { paymentMethodId } = req.body;
-    
-    if (!paymentMethodId) {
-      return res.status(400).json({ error: 'Método de pago es requerido' });
-    }
-    
-    const subscription = await Subscription.findActiveByUserId(req.user.id);
-    
-    if (!subscription) {
-      return res.status(404).json({ error: 'No tienes una suscripción activa' });
-    }
-    
-    const success = await Subscription.updatePaymentMethod(subscription.id, paymentMethodId);
-    
-    if (success) {
-      res.json({ message: 'Método de pago actualizado exitosamente' });
-    } else {
-      res.status(500).json({ error: 'Error al actualizar método de pago' });
-    }
+    res.json({ 
+      message: 'Funcionalidad en desarrollo. Contacta con soporte para cambiar el método de pago.' 
+    });
   } catch (error) {
     console.error('Update payment method error:', error);
     res.status(500).json({ error: 'Error al actualizar método de pago' });

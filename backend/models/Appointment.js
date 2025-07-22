@@ -18,6 +18,10 @@ class Appointment {
     this.deposit_paid = data.deposit_paid || false;
     this.reminder_sent = data.reminder_sent || false;
     this.cancellation_reason = data.cancellation_reason;
+    this.title = data.title;
+    this.client_name = data.client_name;
+    this.client_email = data.client_email;
+    this.client_phone = data.client_phone;
     this.created_at = data.created_at;
     this.updated_at = data.updated_at;
   }
@@ -120,8 +124,8 @@ class Appointment {
         INSERT INTO appointments (
           artist_id, client_id, proposal_id, appointment_date, start_time, end_time,
           duration_hours, status, notes, location, estimated_price, deposit_amount,
-          deposit_paid, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+          deposit_paid, title, client_name, client_email, client_phone, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
       `;
       
       const [result] = await db.execute(query, [
@@ -137,10 +141,14 @@ class Appointment {
         data.location || null,
         data.estimated_price || null,
         data.deposit_amount || null,
-        data.deposit_paid || false
+        data.deposit_paid || false,
+        data.title || null,
+        data.client_name || null,
+        data.client_email || null,
+        data.client_phone || null
       ]);
       
-      return await this.findById(result.insertId);
+      return result.insertId;
     } catch (error) {
       throw new Error(`Error creating appointment: ${error.message}`);
     }

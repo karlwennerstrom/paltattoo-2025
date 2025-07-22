@@ -19,8 +19,8 @@ const updateProfileValidation = [
     .withMessage('El apellido debe tener entre 2 y 50 caracteres'),
   body('phone')
     .optional()
-    .matches(/^\+56[0-9]{9}$/)
-    .withMessage('El teléfono debe tener formato chileno (+56xxxxxxxxx)'),
+    .matches(/^\+56\s?9\s?[0-9]{4}\s?[0-9]{4}$|^\+569[0-9]{8}$/)
+    .withMessage('El teléfono debe tener formato chileno (+56 9 XXXX XXXX)'),
   body('bio')
     .optional()
     .isLength({ max: 500 })

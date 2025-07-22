@@ -1,10 +1,11 @@
 const transporter = require('../config/email');
+const nodemailer = require('nodemailer');
 const path = require('path');
 const fs = require('fs').promises;
 
 class EmailService {
   constructor() {
-    this.from = process.env.EMAIL_FROM || 'TattooConnect <noreply@tattooconnect.cl>';
+    this.from = process.env.EMAIL_FROM || 'PalTattoo <noreply@misterwolf.cl>';
   }
 
   async loadTemplate(templateName, variables = {}) {
@@ -27,6 +28,14 @@ class EmailService {
 
   async send(to, subject, html, attachments = []) {
     try {
+      // In development, skip sending to test domains
+      if (process.env.NODE_ENV !== 'production' && to.includes('@test.com')) {
+        console.log(`Development mode: Skipping email to ${to}`);
+        console.log(`Subject: ${subject}`);
+        console.log(`HTML content: ${html.substring(0, 200)}...`);
+        return { success: true, messageId: 'dev-mode-skip', skipped: true };
+      }
+
       const mailOptions = {
         from: this.from,
         to,
@@ -185,6 +194,36 @@ class EmailService {
     );
   }
 
+  async sendAppointmentConfirmation(data) {
+    const { email, clientName, appointmentDate, startTime, endTime, artistName, title, location, notes } = data;
+    
+    const appointmentDateTime = new Date(`${appointmentDate} ${startTime}`);
+    const formattedDate = appointmentDateTime.toLocaleDateString('es-CL', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+
+    const html = await this.loadTemplate('appointment-confirmation', {
+      clientName: clientName,
+      artistName: artistName,
+      appointmentTitle: title,
+      appointmentDate: formattedDate,
+      startTime: startTime,
+      endTime: endTime,
+      location: location || 'Estudio del tatuador',
+      notes: notes || 'Sin notas adicionales',
+      contactInfo: 'Contacta al artista si tienes alguna pregunta'
+    });
+
+    return this.send(
+      email,
+      `Cita confirmada con ${artistName} - ${formattedDate}`,
+      html || this.getDefaultAppointmentConfirmationHtml(clientName, artistName, formattedDate, startTime, endTime, title, location, notes)
+    );
+  }
+
   async sendAppointmentCancellation(recipientEmail, recipientName, appointment) {
     const appointmentDate = new Date(`${appointment.appointment_date} ${appointment.start_time}`);
     const formattedDate = appointmentDate.toLocaleDateString('es-CL', {
@@ -339,6 +378,190 @@ class EmailService {
         </div>
         <p>Puedes contactarnos para reprogramar tu cita.</p>
         <p style="color: #666;">Disculpa las molestias.</p>
+      </div>
+    `;
+  }
+
+  getDefaultAppointmentConfirmationHtml(clientName, artistName, formattedDate, startTime, endTime, title, location, notes) {
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #28a745;">¡Cita confirmada!</h1>
+        <p>Hola ${clientName},</p>
+        <p>Tu cita <strong>"${title}"</strong> con ${artistName} ha sido confirmada exitosamente.</p>
+        <div style="background-color: #f0fdf4; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #86efac;">
+          <h3 style="margin-top: 0; color: #16a34a;">Detalles de tu cita:</h3>
+          <p><strong>Fecha:</strong> ${formattedDate}</p>
+          <p><strong>Hora:</strong> ${startTime} - ${endTime}</p>
+          <p><strong>Ubicación:</strong> ${location || 'Estudio del tatuador'}</p>
+          ${notes ? `<p><strong>Notas:</strong> ${notes}</p>` : ''}
+        </div>
+        <div style="background-color: #fef3c7; padding: 15px; border-radius: 8px; border: 1px solid #fbbf24;">
+          <p><strong>Recordatorios importantes:</strong></p>
+          <ul style="margin-left: 20px;">
+            <li>Llega con 10 minutos de anticipación</li>
+            <li>Trae una identificación válida</li>
+            <li>Si tienes alguna pregunta, contacta directamente al artista</li>
+          </ul>
+        </div>
+        <p style="color: #666; font-size: 14px;">¡Esperamos verte pronto!</p>
+      </div>
+    `;
+  }
+
+  // Métodos para suscripciones
+  async sendSubscriptionCreated(email, data) {
+    const subject = 'Suscripción creada - PalTattoo';
+    const html = this.getSubscriptionCreatedHtml(data);
+    
+    return this.send(email, subject, html);
+  }
+
+  async sendSubscriptionActivated(email, data) {
+    const subject = '¡Tu suscripción está activa! - PalTattoo';
+    const html = this.getSubscriptionActivatedHtml(data);
+    
+    return this.send(email, subject, html);
+  }
+
+  async sendSubscriptionCancelled(email, data) {
+    const subject = 'Suscripción cancelada - PalTattoo';
+    const html = this.getSubscriptionCancelledHtml(data);
+    
+    return this.send(email, subject, html);
+  }
+
+  async sendPaymentReceived(email, data) {
+    const subject = 'Pago recibido - PalTattoo';
+    const html = this.getPaymentReceivedHtml(data);
+    
+    return this.send(email, subject, html);
+  }
+
+  getSubscriptionCreatedHtml(data) {
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #6366f1;">¡Bienvenido a ${data.planName}!</h1>
+        <p>Hola ${data.userName},</p>
+        <p>Tu suscripción a <strong>${data.planName}</strong> ha sido creada exitosamente.</p>
+        <div style="background-color: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <h3 style="margin-top: 0;">Detalles de tu suscripción:</h3>
+          <p><strong>Plan:</strong> ${data.planName}</p>
+          <p><strong>Precio mensual:</strong> ${this.formatCurrency(data.amount)}</p>
+          <p><strong>Estado:</strong> Pendiente de pago</p>
+        </div>
+        <p>En unos momentos serás redirigido a MercadoPago para completar el pago y activar tu suscripción.</p>
+        <p style="color: #666; font-size: 14px;">Si tienes alguna pregunta, no dudes en contactarnos.</p>
+      </div>
+    `;
+  }
+
+  getSubscriptionActivatedHtml(data) {
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #10b981;">¡Tu suscripción está activa!</h1>
+        <p>Hola ${data.userName},</p>
+        <p>Tu suscripción a <strong>${data.planName}</strong> ha sido activada exitosamente.</p>
+        <div style="background-color: #f0fdf4; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #86efac;">
+          <h3 style="margin-top: 0; color: #16a34a;">Ya puedes disfrutar de todos los beneficios</h3>
+          <p>Tu plan incluye acceso completo a todas las funcionalidades premium de PalTattoo.</p>
+        </div>
+        <p>Gracias por confiar en nosotros. ¡Esperamos que disfrutes de tu experiencia!</p>
+      </div>
+    `;
+  }
+
+  getSubscriptionCancelledHtml(data) {
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #ef4444;">Suscripción cancelada</h1>
+        <p>Hola ${data.userName},</p>
+        <p>Tu suscripción a <strong>${data.planName}</strong> ha sido cancelada según tu solicitud.</p>
+        <div style="background-color: #fef2f2; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #fecaca;">
+          <p><strong>Fecha de cancelación:</strong> ${new Date().toLocaleDateString('es-CL')}</p>
+          <p>Tu acceso continuará hasta el final del período de facturación actual.</p>
+        </div>
+        <p>Lamentamos verte partir. Si cambias de opinión, siempre serás bienvenido de vuelta.</p>
+        <p style="color: #666; font-size: 14px;">Si cancelaste por error o tienes alguna pregunta, contáctanos.</p>
+      </div>
+    `;
+  }
+
+  getPaymentReceivedHtml(data) {
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #10b981;">Pago recibido</h1>
+        <p>Hola ${data.userName},</p>
+        <p>Hemos recibido tu pago exitosamente.</p>
+        <div style="background-color: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <h3 style="margin-top: 0;">Detalles del pago:</h3>
+          <p><strong>Monto:</strong> ${this.formatCurrency(data.amount)}</p>
+          <p><strong>Plan:</strong> ${data.planName}</p>
+          <p><strong>Fecha:</strong> ${new Date(data.paymentDate).toLocaleDateString('es-CL')}</p>
+          <p><strong>ID de transacción:</strong> ${data.transactionId}</p>
+        </div>
+        <p>Tu próximo pago será el ${new Date(data.nextPaymentDate).toLocaleDateString('es-CL')}.</p>
+        <p style="color: #666; font-size: 14px;">Gracias por tu pago.</p>
+      </div>
+    `;
+  }
+
+  // Método para envío de cambios en perfil
+  async sendProfileUpdated(user, updatedFields = []) {
+    const html = await this.loadTemplate('profile-updated', {
+      userName: user.firstName || user.email,
+      userType: user.userType === 'artist' ? 'artista' : 'cliente',
+      updateDate: new Date().toLocaleDateString('es-CL', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long', 
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      }),
+      changedFields: updatedFields.join(', '),
+      dashboardUrl: `${process.env.FRONTEND_URL}/artist`,
+      supportEmail: process.env.EMAIL_USER || 'soporte@paltattoo.cl'
+    });
+
+    return this.send(
+      user.email,
+      'Perfil actualizado - PalTattoo',
+      html || this.getDefaultProfileUpdatedHtml(user, updatedFields)
+    );
+  }
+
+  getDefaultProfileUpdatedHtml(user, updatedFields) {
+    const fieldsText = updatedFields.length > 0 ? updatedFields.join(', ') : 'información del perfil';
+    
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #10b981;">✅ Perfil actualizado exitosamente</h1>
+        <p>Hola ${user.firstName || user.email},</p>
+        <p>Te confirmamos que tu ${fieldsText} ha sido actualizada exitosamente en tu perfil de PalTattoo.</p>
+        <div style="background-color: #f0fdf4; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #86efac;">
+          <h3 style="margin-top: 0; color: #16a34a;">Detalles de la actualización:</h3>
+          <p><strong>Fecha:</strong> ${new Date().toLocaleDateString('es-CL', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          })}</p>
+          <p><strong>Campos actualizados:</strong> ${fieldsText}</p>
+        </div>
+        <div style="background-color: #fef3c7; padding: 15px; border-radius: 8px; border: 1px solid #fbbf24; margin: 20px 0;">
+          <p style="margin: 0;"><strong>💡 Nota de seguridad:</strong> Si no realizaste estos cambios, por favor contacta inmediatamente a nuestro equipo de soporte.</p>
+        </div>
+        <p>
+          <a href="${process.env.FRONTEND_URL}/artist" 
+             style="display: inline-block; padding: 12px 24px; background-color: #10b981; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">
+            Ver mi perfil
+          </a>
+        </p>
+        <p style="color: #666; font-size: 14px;">
+          Si tienes alguna pregunta, puedes contactarnos en ${process.env.EMAIL_USER || 'soporte@paltattoo.cl'}
+        </p>
       </div>
     `;
   }

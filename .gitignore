@@ -101,4 +101,5 @@ public/
 
 # Lock files (optional - remove if you want to commit them)
 # package-lock.json
-# yarn.lock
+# yarn.locknode_modules/
+.cache/

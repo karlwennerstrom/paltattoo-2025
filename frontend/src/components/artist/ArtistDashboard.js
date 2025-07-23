@@ -8,7 +8,6 @@ import ProposalsTab from './ProposalsTab';
 import PublicOffersTab from './PublicOffersTab';
 import PortfolioTab from './PortfolioTab';
 import ProfileTab from './ProfileTab';
-import CollectionsTab from './CollectionsTab';
 import CalendarTab from './CalendarTabNew';
 import PaymentsTab from './PaymentsTab';
 import ArtistAnalytics from './pages/ArtistAnalytics';
@@ -25,6 +24,31 @@ const ArtistDashboard = () => {
 
   useEffect(() => {
     loadInitialData();
+    
+    // Listen for tab switch events from child components
+    const handleSwitchTab = (event) => {
+      if (event.detail?.tab) {
+        setActiveTab(event.detail.tab);
+      }
+    };
+
+    // Listen for proposals navigation events
+    const handleNavigateToProposals = (event) => {
+      setActiveTab('proposals');
+      // Optionally, pass the proposal ID to highlight it
+      if (event.detail?.proposalId) {
+        // Store proposal ID for highlighting in proposals tab
+        sessionStorage.setItem('highlightProposalId', event.detail.proposalId);
+      }
+    };
+    
+    window.addEventListener('switchTab', handleSwitchTab);
+    window.addEventListener('navigateToProposals', handleNavigateToProposals);
+    
+    return () => {
+      window.removeEventListener('switchTab', handleSwitchTab);
+      window.removeEventListener('navigateToProposals', handleNavigateToProposals);
+    };
   }, []);
 
   const loadInitialData = async () => {
@@ -53,7 +77,6 @@ const ArtistDashboard = () => {
     { id: 'overview', label: 'Resumen', icon: FiBarChart2 },
     { id: 'profile', label: 'Perfil', icon: FiUser },
     { id: 'portfolio', label: 'Portfolio', icon: FiImage },
-    { id: 'collections', label: 'Colecciones', icon: FiFolder },
     { id: 'offers', label: 'Ofertas Públicas', icon: FiEye },
     { id: 'proposals', label: 'Mis Propuestas', icon: FiMail },
     { id: 'calendar', label: 'Calendario', icon: FiCalendar },
@@ -249,8 +272,7 @@ const ArtistDashboard = () => {
               <p className="text-sm text-gray-400">
                 {activeTab === 'overview' && 'Resumen de tu actividad y estadísticas'}
                 {activeTab === 'profile' && 'Gestiona tu información personal'}
-                {activeTab === 'portfolio' && 'Gestiona tus trabajos y portafolio'}
-                {activeTab === 'collections' && 'Organiza tu portfolio en colecciones temáticas'}
+                {activeTab === 'portfolio' && 'Gestiona tu portfolio en colecciones organizadas'}
                 {activeTab === 'offers' && 'Encuentra nuevos proyectos'}
                 {activeTab === 'proposals' && 'Gestiona tus propuestas'}
                 {activeTab === 'calendar' && 'Administra tus citas y horarios'}
@@ -282,7 +304,6 @@ const ArtistDashboard = () => {
               {activeTab === 'overview' && <OverviewTab />}
               {activeTab === 'profile' && <ProfileTab />}
               {activeTab === 'portfolio' && <PortfolioTab />}
-              {activeTab === 'collections' && <CollectionsTab />}
               {activeTab === 'offers' && <PublicOffersTab />}
               {activeTab === 'proposals' && <ProposalsTab />}
               {activeTab === 'calendar' && <CalendarTab />}

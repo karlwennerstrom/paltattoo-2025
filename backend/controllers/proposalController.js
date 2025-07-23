@@ -237,6 +237,27 @@ const proposalController = {
       console.error('Get proposal details error:', error);
       res.status(500).json({ error: 'Error al obtener detalles de la propuesta' });
     }
+  },
+
+  async checkExistingProposal(req, res) {
+    try {
+      const { offerId } = req.params;
+      const artist = await TattooArtist.findByUserId(req.user.id);
+      
+      if (!artist) {
+        return res.status(404).json({ error: 'Perfil de tatuador no encontrado' });
+      }
+      
+      const existingProposal = await Proposal.findByArtistAndOffer(artist.id, offerId);
+      
+      res.json({
+        hasProposal: !!existingProposal,
+        proposal: existingProposal || null
+      });
+    } catch (error) {
+      console.error('Check existing proposal error:', error);
+      res.status(500).json({ error: 'Error al verificar propuesta existente' });
+    }
   }
 };
 

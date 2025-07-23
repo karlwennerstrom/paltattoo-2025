@@ -179,7 +179,7 @@ export const portfolioService = {
 // Collection services
 export const collectionService = {
   getAll: (artistId) => api.get(`/collections/${artistId || 'my'}`),
-  getById: (id) => api.get(`/collections/${id}`),
+  getById: (id) => api.get(`/collections/collection/${id}`),
   create: (data) => api.post('/collections', data),
   update: (id, data) => api.put(`/collections/${id}`, data),
   delete: (id) => api.delete(`/collections/${id}`),
@@ -353,6 +353,9 @@ export const proposalService = {
   
   // Create a new proposal for an offer
   create: (offerId, data) => api.post(`/offers/${offerId}/proposals`, data),
+  
+  // Check if artist has already sent a proposal for an offer
+  checkExisting: (offerId) => api.get(`/proposals/check/${offerId}`),
 };
 
 // Search services

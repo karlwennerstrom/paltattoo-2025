@@ -34,6 +34,8 @@ router.get('/my', authenticate, authorizeArtist, proposalController.getProposals
 
 router.get('/offer/:offerId', authenticate, authorizeClient, proposalController.getProposalsByOffer);
 
+router.get('/check/:offerId', authenticate, authorizeArtist, proposalController.checkExistingProposal);
+
 router.get('/:id', authenticate, proposalController.getProposalDetails);
 
 router.put('/:id', authenticate, authorizeArtist, updateValidation, proposalController.updateProposal);

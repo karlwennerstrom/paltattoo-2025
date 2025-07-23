@@ -5,127 +5,95 @@ import Button from '../common/Button';
 import Input from '../common/Input';
 import Modal from '../common/Modal';
 import { getTattooImageUrl, getProfileImageUrl } from '../../utils/imageHelpers';
-import { proposalService } from '../../services/api';
+import { proposalService, profileService } from '../../services/api';
 import toast from 'react-hot-toast';
-import { FiMail, FiClock, FiCheckCircle, FiXCircle, FiDollarSign, FiCalendar, FiEdit2, FiTrash2, FiEye } from 'react-icons/fi';
+import { FiMail, FiClock, FiCheckCircle, FiXCircle, FiDollarSign, FiCalendar, FiEdit2, FiTrash2, FiEye, FiArrowRight } from 'react-icons/fi';
+import { useAuth } from '../../contexts/AuthContext';
 
 const ProposalsTab = () => {
-  const [selectedTab, setSelectedTab] = useState('received'); // 'received' or 'sent'
+  const { user } = useAuth();
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [viewingProposal, setViewingProposal] = useState(null);
   const [editingProposal, setEditingProposal] = useState(null);
   const [loading, setLoading] = useState(true);
   const [proposals, setProposals] = useState([]);
-  const [sentProposals, setSentProposals] = useState([]);
+  const [allProposals, setAllProposals] = useState([]); // Store all proposals for counting
+  const [artistProfile, setArtistProfile] = useState(null);
 
   useEffect(() => {
     loadProposals();
-  }, [selectedStatus, selectedTab]);
+    loadArtistProfile();
+    
+    // Check if we need to highlight a specific proposal
+    const highlightProposalId = sessionStorage.getItem('highlightProposalId');
+    if (highlightProposalId) {
+      sessionStorage.removeItem('highlightProposalId');
+      // Optionally scroll to the proposal or highlight it
+      setTimeout(() => {
+        const proposalElement = document.getElementById(`proposal-${highlightProposalId}`);
+        if (proposalElement) {
+          proposalElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          proposalElement.classList.add('ring-2', 'ring-accent-500');
+          setTimeout(() => {
+            proposalElement.classList.remove('ring-2', 'ring-accent-500');
+          }, 3000);
+        }
+      }, 500);
+    }
+  }, [selectedStatus]);
+
+  const loadArtistProfile = async () => {
+    try {
+      const response = await profileService.get();
+      if (response.data) {
+        setArtistProfile(response.data);
+      }
+    } catch (error) {
+      console.error('Error loading artist profile:', error);
+    }
+  };
 
   const loadProposals = async () => {
     try {
       setLoading(true);
       
-      if (selectedTab === 'received') {
-        // Load proposals received by the artist (direct proposals from clients)
-        const response = await proposalService.getMyProposals(
-          selectedStatus !== 'all' ? { status: selectedStatus, type: 'received' } : { type: 'received' }
-        );
-        if (response.data && response.data.proposals) {
-          setProposals(response.data.proposals);
+      // Always load all proposals first for counting
+      const allResponse = await proposalService.getMyProposals({});
+      if (allResponse.data && allResponse.data.proposals) {
+        setAllProposals(allResponse.data.proposals);
+        
+        // Filter proposals based on selected status
+        if (selectedStatus === 'all') {
+          setProposals(allResponse.data.proposals);
         } else {
-          setProposals([]);
+          const filtered = allResponse.data.proposals.filter(p => p.status === selectedStatus);
+          setProposals(filtered);
         }
       } else {
-        // Load proposals sent by the artist (to public offers)
-        const response = await proposalService.getMyProposals(
-          selectedStatus !== 'all' ? { status: selectedStatus, type: 'sent' } : { type: 'sent' }
-        );
-        if (response.data && response.data.proposals) {
-          setSentProposals(response.data.proposals);
-        } else {
-          setSentProposals([]);
-        }
+        setAllProposals([]);
+        setProposals([]);
       }
     } catch (error) {
       console.error('Error loading proposals:', error);
-      // Fall back to mock data if API fails
-      if (selectedTab === 'received') {
-        setProposals(mockProposals);
-      } else {
-        setSentProposals(mockSentProposals);
-      }
+      toast.error('Error al cargar propuestas');
+      setProposals([]);
+      setAllProposals([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // Mock data for development while backend is not ready
-  const mockProposals = [
-    {
-      id: 1,
-      client: {
-        name: 'María González',
-        avatar: null,
-        rating: 4.8,
-        completedTattoos: 3
-      },
-      title: 'Tatuaje de León Realista',
-      description: 'Quiero un tatuaje realista de un león en el brazo derecho. Me gusta el estilo que manejas y creo que podrías hacer un trabajo increíble.',
-      category: 'Realista',
-      size: 'Grande',
-      bodyPart: 'Brazo derecho',
-      budget: 250000,
-      deadline: '2024-02-15',
-      referenceImages: ['/placeholder-tattoo-1.jpg', '/placeholder-tattoo-2.jpg'],
-      status: 'pending',
-      createdAt: '2024-01-20',
-      priority: 'high',
-      sessionDuration: '4-6 horas',
-      isFlexibleDate: true,
-      specialRequests: 'Prefiero sesiones matutinas si es posible'
-    }
-  ];
-
-  // Mock data for sent proposals
-  const mockSentProposals = [
-    {
-      id: 101,
-      client: {
-        name: 'Pedro Sánchez',
-        avatar: null,
-        rating: 4.9,
-        completedTattoos: 0
-      },
-      title: 'Tatuaje de Lobo Geométrico',
-      description: 'Propuesta para diseño de lobo con elementos geométricos en el antebrazo.',
-      category: 'Geométrico',
-      size: 'Mediano',
-      bodyPart: 'Antebrazo',
-      proposedPrice: 220000,
-      estimatedDuration: '3-4 horas',
-      status: 'pending',
-      createdAt: '2024-01-22',
-      message: 'Me interesa mucho tu propuesta, creo que puedo hacer un trabajo excelente con este diseño.'
-    }
-  ];
-
-  // Use mock data if no real data is available
-  const displayProposals = selectedTab === 'received' 
-    ? (proposals.length > 0 ? proposals : (loading ? [] : mockProposals))
-    : (sentProposals.length > 0 ? sentProposals : (loading ? [] : mockSentProposals));
 
   const statusOptions = [
-    { value: 'all', label: 'Todas', count: displayProposals.length },
-    { value: 'pending', label: 'Pendientes', count: displayProposals.filter(p => p.status === 'pending').length },
-    { value: 'accepted', label: 'Aceptadas', count: displayProposals.filter(p => p.status === 'accepted').length },
-    { value: 'rejected', label: 'Rechazadas', count: displayProposals.filter(p => p.status === 'rejected').length },
-    { value: 'withdrawn', label: 'Retiradas', count: displayProposals.filter(p => p.status === 'withdrawn').length }
+    { value: 'all', label: 'Todas', count: allProposals.length },
+    { value: 'pending', label: 'Pendientes', count: allProposals.filter(p => p.status === 'pending').length },
+    { value: 'accepted', label: 'Aceptadas', count: allProposals.filter(p => p.status === 'accepted').length },
+    { value: 'rejected', label: 'Rechazadas', count: allProposals.filter(p => p.status === 'rejected').length },
+    { value: 'withdrawn', label: 'Retiradas', count: allProposals.filter(p => p.status === 'withdrawn').length }
   ];
 
-  const filteredProposals = selectedStatus === 'all' 
-    ? displayProposals 
-    : displayProposals.filter(p => p.status === selectedStatus);
+  // No need to filter again since we already filter in loadProposals
+  const filteredProposals = proposals;
 
   const getStatusBadge = (status) => {
     const badges = {
@@ -186,6 +154,17 @@ const ProposalsTab = () => {
     return `Hace ${days} días`;
   };
 
+  // Calculate statistics
+  const stats = {
+    total: allProposals.length,
+    pending: allProposals.filter(p => p.status === 'pending').length,
+    accepted: allProposals.filter(p => p.status === 'accepted').length,
+    rejected: allProposals.filter(p => p.status === 'rejected').length,
+    acceptanceRate: allProposals.length > 0 
+      ? Math.round((allProposals.filter(p => p.status === 'accepted').length / allProposals.length) * 100)
+      : 0
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -193,10 +172,7 @@ const ProposalsTab = () => {
         <div>
           <h1 className="text-2xl font-bold text-primary-100">Mis Propuestas</h1>
           <p className="text-primary-400">
-            {selectedTab === 'received' 
-              ? 'Propuestas directas recibidas de clientes' 
-              : 'Propuestas enviadas a ofertas públicas'
-            }
+            Gestiona todas tus propuestas enviadas
           </p>
         </div>
         <div className="flex items-center space-x-3">
@@ -206,34 +182,41 @@ const ProposalsTab = () => {
         </div>
       </div>
 
-      {/* Tab Navigation */}
-      <div className="flex flex-col space-y-4">
-        <div className="flex space-x-1 bg-primary-800 p-1 rounded-lg w-fit">
-          <button
-            onClick={() => setSelectedTab('received')}
-            className={twMerge(
-              'px-4 py-2 rounded-md text-sm font-medium transition-colors',
-              selectedTab === 'received'
-                ? 'bg-accent-600 text-white'
-                : 'text-primary-300 hover:text-primary-100'
-            )}
-          >
-            Recibidas ({(selectedTab === 'received' ? displayProposals : proposals).length})
-          </button>
-          <button
-            onClick={() => setSelectedTab('sent')}
-            className={twMerge(
-              'px-4 py-2 rounded-md text-sm font-medium transition-colors',
-              selectedTab === 'sent'
-                ? 'bg-accent-600 text-white'
-                : 'text-primary-300 hover:text-primary-100'
-            )}
-          >
-            Enviadas ({(selectedTab === 'sent' ? displayProposals : sentProposals).length})
-          </button>
-        </div>
+      {/* Statistics Cards */}
+      <Grid cols={4} gap={4}>
+        <Card className="text-center p-4">
+          <p className="text-3xl font-bold text-primary-100">{stats.total}</p>
+          <p className="text-sm text-primary-400">Total Enviadas</p>
+        </Card>
+        <Card className="text-center p-4">
+          <p className="text-3xl font-bold text-yellow-400">{stats.pending}</p>
+          <p className="text-sm text-primary-400">Esperando Respuesta</p>
+        </Card>
+        <Card className="text-center p-4">
+          <p className="text-3xl font-bold text-green-400">{stats.accepted}</p>
+          <p className="text-sm text-primary-400">Aceptadas</p>
+        </Card>
+        <Card className="text-center p-4">
+          <p className="text-3xl font-bold text-accent-400">{stats.acceptanceRate}%</p>
+          <p className="text-sm text-primary-400">Tasa de Éxito</p>
+        </Card>
+      </Grid>
 
-        {/* Status Filter Tabs */}
+      {/* Info Box */}
+      <Card className="p-4 bg-primary-800 border-primary-700">
+        <div className="flex items-start space-x-3">
+          <svg className="h-5 w-5 text-accent-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <div className="text-sm text-primary-300">
+            <p className="font-medium text-primary-100 mb-1">Sistema de Propuestas</p>
+            <p>Aquí puedes ver todas las propuestas que has enviado a ofertas públicas de clientes. Los clientes pueden aceptar, rechazar o dejar pendientes tus propuestas.</p>
+          </div>
+        </div>
+      </Card>
+
+      {/* Status Filter Tabs */}
+      <div className="flex flex-col space-y-4">
         <div className="flex flex-wrap gap-2">
           {statusOptions.map((option) => (
             <button
@@ -282,18 +265,48 @@ const ProposalsTab = () => {
               const priorityBadge = getPriorityBadge(proposal.priority);
               
               return (
-                <Card key={proposal.id} className="p-6">
+                <Card key={proposal.id} id={`proposal-${proposal.id}`} className="p-6 transition-all duration-300">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center space-x-4">
-                      <img
-                        src={getProfileImageUrl(proposal.client?.avatar || null)}
-                        alt={proposal.client?.name || 'Cliente'}
-                        className="h-12 w-12 rounded-full object-cover"
-                      />
+                      {/* Artist to Client flow visualization */}
+                      <div className="flex items-center space-x-3">
+                        {/* Artist Avatar */}
+                        <div className="relative">
+                          <img
+                            src={getProfileImageUrl(
+                              artistProfile?.profile?.profile_image || 
+                              artistProfile?.profileImage || 
+                              user?.profileImage || 
+                              user?.avatar ||
+                              null
+                            )}
+                            alt={
+                              artistProfile?.profile?.first_name || 
+                              artistProfile?.first_name ||
+                              user?.first_name || 
+                              user?.name || 
+                              'Tu perfil'
+                            }
+                            className="h-12 w-12 rounded-full object-cover border-2 border-accent-500"
+                          />
+                          <span className="absolute -bottom-1 -right-1 bg-accent-500 text-white text-xs px-1 rounded">Tú</span>
+                        </div>
+                        
+                        {/* Arrow indicator */}
+                        <FiArrowRight className="text-primary-400" size={20} />
+                        
+                        {/* Client Avatar */}
+                        <img
+                          src={getProfileImageUrl(proposal.client?.avatar || null)}
+                          alt={proposal.client?.name || 'Cliente'}
+                          className="h-12 w-12 rounded-full object-cover border-2 border-primary-600"
+                        />
+                      </div>
+                      
                       <div>
                         <h3 className="text-lg font-semibold text-primary-100">{proposal.offer_title || proposal.title}</h3>
                         <div className="flex items-center space-x-2 text-sm text-primary-400">
-                          <span>{proposal.client_first_name ? `${proposal.client_first_name} ${proposal.client_last_name}` : proposal.client?.name || 'Cliente'}</span>
+                          <span>Para: {proposal.client_first_name ? `${proposal.client_first_name} ${proposal.client_last_name}` : proposal.client?.name || 'Cliente'}</span>
                           <span>•</span>
                           <div className="flex items-center space-x-1">
                             <svg className="h-3 w-3 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
@@ -313,8 +326,11 @@ const ProposalsTab = () => {
                           {priorityBadge.text}
                         </span>
                       )}
-                      <span className={twMerge('px-3 py-1 text-sm rounded-full text-white', statusBadge.color)}>
-                        {statusBadge.text}
+                      <span className={twMerge('px-3 py-1 text-sm rounded-full text-white flex items-center space-x-1', statusBadge.color)}>
+                        {proposal.status === 'accepted' && <FiCheckCircle size={14} />}
+                        {proposal.status === 'rejected' && <FiXCircle size={14} />}
+                        {proposal.status === 'pending' && <FiClock size={14} />}
+                        <span>{statusBadge.text}</span>
                       </span>
                     </div>
                   </div>
@@ -327,7 +343,7 @@ const ProposalsTab = () => {
                       <p className="text-sm text-primary-200">{proposal.style_name || proposal.category}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-primary-500">Presupuesto</p>
+                      <p className="text-xs text-primary-500">Presupuesto del cliente</p>
                       <p className="text-sm text-primary-200">
                         {proposal.budget_min && proposal.budget_max 
                           ? `${formatCurrency(proposal.budget_min)}-${formatCurrency(proposal.budget_max)}` 
@@ -336,11 +352,11 @@ const ProposalsTab = () => {
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs text-primary-500">Ubicación</p>
+                      <p className="text-xs text-primary-500">Ubicación del tatuaje</p>
                       <p className="text-sm text-primary-200">{proposal.body_part_name || proposal.bodyPart}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-primary-500">Precio Propuesto</p>
+                      <p className="text-xs text-primary-500">Precio que has propuesto</p>
                       <p className="text-sm text-primary-200 font-medium">
                         {formatCurrency(proposal.proposed_price || proposal.proposedPrice || 0)}
                       </p>
@@ -404,7 +420,7 @@ const ProposalsTab = () => {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-primary-300 mb-1">Precio Propuesto</label>
+                <label className="block text-sm font-medium text-primary-300 mb-1">Precio que has propuesto</label>
                 <Input
                   type="number"
                   value={editingProposal.proposed_price || editingProposal.proposedPrice || ''}
@@ -412,7 +428,7 @@ const ProposalsTab = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-primary-300 mb-1">Duración (días)</label>
+                <label className="block text-sm font-medium text-primary-300 mb-1">Duración estimada (días)</label>
                 <Input
                   type="number"
                   value={editingProposal.estimated_duration || editingProposal.estimatedDuration || ''}
@@ -448,25 +464,60 @@ const ProposalsTab = () => {
       >
         {viewingProposal && (
           <div className="space-y-6">
-            <div className="flex items-center space-x-4 p-4 bg-primary-800 rounded-lg">
-              <img
-                src={getProfileImageUrl(viewingProposal.client?.avatar || null)}
-                alt={viewingProposal.client?.name || 'Cliente'}
-                className="h-16 w-16 rounded-full object-cover"
-              />
-              <div>
-                <h3 className="text-lg font-semibold text-primary-100">
-                  {viewingProposal.client_first_name ? `${viewingProposal.client_first_name} ${viewingProposal.client_last_name}` : viewingProposal.client?.name || 'Cliente'}
-                </h3>
-                <div className="flex items-center space-x-2 text-sm text-primary-400">
-                  <div className="flex items-center space-x-1">
-                    <svg className="h-4 w-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                    </svg>
-                    <span>{viewingProposal.client?.rating || '5.0'}</span>
+            {/* Artist to Client Flow in Modal */}
+            <div className="flex items-center justify-center p-4 bg-primary-800 rounded-lg">
+              <div className="flex items-center space-x-4">
+                {/* Artist */}
+                <div className="text-center">
+                  <div className="relative mb-2">
+                    <img
+                      src={getProfileImageUrl(
+                        artistProfile?.profile?.profile_image || 
+                        artistProfile?.profileImage || 
+                        user?.profileImage || 
+                        user?.avatar ||
+                        null
+                      )}
+                      alt={
+                        artistProfile?.profile?.first_name || 
+                        artistProfile?.first_name ||
+                        user?.first_name || 
+                        user?.name || 
+                        'Tu perfil'
+                      }
+                      className="h-16 w-16 rounded-full object-cover border-2 border-accent-500"
+                    />
+                    <span className="absolute -bottom-1 -right-1 bg-accent-500 text-white text-xs px-1 rounded">Tú</span>
                   </div>
-                  <span>•</span>
-                  <span>{viewingProposal.client?.completedTattoos || '0'} tatuajes completados</span>
+                  <p className="text-sm text-primary-300">Tu propuesta</p>
+                </div>
+                
+                {/* Arrow */}
+                <div className="flex flex-col items-center space-y-1">
+                  <FiArrowRight className="text-accent-400" size={24} />
+                  <span className="text-xs text-primary-400">enviada a</span>
+                </div>
+                
+                {/* Client */}
+                <div className="text-center">
+                  <img
+                    src={getProfileImageUrl(viewingProposal.client?.avatar || null)}
+                    alt={viewingProposal.client?.name || 'Cliente'}
+                    className="h-16 w-16 rounded-full object-cover border-2 border-primary-600 mb-2"
+                  />
+                  <h3 className="text-lg font-semibold text-primary-100">
+                    {viewingProposal.client_first_name ? `${viewingProposal.client_first_name} ${viewingProposal.client_last_name}` : viewingProposal.client?.name || 'Cliente'}
+                  </h3>
+                  <div className="flex items-center justify-center space-x-2 text-sm text-primary-400">
+                    <div className="flex items-center space-x-1">
+                      <svg className="h-4 w-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                      </svg>
+                      <span>{viewingProposal.client?.rating || '5.0'}</span>
+                    </div>
+                    <span>•</span>
+                    <span>{viewingProposal.client?.completedTattoos || '0'} tatuajes</span>
+                  </div>
                 </div>
               </div>
             </div>

@@ -43,6 +43,7 @@ const calendarRoutes = require('./routes/calendar');
 const sponsoredShopsRoutes = require('./routes/sponsoredShops');
 const statsRoutes = require('./routes/stats');
 const subscriptionRoutes = require('./routes/subscriptions');
+const collectionRoutes = require('./routes/collections');
 
 // Import middleware
 const { errorHandler, notFound } = require('./middleware/errorHandler');
@@ -67,7 +68,8 @@ app.get('/', (req, res) => {
       notifications: '/api/notifications',
       payments: '/api/payments',
       calendar: '/api/calendar',
-      sponsoredShops: '/api/sponsored-shops'
+      sponsoredShops: '/api/sponsored-shops',
+      collections: '/api/collections'
     }
   });
 });
@@ -85,6 +87,7 @@ app.use('/api/calendar', calendarRoutes);
 app.use('/api/sponsored-shops', sponsoredShopsRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
+app.use('/api/collections', collectionRoutes);
 
 // Error handling
 app.use(notFound);

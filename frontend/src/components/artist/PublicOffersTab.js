@@ -15,6 +15,7 @@ const PublicOffersTab = () => {
   const [selectedOffer, setSelectedOffer] = useState(null);
   const [showProposalModal, setShowProposalModal] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [proposalStatus, setProposalStatus] = useState({}); // Track proposal status for each offer
   const [filters, setFilters] = useState({
     style: '',
     bodyPart: '',
@@ -73,13 +74,52 @@ const PublicOffersTab = () => {
       if (filters.comuna) apiFilters.comuna = filters.comuna;
       
       const response = await offerService.getAll(apiFilters);
-      setOffers(response.data || []);
+      const offersData = response.data || [];
+      setOffers(offersData);
+      
+      // Check proposal status for each offer
+      await checkProposalStatusForOffers(offersData);
     } catch (error) {
       console.error('Error loading offers:', error);
       toast.error('Error al cargar ofertas');
       setOffers([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const checkProposalStatusForOffers = async (offersData) => {
+    try {
+      const statusChecks = offersData.map(async (offer) => {
+        try {
+          const response = await proposalService.checkExisting(offer.id);
+          return {
+            offerId: offer.id,
+            hasProposal: response.data.hasProposal,
+            proposal: response.data.proposal
+          };
+        } catch (error) {
+          console.error(`Error checking proposal for offer ${offer.id}:`, error);
+          return {
+            offerId: offer.id,
+            hasProposal: false,
+            proposal: null
+          };
+        }
+      });
+
+      const results = await Promise.all(statusChecks);
+      const statusMap = {};
+      results.forEach(result => {
+        statusMap[result.offerId] = {
+          hasProposal: result.hasProposal,
+          proposal: result.proposal
+        };
+      });
+      
+      setProposalStatus(statusMap);
+    } catch (error) {
+      console.error('Error checking proposal status:', error);
     }
   };
 
@@ -99,6 +139,16 @@ const PublicOffersTab = () => {
       toast.success('Propuesta enviada exitosamente');
       setShowProposalModal(null);
       setProposalData({ message: '', proposedPrice: '', estimatedDuration: '' });
+      
+      // Update proposal status for this specific offer
+      const offerId = showProposalModal.id;
+      setProposalStatus(prev => ({
+        ...prev,
+        [offerId]: {
+          hasProposal: true,
+          proposal: { id: 'new' } // We don't have the full proposal data yet
+        }
+      }));
       
       // Refresh offers to update proposal count
       loadOffers();
@@ -138,6 +188,17 @@ const PublicOffersTab = () => {
       maxBudget: '',
       comuna: ''
     });
+  };
+
+  const handleViewSentProposal = (offerId) => {
+    // Find the proposal for this offer
+    const proposalInfo = proposalStatus[offerId];
+    if (proposalInfo?.proposal) {
+      // Emit event to parent component to switch to proposals tab
+      window.dispatchEvent(new CustomEvent('navigateToProposals', { 
+        detail: { proposalId: proposalInfo.proposal.id } 
+      }));
+    }
   };
 
   const hasActiveFilters = Object.values(filters).some(value => value !== '');
@@ -357,13 +418,28 @@ const PublicOffersTab = () => {
                     >
                       Ver Detalles
                     </Button>
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={() => setShowProposalModal(offer)}
-                    >
-                      Enviar Propuesta
-                    </Button>
+                    {proposalStatus[offer.id]?.hasProposal ? (
+                      <div className="flex items-center space-x-2">
+                        <span className="text-sm text-accent-400 font-medium">
+                          Propuesta ya enviada
+                        </span>
+                        <Button
+                          variant="accent"
+                          size="sm"
+                          onClick={() => handleViewSentProposal(offer.id)}
+                        >
+                          Ver Propuesta Enviada
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => setShowProposalModal(offer)}
+                      >
+                        Enviar Propuesta
+                      </Button>
+                    )}
                   </div>
                 </div>
               </Card>
@@ -479,15 +555,32 @@ const PublicOffersTab = () => {
               <Button variant="ghost" onClick={() => setSelectedOffer(null)}>
                 Cerrar
               </Button>
-              <Button
-                variant="primary"
-                onClick={() => {
-                  setSelectedOffer(null);
-                  setShowProposalModal(selectedOffer);
-                }}
-              >
-                Enviar Propuesta
-              </Button>
+              {proposalStatus[selectedOffer.id]?.hasProposal ? (
+                <div className="flex items-center space-x-3">
+                  <span className="text-sm text-accent-400 font-medium">
+                    Propuesta ya enviada
+                  </span>
+                  <Button
+                    variant="accent"
+                    onClick={() => {
+                      setSelectedOffer(null);
+                      handleViewSentProposal(selectedOffer.id);
+                    }}
+                  >
+                    Ver Propuesta Enviada
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  variant="primary"
+                  onClick={() => {
+                    setSelectedOffer(null);
+                    setShowProposalModal(selectedOffer);
+                  }}
+                >
+                  Enviar Propuesta
+                </Button>
+              )}
             </div>
           </div>
         )}

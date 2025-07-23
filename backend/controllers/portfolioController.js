@@ -1,5 +1,6 @@
 const Portfolio = require('../models/Portfolio');
 const TattooArtist = require('../models/TattooArtist');
+const Collection = require('../models/Collection');
 const ImageProcessor = require('../utils/imageProcessor');
 const VideoProcessor = require('../utils/videoProcessor');
 const { body, param } = require('express-validator');
@@ -351,6 +352,20 @@ const uploadPortfolioMedia = async (req, res) => {
           duration: mediaData.duration,
           fileSize: mediaData.fileSize
         });
+
+        // Automatically add to default collection
+        try {
+          // Find the default collection (first collection with sort_order 0 or name 'Mi Portfolio')
+          const defaultCollections = await Collection.findByArtist(artist.id, true);
+          const defaultCollection = defaultCollections.find(c => c.sort_order === 0) || defaultCollections[0];
+          
+          if (defaultCollection) {
+            await Collection.addImage(defaultCollection.id, portfolioId, 0);
+          }
+        } catch (collectionError) {
+          console.error('Error adding image to default collection:', collectionError);
+          // Continue without failing the upload
+        }
       }
       
       const portfolioItem = await Portfolio.findById(portfolioId);

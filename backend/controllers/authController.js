@@ -2,6 +2,7 @@ const { body } = require('express-validator');
 const User = require('../models/User');
 const TattooArtist = require('../models/TattooArtist');
 const Client = require('../models/Client');
+const Collection = require('../models/Collection');
 const { generateToken } = require('../config/jwt');
 const { handleValidationErrors } = require('../middleware/validation');
 const emailService = require('../services/emailService');
@@ -41,7 +42,7 @@ const register = async (req, res) => {
     if (userType === 'artist') {
       const existingArtist = await TattooArtist.findByUserId(userId);
       if (!existingArtist) {
-        await TattooArtist.create({ 
+        const artistData = await TattooArtist.create({ 
           userId,
           studioName: null,
           comunaId: null,
@@ -51,6 +52,14 @@ const register = async (req, res) => {
           maxPrice: null,
           instagramUrl: null
         });
+        
+        // Create default collection for the new artist
+        try {
+          await Collection.createDefaultCollection(artistData.id);
+        } catch (collectionError) {
+          console.error('Error creating default collection:', collectionError);
+          // Continue without failing the registration
+        }
       }
     } else if (userType === 'client') {
       const existingClient = await Client.findByUserId(userId);
@@ -350,7 +359,7 @@ const completeProfile = async (req, res) => {
     if (userType === 'artist') {
       const existingArtist = await TattooArtist.findByUserId(req.user.id);
       if (!existingArtist) {
-        await TattooArtist.create({ 
+        const artistData = await TattooArtist.create({ 
           userId: req.user.id,
           studioName: null,
           comunaId: null,
@@ -360,6 +369,14 @@ const completeProfile = async (req, res) => {
           maxPrice: null,
           instagramUrl: null
         });
+        
+        // Create default collection for the new artist
+        try {
+          await Collection.createDefaultCollection(artistData.id);
+        } catch (collectionError) {
+          console.error('Error creating default collection:', collectionError);
+          // Continue without failing the profile completion
+        }
       }
     } else if (userType === 'client') {
       const existingClient = await Client.findByUserId(req.user.id);

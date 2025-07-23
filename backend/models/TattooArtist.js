@@ -14,7 +14,8 @@ class TattooArtist {
       [userId, studioName || null, comunaId || null, address || null, yearsExperience || 0, minPrice || null, maxPrice || null, instagramUrl || null]
     );
     
-    return result.insertId;
+    // Return the created artist object with the ID
+    return { id: result.insertId, ...artistData };
   }
 
   static async findByUserId(userId) {

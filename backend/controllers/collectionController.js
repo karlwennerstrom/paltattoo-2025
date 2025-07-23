@@ -10,7 +10,7 @@ const createCollectionValidation = [
 ];
 
 const updateCollectionValidation = [
-  param('collectionId').isInt().withMessage('ID de colección inválido'),
+  param('collectionId').isNumeric().withMessage('ID de colección inválido'),
   body('name').optional().isLength({ max: 255 }).withMessage('El nombre no puede exceder 255 caracteres'),
   body('description').optional().isLength({ max: 1000 }).withMessage('La descripción no puede exceder 1000 caracteres')
 ];
@@ -134,7 +134,7 @@ const createCollection = async (req, res) => {
     
     res.status(201).json({
       message: 'Colección creada exitosamente',
-      collection: {
+      data: {
         ...collection,
         coverImageUrl: collection.cover_image_url ? `/uploads/portfolio/${collection.cover_image_url}` : null
       }
@@ -148,7 +148,13 @@ const createCollection = async (req, res) => {
 const updateCollection = async (req, res) => {
   try {
     const { collectionId } = req.params;
-    const { name, description, coverImageId, isPublic, sortOrder } = req.body;
+    const { name, description, cover_image_id, is_public, sort_order } = req.body;
+    
+    console.log('Update collection request:', {
+      collectionId,
+      body: req.body,
+      extracted: { name, description, cover_image_id, is_public, sort_order }
+    });
     
     const collection = await Collection.findById(collectionId);
     if (!collection) {
@@ -163,9 +169,9 @@ const updateCollection = async (req, res) => {
     const updateData = {};
     if (name !== undefined) updateData.name = name;
     if (description !== undefined) updateData.description = description;
-    if (coverImageId !== undefined) updateData.coverImageId = coverImageId;
-    if (isPublic !== undefined) updateData.isPublic = isPublic;
-    if (sortOrder !== undefined) updateData.sortOrder = sortOrder;
+    if (cover_image_id !== undefined) updateData.coverImageId = cover_image_id;
+    if (is_public !== undefined) updateData.isPublic = is_public;
+    if (sort_order !== undefined) updateData.sortOrder = sort_order;
     
     const updated = await Collection.update(collectionId, updateData);
     
@@ -177,7 +183,7 @@ const updateCollection = async (req, res) => {
     
     res.json({
       message: 'Colección actualizada exitosamente',
-      collection: {
+      data: {
         ...updatedCollection,
         coverImageUrl: updatedCollection.cover_image_url ? `/uploads/portfolio/${updatedCollection.cover_image_url}` : null
       }

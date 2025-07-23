@@ -32,6 +32,8 @@ const CollectionsTab = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showManageImagesModal, setShowManageImagesModal] = useState(false);
+  const [showAddToCollectionModal, setShowAddToCollectionModal] = useState(false);
+  const [selectedImageForCollection, setSelectedImageForCollection] = useState(null);
   const [newCollection, setNewCollection] = useState({
     name: '',
     description: '',
@@ -42,6 +44,29 @@ const CollectionsTab = () => {
   useEffect(() => {
     loadCollections();
     loadPortfolioItems();
+    
+    // Listen for openCollectionsTab event from PortfolioTab
+    const handleOpenCollectionsTab = (event) => {
+      if (event.detail?.createNew) {
+        setShowCreateModal(true);
+      }
+    };
+    
+    // Listen for addToCollection event from PortfolioTab
+    const handleAddToCollection = (event) => {
+      if (event.detail?.imageId) {
+        setSelectedImageForCollection(event.detail.imageId);
+        setShowAddToCollectionModal(true);
+      }
+    };
+    
+    window.addEventListener('openCollectionsTab', handleOpenCollectionsTab);
+    window.addEventListener('addToCollection', handleAddToCollection);
+    
+    return () => {
+      window.removeEventListener('openCollectionsTab', handleOpenCollectionsTab);
+      window.removeEventListener('addToCollection', handleAddToCollection);
+    };
   }, []);
 
   const loadCollections = async () => {
@@ -200,14 +225,44 @@ const CollectionsTab = () => {
   };
 
   const openEditModal = (collection) => {
+    console.log('Opening edit modal for collection:', collection);
     setSelectedCollection(collection);
-    setNewCollection({
+    const newCollectionData = {
       name: collection.name,
       description: collection.description || '',
-      isPublic: collection.is_public,
+      isPublic: Boolean(collection.is_public),
       coverImageId: collection.cover_image_id
-    });
+    };
+    console.log('Setting newCollection state:', newCollectionData);
+    setNewCollection(newCollectionData);
     setShowEditModal(true);
+    console.log('showEditModal set to true');
+  };
+
+  const handleAddImageToCollection = async (collectionId, imageId) => {
+    if (!apiAvailable) {
+      toast.error('Las colecciones están en desarrollo - funcionalidad no disponible');
+      return;
+    }
+
+    try {
+      await collectionService.addImage(collectionId, imageId);
+      toast.success('Imagen agregada a la colección exitosamente');
+      
+      // Update collection image count locally if possible
+      setCollections(prev => prev.map(c => 
+        c.id === collectionId 
+          ? { ...c, image_count: (c.image_count || 0) + 1 }
+          : c
+      ));
+    } catch (error) {
+      console.error('Error adding image to collection:', error);
+      if (error.response?.status === 409) {
+        toast.error('La imagen ya está en esta colección');
+      } else {
+        toast.error('Error al agregar imagen a la colección');
+      }
+    }
   };
 
   if (loading) {
@@ -263,25 +318,54 @@ const CollectionsTab = () => {
                 <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-60 transition-all duration-200 flex items-center justify-center opacity-0 group-hover:opacity-100">
                   <div className="flex space-x-2">
                     <button
-                      onClick={() => setViewingCollection(collection)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setViewingCollection(collection);
+                      }}
                       className="p-2 bg-white bg-opacity-20 text-white rounded-full hover:bg-opacity-30 transition-colors"
                       title="Ver colección"
                     >
-                      <FiEye className="w-4 h-4" />
+                      <FiFolder className="w-4 h-4" />
                     </button>
                     <button
-                      onClick={() => setShowManageImagesModal(collection)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggleVisibility(collection.id);
+                      }}
+                      className="p-2 bg-white bg-opacity-20 text-white rounded-full hover:bg-opacity-30 transition-colors"
+                      title={collection.is_public ? "Ocultar" : "Publicar"}
+                    >
+                      {collection.is_public ? <FiEye className="w-4 h-4" /> : <FiEyeOff className="w-4 h-4" />}
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowManageImagesModal(collection);
+                      }}
                       className="p-2 bg-white bg-opacity-20 text-white rounded-full hover:bg-opacity-30 transition-colors"
                       title="Gestionar imágenes"
                     >
                       <FiGrid className="w-4 h-4" />
                     </button>
                     <button
-                      onClick={() => openEditModal(collection)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openEditModal(collection);
+                      }}
                       className="p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors"
                       title="Editar"
                     >
                       <FiEdit2 className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteCollection(collection.id);
+                      }}
+                      className="p-2 bg-red-600 text-white rounded-full hover:bg-red-700 transition-colors"
+                      title="Eliminar"
+                    >
+                      <FiTrash2 className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
@@ -409,6 +493,7 @@ const CollectionsTab = () => {
       </Modal>
 
       {/* Edit Collection Modal */}
+      {console.log('Rendering edit modal, showEditModal:', showEditModal, 'selectedCollection:', selectedCollection)}
       <Modal
         isOpen={showEditModal}
         onClose={() => {
@@ -467,6 +552,207 @@ const CollectionsTab = () => {
           </div>
         </div>
       </Modal>
+
+      {/* Manage Images Modal */}
+      <Modal
+        isOpen={showManageImagesModal}
+        onClose={() => {
+          setShowManageImagesModal(false);
+          setSelectedCollection(null);
+        }}
+        title={`Gestionar Imágenes - ${showManageImagesModal?.name || ''}`}
+        size="xl"
+      >
+        <div className="space-y-6">
+          {/* Available Portfolio Items */}
+          <div>
+            <h3 className="text-lg font-medium text-primary-100 mb-4">Imágenes Disponibles en tu Portfolio</h3>
+            {portfolioItems.length > 0 ? (
+              <div className="grid grid-cols-3 gap-4 max-h-64 overflow-y-auto">
+                {portfolioItems.map((item) => (
+                  <div key={item.id} className="relative group">
+                    <img
+                      src={getTattooImageUrl(item.imageUrl || item.image_url)}
+                      alt={item.title}
+                      className="w-full h-24 object-cover rounded-lg"
+                    />
+                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-60 transition-all duration-200 flex items-center justify-center opacity-0 group-hover:opacity-100 rounded-lg">
+                      <button
+                        onClick={() => handleAddImageToCollection(showManageImagesModal.id, item.id)}
+                        className="px-3 py-1 bg-accent-600 text-white rounded text-sm hover:bg-accent-700 transition-colors"
+                        disabled={!apiAvailable}
+                      >
+                        Agregar
+                      </button>
+                    </div>
+                    <div className="absolute bottom-1 left-1 right-1">
+                      <p className="text-xs text-white bg-black bg-opacity-75 px-1 rounded truncate">
+                        {item.title}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-primary-400 text-center py-8">No hay imágenes en tu portfolio</p>
+            )}
+          </div>
+
+          {/* Collection Images */}
+          <div>
+            <h3 className="text-lg font-medium text-primary-100 mb-4">Imágenes en esta Colección</h3>
+            <div className="bg-primary-800 rounded-lg p-4">
+              <p className="text-primary-400 text-center">Funcionalidad en desarrollo - pronto podrás ver y reordenar las imágenes de la colección</p>
+            </div>
+          </div>
+
+          <div className="flex justify-end">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setShowManageImagesModal(false);
+                setSelectedCollection(null);
+              }}
+            >
+              Cerrar
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Add to Collection Modal */}
+      <Modal
+        isOpen={showAddToCollectionModal}
+        onClose={() => {
+          setShowAddToCollectionModal(false);
+          setSelectedImageForCollection(null);
+        }}
+        title="Agregar a Colección"
+        size="md"
+      >
+        <div className="space-y-4">
+          <p className="text-primary-200">Selecciona la colección donde quieres agregar esta imagen:</p>
+          
+          {collections.length > 0 ? (
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {collections.map((collection) => (
+                <button
+                  key={collection.id}
+                  onClick={() => {
+                    handleAddImageToCollection(collection.id, selectedImageForCollection);
+                    setShowAddToCollectionModal(false);
+                    setSelectedImageForCollection(null);
+                  }}
+                  className="w-full p-3 bg-primary-700 hover:bg-primary-600 rounded-lg transition-colors text-left"
+                  disabled={!apiAvailable}
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-primary-100">{collection.name}</p>
+                      {collection.description && (
+                        <p className="text-sm text-primary-400 truncate">{collection.description}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm text-primary-400">
+                        {collection.image_count || 0} imágenes
+                      </span>
+                      {!collection.is_public && (
+                        <span className="px-2 py-1 bg-gray-600 text-white text-xs rounded">
+                          Privada
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <FiFolder className="w-12 h-12 text-primary-600 mx-auto mb-3" />
+              <p className="text-primary-400 mb-4">No tienes colecciones aún</p>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  setShowAddToCollectionModal(false);
+                  setSelectedImageForCollection(null);
+                  setShowCreateModal(true);
+                }}
+              >
+                Crear Primera Colección
+              </Button>
+            </div>
+          )}
+
+          <div className="flex justify-end space-x-3 pt-4">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setShowAddToCollectionModal(false);
+                setSelectedImageForCollection(null);
+              }}
+            >
+              Cancelar
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* View Collection Modal */}
+      {viewingCollection && (
+        <Modal
+          isOpen={viewingCollection !== null}
+          onClose={() => setViewingCollection(null)}
+          title={viewingCollection.name}
+          size="xl"
+        >
+          <div className="space-y-4">
+            {viewingCollection.description && (
+              <p className="text-primary-200">{viewingCollection.description}</p>
+            )}
+            
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4 text-sm text-primary-400">
+                <span className="flex items-center">
+                  <FiImage className="w-4 h-4 mr-1" />
+                  {viewingCollection.image_count || 0} imágenes
+                </span>
+                <span className={`px-2 py-1 rounded text-xs ${viewingCollection.is_public ? 'bg-green-600 text-white' : 'bg-gray-600 text-white'}`}>
+                  {viewingCollection.is_public ? 'Pública' : 'Privada'}
+                </span>
+              </div>
+              <div className="flex space-x-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setViewingCollection(null);
+                    openEditModal(viewingCollection);
+                  }}
+                >
+                  <FiEdit2 className="w-4 h-4 mr-2" />
+                  Editar
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setViewingCollection(null);
+                    setShowManageImagesModal(viewingCollection);
+                  }}
+                >
+                  <FiGrid className="w-4 h-4 mr-2" />
+                  Gestionar
+                </Button>
+              </div>
+            </div>
+            
+            <div className="bg-primary-800 rounded-lg p-4">
+              <p className="text-primary-400 text-center">La vista de imágenes de la colección está en desarrollo</p>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 };

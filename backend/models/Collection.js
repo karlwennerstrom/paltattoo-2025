@@ -87,16 +87,34 @@ class Collection {
   }
 
   static async delete(collectionId) {
+    // Check if this is a default collection (cannot be deleted)
+    const [collection] = await promisePool.execute(
+      'SELECT * FROM portfolio_collections WHERE id = ?',
+      [collectionId]
+    );
+    
+    if (collection[0] && (collection[0].sort_order === 0 || collection[0].name === 'Mi Portfolio')) {
+      throw new Error('No se puede eliminar la colección por defecto');
+    }
+    
     const connection = await promisePool.getConnection();
     
     try {
       await connection.beginTransaction();
       
-      // Delete collection-image relationships first
-      await connection.execute(
-        'DELETE FROM portfolio_collection_images WHERE collection_id = ?',
-        [collectionId]
+      // Move images from this collection to the default collection
+      const [defaultCollection] = await connection.execute(
+        'SELECT id FROM portfolio_collections WHERE artist_id = ? AND sort_order = 0 LIMIT 1',
+        [collection[0].artist_id]
       );
+      
+      if (defaultCollection[0]) {
+        // Move images to default collection
+        await connection.execute(
+          'UPDATE portfolio_collection_images SET collection_id = ? WHERE collection_id = ?',
+          [defaultCollection[0].id, collectionId]
+        );
+      }
       
       // Then delete the collection
       await connection.execute(
@@ -183,6 +201,18 @@ class Collection {
     );
     
     return rows[0].total;
+  }
+
+  static async createDefaultCollection(artistId) {
+    const defaultCollection = {
+      artistId,
+      name: 'Mi Portfolio',
+      description: 'Colección principal con mis mejores trabajos',
+      isPublic: true,
+      sortOrder: 0
+    };
+    
+    return await this.create(defaultCollection);
   }
 
   static async reorderCollections(artistId, collectionOrders) {

@@ -4,8 +4,11 @@ import { Card, Grid } from '../common/Layout';
 import Button from '../common/Button';
 import Input from '../common/Input';
 import Modal from '../common/Modal';
+import UpgradePrompt from '../common/UpgradePrompt';
 import { getProfileImageUrl } from '../../utils/imageHelpers';
 import { calendarService } from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
+import { getUserFeatures } from '../../utils/subscriptionHelpers';
 import toast from 'react-hot-toast';
 import { 
   FiPlus, FiCalendar, FiClock, FiUser, FiPhone, FiMail, 
@@ -14,9 +17,14 @@ import {
 } from 'react-icons/fi';
 
 const CalendarTab = () => {
+  const { user } = useAuth();
+  const userFeatures = getUserFeatures(user);
+  
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(null);
   const [viewMode, setViewMode] = useState('month');
+  const [activeTab, setActiveTab] = useState('calendar'); // 'calendar' or 'all-appointments'
+  const [appointmentFilter, setAppointmentFilter] = useState('all'); // 'all', 'scheduled', 'confirmed', 'completed', 'cancelled'
   const [loading, setLoading] = useState(true);
   const [appointments, setAppointments] = useState([]);
   const [availability, setAvailability] = useState({});
@@ -46,6 +54,8 @@ const CalendarTab = () => {
       // Ensure appointments is always an array
       // Backend returns { success: true, data: appointments }
       const appointmentsData = response.data?.data || response.data || [];
+      
+      // The backend now returns dates in YYYY-MM-DD format, so we can use them directly
       setAppointments(Array.isArray(appointmentsData) ? appointmentsData : []);
     } catch (error) {
       console.log('API not available, using mock data:', error.message);
@@ -122,7 +132,8 @@ const CalendarTab = () => {
 
   const handleCreateAppointment = async (appointmentData) => {
     try {
-      await calendarService.createAppointment(appointmentData);
+      // Use standalone appointment creation since we're not requiring proposal_id
+      await calendarService.createStandaloneAppointment(appointmentData);
       toast.success('Cita creada exitosamente');
       setIsAddingAppointment(false);
       loadAppointments();
@@ -234,6 +245,24 @@ const CalendarTab = () => {
     return time ? time.substring(0, 5) : '';
   };
 
+  const getFilteredAppointments = () => {
+    if (appointmentFilter === 'all') {
+      return appointments;
+    }
+    return appointments.filter(appointment => appointment.status === appointmentFilter);
+  };
+
+  const getFilterButtonVariant = (filterValue) => {
+    return appointmentFilter === filterValue ? 'primary' : 'ghost';
+  };
+
+  const getFilterCount = (status) => {
+    if (status === 'all') {
+      return appointments.length;
+    }
+    return appointments.filter(appointment => appointment.status === status).length;
+  };
+
   const CalendarGrid = () => {
     const days = getDaysInMonth(currentDate);
     const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
@@ -279,16 +308,26 @@ const CalendarTab = () => {
                   <div
                     key={apt.id}
                     className={twMerge(
-                      'text-xs px-1 py-0.5 rounded text-white truncate',
+                      'text-xs px-1 py-0.5 rounded text-white truncate cursor-pointer hover:opacity-80 transition-opacity',
                       getStatusColor(apt.status)
                     )}
                     title={`${apt.title} - ${formatTime(apt.start_time)}`}
+                    onClick={(e) => {
+                      e.stopPropagation(); // Prevent day selection
+                      setSelectedAppointment(apt);
+                    }}
                   >
                     {formatTime(apt.start_time)} {apt.title}
                   </div>
                 ))}
                 {dayAppointments.length > 2 && (
-                  <div className="text-xs text-primary-400">
+                  <div 
+                    className="text-xs text-primary-400 cursor-pointer hover:text-primary-300 transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation(); // Prevent day selection
+                      setSelectedDate(day); // Show all appointments for this day
+                    }}
+                  >
                     +{dayAppointments.length - 2} más
                   </div>
                 )}
@@ -315,7 +354,26 @@ const CalendarTab = () => {
 
     const handleSubmit = (e) => {
       e.preventDefault();
-      onSubmit(formData);
+      
+      // Calculate duration_hours automatically
+      const calculateDuration = (startTime, endTime) => {
+        if (!startTime || !endTime) return 1; // Default 1 hour
+        
+        const [startHour, startMin] = startTime.split(':').map(Number);
+        const [endHour, endMin] = endTime.split(':').map(Number);
+        
+        const startMinutes = startHour * 60 + startMin;
+        const endMinutes = endHour * 60 + endMin;
+        
+        return Math.max(0.5, (endMinutes - startMinutes) / 60); // Minimum 0.5 hours
+      };
+      
+      const submissionData = {
+        ...formData,
+        duration_hours: calculateDuration(formData.start_time, formData.end_time)
+      };
+      
+      onSubmit(submissionData);
     };
 
     return (
@@ -339,6 +397,7 @@ const CalendarTab = () => {
           type="email"
           value={formData.client_email}
           onChange={(e) => setFormData({...formData, client_email: e.target.value})}
+          required
         />
 
         <Input
@@ -415,6 +474,27 @@ const CalendarTab = () => {
     );
   }
 
+  // Check if user has calendar access
+  if (!userFeatures.calendar) {
+    return (
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between space-y-4 md:space-y-0">
+          <div>
+            <h2 className="text-xl font-bold text-primary-100">Mi Calendario</h2>
+            <p className="text-primary-400">Gestiona tus citas y disponibilidad</p>
+          </div>
+        </div>
+
+        {/* Upgrade Prompt */}
+        <UpgradePrompt 
+          title="Actualiza tu plan para acceder a esta funcionalidad"
+          description="El calendario de citas está disponible solo para usuarios con plan Premium o superior"
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -442,8 +522,45 @@ const CalendarTab = () => {
         </div>
       </div>
 
-      {/* Calendar Navigation */}
-      <Card>
+      {/* Tabs */}
+      <div className="flex space-x-1 bg-primary-800 p-1 rounded-lg">
+        <button
+          onClick={() => {
+            setActiveTab('calendar');
+            setAppointmentFilter('all');
+          }}
+          className={twMerge(
+            'flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors',
+            activeTab === 'calendar'
+              ? 'bg-primary-600 text-primary-100'
+              : 'text-primary-300 hover:text-primary-100'
+          )}
+        >
+          <FiCalendar className="inline mr-2" size={16} />
+          Vista Calendario
+        </button>
+        <button
+          onClick={() => {
+            setActiveTab('all-appointments');
+            setAppointmentFilter('all');
+          }}
+          className={twMerge(
+            'flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors',
+            activeTab === 'all-appointments'
+              ? 'bg-primary-600 text-primary-100'
+              : 'text-primary-300 hover:text-primary-100'
+          )}
+        >
+          <FiClock className="inline mr-2" size={16} />
+          Todas las Citas
+        </button>
+      </div>
+
+      {/* Calendar View */}
+      {activeTab === 'calendar' && (
+        <>
+          {/* Calendar Navigation */}
+          <Card>
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-primary-100">
             {currentDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
@@ -476,8 +593,78 @@ const CalendarTab = () => {
         <CalendarGrid />
       </Card>
 
+      {/* Selected Day Appointments */}
+      {selectedDate && (
+        <Card title={`Citas del ${selectedDate.toLocaleDateString('es-ES', { 
+          weekday: 'long', 
+          day: 'numeric', 
+          month: 'long', 
+          year: 'numeric' 
+        })}`}>
+          {(() => {
+            const dayAppointments = getAppointmentsForDate(selectedDate);
+            if (dayAppointments.length === 0) {
+              return (
+                <div className="text-center py-8">
+                  <FiCalendar className="mx-auto mb-4 text-primary-400" size={48} />
+                  <p className="text-primary-300">No hay citas programadas para este día</p>
+                </div>
+              );
+            }
+            
+            return (
+              <div className="space-y-3">
+                {dayAppointments.map((appointment) => (
+                  <div
+                    key={appointment.id}
+                    className="flex items-center justify-between p-4 bg-primary-700 rounded-lg hover:bg-primary-600 transition-colors cursor-pointer"
+                    onClick={() => setSelectedAppointment(appointment)}
+                  >
+                    <div className="flex items-center space-x-4">
+                      <div className={twMerge(
+                        'w-3 h-3 rounded-full',
+                        getStatusColor(appointment.status)
+                      )}></div>
+                      <div>
+                        <h4 className="font-medium text-primary-100">{appointment.title}</h4>
+                        <p className="text-sm text-primary-400">
+                          {appointment.client_name} • {formatTime(appointment.start_time)} - {formatTime(appointment.end_time)}
+                        </p>
+                        {appointment.notes && (
+                          <p className="text-xs text-primary-500 mt-1">{appointment.notes}</p>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <span className={twMerge(
+                        'px-2 py-1 rounded text-xs font-medium text-white',
+                        getStatusColor(appointment.status)
+                      )}>
+                        {getStatusText(appointment.status)}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedAppointment(appointment);
+                        }}
+                      >
+                        <FiEye size={16} />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+        </Card>
+      )}
+
       {/* Upcoming Appointments */}
-      <Card title="Próximas Citas">
+      <div className="bg-black/60 backdrop-blur-xl border border-white/10 hover:border-accent-500/20 transition-all duration-300 hover:shadow-2xl hover:transform hover:-translate-y-1 shadow rounded-lg p-6" title="Próximas Citas">
+        <h3 className="text-lg font-semibold text-primary-100 mb-4">Todas las Citas</h3>
         {!Array.isArray(appointments) || appointments.length === 0 ? (
           <div className="text-center py-8">
             <FiCalendar className="mx-auto mb-4 text-primary-400" size={48} />
@@ -488,7 +675,8 @@ const CalendarTab = () => {
             {appointments.slice(0, 5).map((appointment) => (
               <div
                 key={appointment.id}
-                className="flex items-center justify-between p-4 bg-primary-700 rounded-lg hover:bg-primary-600 transition-colors"
+                className="flex items-center justify-between p-4 bg-primary-700 rounded-lg hover:bg-primary-600 transition-colors cursor-pointer"
+                onClick={() => setSelectedAppointment(appointment)}
               >
                 <div className="flex items-center space-x-4">
                   <div className={twMerge(
@@ -513,7 +701,10 @@ const CalendarTab = () => {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setSelectedAppointment(appointment)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedAppointment(appointment);
+                    }}
                   >
                     <FiEye size={16} />
                   </Button>
@@ -522,7 +713,159 @@ const CalendarTab = () => {
             ))}
           </div>
         )}
-      </Card>
+      </div>
+        </>
+      )}
+
+      {/* All Appointments View */}
+      {activeTab === 'all-appointments' && (
+        <Card title="Todas las Citas">
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent-500"></div>
+            </div>
+          ) : !Array.isArray(appointments) || appointments.length === 0 ? (
+            <div className="text-center py-8">
+              <FiCalendar className="mx-auto mb-4 text-primary-400" size={48} />
+              <p className="text-primary-300">No tienes citas programadas</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* Filter buttons */}
+              <div className="flex flex-wrap gap-2 mb-4">
+                <Button 
+                  variant={getFilterButtonVariant('all')} 
+                  size="sm"
+                  onClick={() => setAppointmentFilter('all')}
+                >
+                  Todas ({getFilterCount('all')})
+                </Button>
+                <Button 
+                  variant={getFilterButtonVariant('scheduled')} 
+                  size="sm"
+                  onClick={() => setAppointmentFilter('scheduled')}
+                >
+                  Programadas ({getFilterCount('scheduled')})
+                </Button>
+                <Button 
+                  variant={getFilterButtonVariant('confirmed')} 
+                  size="sm"
+                  onClick={() => setAppointmentFilter('confirmed')}
+                >
+                  Confirmadas ({getFilterCount('confirmed')})
+                </Button>
+                <Button 
+                  variant={getFilterButtonVariant('completed')} 
+                  size="sm"
+                  onClick={() => setAppointmentFilter('completed')}
+                >
+                  Completadas ({getFilterCount('completed')})
+                </Button>
+                <Button 
+                  variant={getFilterButtonVariant('cancelled')} 
+                  size="sm"
+                  onClick={() => setAppointmentFilter('cancelled')}
+                >
+                  Canceladas ({getFilterCount('cancelled')})
+                </Button>
+              </div>
+              
+              {/* Appointments grouped by date */}
+              {(() => {
+                const filteredAppointments = getFilteredAppointments();
+                if (filteredAppointments.length === 0) {
+                  return (
+                    <div className="text-center py-8">
+                      <FiCalendar className="mx-auto mb-4 text-primary-400" size={48} />
+                      <p className="text-primary-300">
+                        No hay citas {appointmentFilter === 'all' ? '' : getStatusText(appointmentFilter).toLowerCase()}
+                      </p>
+                    </div>
+                  );
+                }
+                
+                const groupedAppointments = filteredAppointments.reduce((groups, appointment) => {
+                  const date = appointment.appointment_date;
+                  if (!groups[date]) {
+                    groups[date] = [];
+                  }
+                  groups[date].push(appointment);
+                  return groups;
+                }, {});
+
+                return Object.entries(groupedAppointments)
+                  .sort(([a], [b]) => new Date(a) - new Date(b))
+                  .map(([date, dayAppointments]) => (
+                    <div key={date} className="mb-6">
+                      <h3 className="text-lg font-semibold text-primary-100 mb-3 border-b border-primary-700 pb-2">
+                        {new Date(date + 'T00:00:00').toLocaleDateString('es-ES', {
+                          weekday: 'long',
+                          day: 'numeric',
+                          month: 'long',
+                          year: 'numeric'
+                        })}
+                      </h3>
+                      <div className="space-y-3">
+                        {dayAppointments
+                          .sort((a, b) => a.start_time.localeCompare(b.start_time))
+                          .map((appointment) => (
+                            <div
+                              key={appointment.id}
+                              className="flex items-center justify-between p-4 bg-primary-700 rounded-lg hover:bg-primary-600 transition-colors cursor-pointer"
+                              onClick={() => setSelectedAppointment(appointment)}
+                            >
+                              <div className="flex items-center space-x-4">
+                                <div className={twMerge(
+                                  'w-3 h-3 rounded-full',
+                                  getStatusColor(appointment.status)
+                                )}></div>
+                                <div className="flex-1">
+                                  <h4 className="font-medium text-primary-100">{appointment.title}</h4>
+                                  <p className="text-sm text-primary-400">
+                                    {appointment.client_name} • {formatTime(appointment.start_time)} - {formatTime(appointment.end_time)}
+                                  </p>
+                                  {appointment.client_phone && (
+                                    <p className="text-xs text-primary-500">📞 {appointment.client_phone}</p>
+                                  )}
+                                  {appointment.notes && (
+                                    <p className="text-xs text-primary-500 mt-1">📝 {appointment.notes}</p>
+                                  )}
+                                </div>
+                              </div>
+                              
+                              <div className="flex items-center space-x-2">
+                                {appointment.estimated_price && (
+                                  <span className="text-xs text-primary-400">
+                                    ${appointment.estimated_price.toLocaleString()}
+                                  </span>
+                                )}
+                                <span className={twMerge(
+                                  'px-2 py-1 rounded text-xs font-medium text-white',
+                                  getStatusColor(appointment.status)
+                                )}>
+                                  {getStatusText(appointment.status)}
+                                </span>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedAppointment(appointment);
+                                  }}
+                                >
+                                  <FiEye size={16} />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  ));
+              })()}
+            </div>
+          )}
+        </Card>
+      )}
 
       {/* Modals */}
       <Modal
@@ -542,6 +885,7 @@ const CalendarTab = () => {
         onClose={() => setEditingAppointment(null)}
         title="Editar Cita"
         size="lg"
+        zIndex="z-60"
       >
         {editingAppointment && (
           <AppointmentForm

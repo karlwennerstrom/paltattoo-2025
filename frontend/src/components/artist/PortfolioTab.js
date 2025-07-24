@@ -3,9 +3,12 @@ import { twMerge } from 'tailwind-merge';
 import { Card, Grid } from '../common/Layout';
 import Button from '../common/Button';
 import Input from '../common/Input';
-import Modal from '../common/Modal';
+import Modal, { ConfirmModal } from '../common/Modal';
+import UpgradePrompt from '../common/UpgradePrompt';
 import { getTattooImageUrl } from '../../utils/imageHelpers';
-import { portfolioService, collectionService } from '../../services/api';
+import { portfolioService, collectionService, subscriptionsAPI } from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
+import { getUserFeatures } from '../../utils/subscriptionHelpers';
 import toast from 'react-hot-toast';
 import { 
   FiImage, 
@@ -18,10 +21,15 @@ import {
   FiList,
   FiStar,
   FiEye,
-  FiEyeOff 
+  FiEyeOff,
+  FiLock,
+  FiArrowUp 
 } from 'react-icons/fi';
 
 const PortfolioTab = () => {
+  const { user } = useAuth();
+  const userFeatures = getUserFeatures(user);
+  
   // View states
   const [currentView, setCurrentView] = useState('collections'); // 'collections' | 'collection-detail'
   const [selectedCollection, setSelectedCollection] = useState(null);
@@ -32,12 +40,30 @@ const PortfolioTab = () => {
   const [collectionImages, setCollectionImages] = useState([]);
   const [loading, setLoading] = useState(true);
   
+  // Subscription states
+  const [userSubscription, setUserSubscription] = useState(null);
+  const [collectionLimits, setCollectionLimits] = useState({
+    basic: 3,
+    pro: 10,
+    premium: 20
+  });
+  
   // Modal states
   const [showCreateCollectionModal, setShowCreateCollectionModal] = useState(false);
   const [showEditCollectionModal, setShowEditCollectionModal] = useState(false);
   const [showAddImageModal, setShowAddImageModal] = useState(false);
   const [showEditImageModal, setShowEditImageModal] = useState(false);
   const [editingImage, setEditingImage] = useState(null);
+  
+  // Delete confirmation modal states
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
+  const [imageToDelete, setImageToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  
+  // Delete collection modal states
+  const [showDeleteCollectionModal, setShowDeleteCollectionModal] = useState(false);
+  const [collectionToDelete, setCollectionToDelete] = useState(null);
+  const [isDeletingCollection, setIsDeletingCollection] = useState(false);
   
   // Form states
   const [newCollection, setNewCollection] = useState({
@@ -64,6 +90,7 @@ const PortfolioTab = () => {
 
   useEffect(() => {
     loadCollections();
+    loadSubscriptionInfo();
   }, []);
 
   useEffect(() => {
@@ -86,6 +113,45 @@ const PortfolioTab = () => {
     }
   };
 
+  const loadSubscriptionInfo = async () => {
+    try {
+      const response = await subscriptionsAPI.getMySubscription();
+      setUserSubscription(response.data);
+    } catch (error) {
+      console.error('Error loading subscription info:', error);
+      // If no subscription, assume basic plan
+      setUserSubscription({ plan: { name: 'basic' } });
+    }
+  };
+
+  const getCurrentCollectionLimit = () => {
+    const maxImages = userFeatures.maxImages;
+    if (maxImages === -1) return Infinity; // Unlimited
+    return maxImages;
+  };
+
+  const getCurrentImageLimit = () => {
+    const maxImages = userFeatures.maxImages;
+    if (maxImages === -1) return Infinity; // Unlimited
+    return maxImages;
+  };
+
+  const canCreateNewCollection = () => {
+    if (userFeatures.unlimitedGallery) return true;
+    return collections.length < getCurrentCollectionLimit();
+  };
+
+  const canAddMoreImages = () => {
+    if (userFeatures.unlimitedGallery) return true;
+    const totalImages = collections.reduce((total, collection) => total + (collection.imageCount || 0), 0);
+    return totalImages < getCurrentImageLimit();
+  };
+
+  const isCollectionBlocked = (collectionIndex) => {
+    if (userFeatures.unlimitedGallery) return false;
+    return collectionIndex >= getCurrentCollectionLimit();
+  };
+
   const loadCollectionImages = async (collectionId) => {
     try {
       setLoading(true);
@@ -103,6 +169,13 @@ const PortfolioTab = () => {
   const handleCreateCollection = async () => {
     if (!newCollection.name.trim()) {
       toast.error('El nombre de la colección es obligatorio');
+      return;
+    }
+
+    if (!canCreateNewCollection()) {
+      const currentLimit = getCurrentCollectionLimit();
+      const planName = userSubscription?.plan?.name || 'básico';
+      toast.error(`Has alcanzado el límite de ${currentLimit} colecciones para tu plan ${planName}. Actualiza tu plan para crear más colecciones.`);
       return;
     }
 
@@ -174,32 +247,40 @@ const PortfolioTab = () => {
     }
   };
 
-  const handleDeleteCollection = async (collectionId) => {
+  const handleDeleteCollection = (collectionId) => {
     const collection = collections.find(c => c.id === collectionId);
+    setCollectionToDelete(collection);
+    setShowDeleteCollectionModal(true);
+  };
+
+  const confirmDeleteCollection = async () => {
+    if (!collectionToDelete) return;
     
-    if (collection && (collection.sort_order === 0 || collection.name === 'Mi Portfolio')) {
-      toast.error('No se puede eliminar la colección por defecto');
-      return;
-    }
-
-    if (!window.confirm('¿Estás seguro de que quieres eliminar esta colección? Las imágenes se moverán a tu colección principal.')) {
-      return;
-    }
-
+    setIsDeletingCollection(true);
     try {
-      await collectionService.delete(collectionId);
-      setCollections(prev => prev.filter(c => c.id !== collectionId));
+      await collectionService.delete(collectionToDelete.id);
+      setCollections(prev => prev.filter(c => c.id !== collectionToDelete.id));
       
-      if (selectedCollection?.id === collectionId) {
+      if (selectedCollection?.id === collectionToDelete.id) {
         setCurrentView('collections');
         setSelectedCollection(null);
       }
       
       toast.success('Colección eliminada exitosamente');
+      setShowDeleteCollectionModal(false);
+      setCollectionToDelete(null);
     } catch (error) {
       console.error('Error deleting collection:', error);
       toast.error(error.response?.data?.error || 'Error al eliminar colección');
+    } finally {
+      setIsDeletingCollection(false);
     }
+  };
+
+  const cancelDeleteCollection = () => {
+    setShowDeleteCollectionModal(false);
+    setCollectionToDelete(null);
+    setIsDeletingCollection(false);
   };
 
   const handleAddImage = async () => {
@@ -214,7 +295,8 @@ const PortfolioTab = () => {
         description: newImage.description,
         category: newImage.category,
         file: newImage.file,
-        isFeatured: newImage.featured
+        isFeatured: newImage.featured,
+        collectionId: selectedCollection?.id // Enviar el ID de la colección actual
       };
 
       await portfolioService.create(formData);
@@ -273,6 +355,44 @@ const PortfolioTab = () => {
       console.error('Error updating image:', error);
       toast.error('Error al actualizar imagen');
     }
+  };
+
+  const handleDeleteImage = (imageId, imageTitle) => {
+    setImageToDelete({ id: imageId, title: imageTitle });
+    setShowDeleteConfirmModal(true);
+  };
+
+  const confirmDeleteImage = async () => {
+    if (!imageToDelete) return;
+    
+    setIsDeleting(true);
+    try {
+      await portfolioService.delete(imageToDelete.id);
+      toast.success('Imagen eliminada exitosamente');
+      
+      // Reload collection images
+      if (selectedCollection) {
+        loadCollectionImages(selectedCollection.id);
+      }
+      
+      // Reload collections to update image counts
+      loadCollections();
+      
+      // Close modal and reset state
+      setShowDeleteConfirmModal(false);
+      setImageToDelete(null);
+    } catch (error) {
+      console.error('Error deleting image:', error);
+      toast.error('Error al eliminar imagen');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const cancelDeleteImage = () => {
+    setShowDeleteConfirmModal(false);
+    setImageToDelete(null);
+    setIsDeleting(false);
   };
 
   const handleImageUpload = (event) => {
@@ -396,14 +516,8 @@ const PortfolioTab = () => {
   };
 
   const openEditCollectionModal = (collection) => {
-    console.log('Opening edit modal for collection:', collection);
     setSelectedCollection(collection);
     setNewCollection({
-      name: collection.name,
-      description: collection.description || '',
-      isPublic: Boolean(collection.is_public)
-    });
-    console.log('Setting newCollection state:', {
       name: collection.name,
       description: collection.description || '',
       isPublic: Boolean(collection.is_public)
@@ -451,6 +565,14 @@ const PortfolioTab = () => {
           <div>
             <h1 className="text-2xl font-bold text-primary-100">Mi Portfolio</h1>
             <p className="text-primary-400">Organiza tu trabajo en colecciones temáticas</p>
+            <p className="text-sm text-primary-500 mt-1">
+              {collections.length}/{getCurrentCollectionLimit()} colecciones utilizadas
+              {userSubscription?.plan?.name && (
+                <span className="ml-2 px-2 py-1 bg-accent-600 text-white text-xs rounded">
+                  Plan {userSubscription.plan.name}
+                </span>
+              )}
+            </p>
           </div>
           <div className="flex space-x-3">
             <Button variant="ghost" onClick={loadCollections} disabled={loading}>
@@ -459,12 +581,25 @@ const PortfolioTab = () => {
               </svg>
               Actualizar
             </Button>
-            <Button variant="primary" onClick={() => setShowCreateCollectionModal(true)}>
+            <Button 
+              variant="primary" 
+              onClick={() => setShowCreateCollectionModal(true)}
+              disabled={!canCreateNewCollection()}
+              title={!canCreateNewCollection() ? `Límite de ${getCurrentCollectionLimit()} colecciones alcanzado` : ''}
+            >
               <FiPlus className="h-5 w-5 mr-2" />
               Nueva Colección
             </Button>
           </div>
         </div>
+
+        {/* Upgrade Prompt for Collection Limits */}
+        {!canCreateNewCollection() && !userFeatures.unlimitedGallery && (
+          <UpgradePrompt 
+            title="Actualiza tu plan para subir más colecciones o imágenes"
+            description={`Has alcanzado el límite de ${getCurrentCollectionLimit()} ${getCurrentCollectionLimit() === 1 ? 'colección' : 'colecciones'} de tu plan actual`}
+          />
+        )}
 
         {/* Drag & Drop Hint */}
         {draggedImageId && (
@@ -481,18 +616,21 @@ const PortfolioTab = () => {
         {/* Collections Grid */}
         {collections.length > 0 ? (
           <Grid cols={3} gap={6}>
-            {collections.filter(collection => collection && collection.id).map((collection) => (
-              <Card 
-                key={collection.id} 
-                className={twMerge(
-                  "group overflow-hidden transition-all duration-200",
-                  dropTargetId === collection.id && draggedImageId ? "ring-2 ring-accent-500 bg-accent-500/10" : ""
-                )}
-                onDragOver={handleDragOver}
-                onDragEnter={(e) => handleDragEnter(e, collection.id)}
-                onDragLeave={handleDragLeave}
-                onDrop={(e) => handleDrop(e, collection.id)}
-              >
+            {collections.filter(collection => collection && collection.id).map((collection, index) => {
+              const isBlocked = isCollectionBlocked(index);
+              return (
+                <div 
+                  key={collection.id} 
+                  className={twMerge(
+                    "bg-black/60 backdrop-blur-xl border border-white/10 hover:border-accent-500/20 hover:shadow-2xl hover:transform hover:-translate-y-1 shadow rounded-lg p-6 group overflow-hidden transition-all duration-200",
+                    dropTargetId === collection.id && draggedImageId ? "ring-2 ring-accent-500 bg-accent-500/10" : "",
+                    isBlocked ? "opacity-60 border-2 border-orange-500" : ""
+                  )}
+                  onDragOver={handleDragOver}
+                  onDragEnter={(e) => handleDragEnter(e, collection.id)}
+                  onDragLeave={handleDragLeave}
+                  onDrop={(e) => handleDrop(e, collection.id)}
+                >
                 {/* Collection Cover */}
                 <div className="aspect-video bg-primary-800 relative overflow-hidden">
                   {collection.cover_image_url ? (
@@ -530,23 +668,27 @@ const PortfolioTab = () => {
                       >
                         <FiEdit2 className="w-4 h-4" />
                       </button>
-                      {!(collection.sort_order === 0 || collection.name === 'Mi Portfolio') && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteCollection(collection.id);
-                          }}
-                          className="p-2 bg-red-600 text-white rounded-full hover:bg-red-700 transition-colors"
-                          title="Eliminar colección"
-                        >
-                          <FiTrash2 className="w-4 h-4" />
-                        </button>
-                      )}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteCollection(collection.id);
+                        }}
+                        className="p-2 bg-red-600 text-white rounded-full hover:bg-red-700 transition-colors"
+                        title="Eliminar colección"
+                      >
+                        <FiTrash2 className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
 
                   {/* Status badges */}
                   <div className="absolute top-2 right-2 flex space-x-1">
+                    {isBlocked && (
+                      <div className="px-2 py-1 bg-orange-600 text-white text-xs rounded flex items-center space-x-1">
+                        <FiLock className="w-3 h-3" />
+                        <span>Bloqueada</span>
+                      </div>
+                    )}
                     {!collection.is_public && (
                       <div className="px-2 py-1 bg-gray-600 text-white text-xs rounded">
                         Privada
@@ -562,12 +704,21 @@ const PortfolioTab = () => {
 
                 {/* Collection Info */}
                 <div 
-                  className="p-4 cursor-pointer hover:bg-primary-700/50 transition-colors"
+                  className="cursor-pointer hover:bg-primary-700/50 transition-colors mt-4"
                   onClick={() => enterCollectionView(collection)}
                 >
                   <h3 className="text-lg font-semibold text-primary-100 mb-1">{collection.name}</h3>
                   {collection.description && (
                     <p className="text-sm text-primary-400 mb-3 line-clamp-2">{collection.description}</p>
+                  )}
+                  {isBlocked && (
+                    <div className="mb-3 p-2 bg-orange-500/20 border border-orange-500/50 rounded text-xs text-orange-300">
+                      <div className="flex items-center space-x-1 mb-1">
+                        <FiArrowUp className="w-3 h-3" />
+                        <span className="font-medium">Actualiza tu plan</span>
+                      </div>
+                      <p>Esta colección estará disponible cuando actualices a un plan superior.</p>
+                    </div>
                   )}
                   
                   <div className="flex items-center justify-between">
@@ -576,17 +727,42 @@ const PortfolioTab = () => {
                       <span>{collection.image_count || 0} imagen{(collection.image_count || 0) !== 1 ? 'es' : ''}</span>
                     </div>
                     
-                    <div className="flex items-center space-x-1">
+                    <div className="flex items-center space-x-2">
                       {collection.is_public ? (
                         <FiEye className="w-4 h-4 text-primary-400" title="Colección pública" />
                       ) : (
                         <FiEyeOff className="w-4 h-4 text-yellow-500" title="Colección privada" />
                       )}
+                      
+                      {/* Action buttons - always visible */}
+                      <div className="flex items-center space-x-1 ml-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEditCollectionModal(collection);
+                          }}
+                          className="p-1 text-primary-400 hover:text-blue-400 transition-colors"
+                          title="Editar colección"
+                        >
+                          <FiEdit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteCollection(collection.id);
+                          }}
+                          className="p-1 text-primary-400 hover:text-red-400 transition-colors"
+                          title="Eliminar colección"
+                        >
+                          <FiTrash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </Card>
-            ))}
+              </div>
+              );
+            })}
           </Grid>
         ) : (
           <div className="text-center py-12">
@@ -772,11 +948,11 @@ const PortfolioTab = () => {
                 onDrop={(e) => handleDrop(e, selectedCollection.id, index)}
               >
                 {/* Featured Badge */}
-                {image.is_featured && (
+                {image.is_featured ? (
                   <div className="absolute top-2 left-2 z-10 px-2 py-1 bg-accent-600 text-white text-xs font-medium rounded">
                     Destacado
                   </div>
-                )}
+                ) : null}
 
                 {/* Action Buttons */}
                 <div className="absolute top-2 right-2 z-10 transition-opacity">
@@ -787,6 +963,13 @@ const PortfolioTab = () => {
                       title="Editar"
                     >
                       <FiEdit2 className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteImage(image.id, image.title)}
+                      className="p-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+                      title="Eliminar"
+                    >
+                      <FiTrash2 className="h-4 w-4" />
                     </button>
                   </div>
                 </div>
@@ -811,9 +994,9 @@ const PortfolioTab = () => {
                   
                   <div className="flex items-center justify-between text-xs text-primary-500 mb-3">
                     <span>{image.style_name || 'Sin estilo'}</span>
-                    {image.is_featured && (
+                    {image.is_featured ? (
                       <FiStar className="h-4 w-4 text-yellow-500" />
-                    )}
+                    ) : null}
                   </div>
                 </div>
               </div>
@@ -858,11 +1041,11 @@ const PortfolioTab = () => {
                     <div className="flex items-center justify-between mb-2">
                       <h3 className="text-lg font-semibold text-primary-100">{image.title || 'Sin título'}</h3>
                       <div className="flex items-center space-x-2">
-                        {image.is_featured && (
+                        {image.is_featured ? (
                           <span className="px-2 py-1 bg-accent-600 text-white text-xs rounded">
                             Destacado
                           </span>
-                        )}
+                        ) : null}
                       </div>
                     </div>
                     <p className="text-sm text-primary-400 mb-2">{image.description}</p>
@@ -873,6 +1056,9 @@ const PortfolioTab = () => {
                       <div className="flex items-center space-x-2">
                         <Button variant="ghost" size="sm" onClick={() => openEditImageModal(image)}>
                           Editar
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => handleDeleteImage(image.id, image.title)} className="text-red-400 hover:text-red-300">
+                          Eliminar
                         </Button>
                       </div>
                     </div>
@@ -1093,8 +1279,38 @@ const PortfolioTab = () => {
         </div>
       </Modal>
 
-      {/* Edit Collection Modal */}
-      {console.log('Edit Collection Modal - showEditCollectionModal:', showEditCollectionModal)}
+
+      {/* Delete Image Confirmation Modal */}
+      <ConfirmModal
+        isOpen={showDeleteConfirmModal}
+        onClose={cancelDeleteImage}
+        onConfirm={confirmDeleteImage}
+        title="Eliminar Imagen"
+        message={`¿Estás seguro de que quieres eliminar la imagen "${imageToDelete?.title || 'Sin título'}"? Esta acción no se puede deshacer.`}
+        confirmText="Eliminar"
+        cancelText="Cancelar"
+        type="danger"
+        loading={isDeleting}
+      />
+
+      {/* Delete Collection Confirmation Modal */}
+      <ConfirmModal
+        isOpen={showDeleteCollectionModal}
+        onClose={cancelDeleteCollection}
+        onConfirm={confirmDeleteCollection}
+        title="Eliminar Colección"
+        message={
+          collectionToDelete?.image_count > 0 
+            ? `¿Estás seguro de que quieres eliminar la colección "${collectionToDelete?.name}"? Esta acción eliminará permanentemente la colección y todas las ${collectionToDelete?.image_count} imágenes que contiene. Esta acción no se puede deshacer.`
+            : `¿Estás seguro de que quieres eliminar la colección "${collectionToDelete?.name}"? Esta acción no se puede deshacer.`
+        }
+        confirmText="Eliminar Colección"
+        cancelText="Cancelar"
+        type="danger"
+        loading={isDeletingCollection}
+      />
+
+      {/* Edit Collection Modal - Global (works in both views) */}
       <Modal
         isOpen={showEditCollectionModal}
         onClose={() => {

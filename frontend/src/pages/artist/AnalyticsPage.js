@@ -1,8 +1,13 @@
 import React, { useState } from 'react';
 import { PageContainer, Card, Grid } from '../../components/common/Layout';
 import Button from '../../components/common/Button';
+import UpgradePrompt from '../../components/common/UpgradePrompt';
+import { useAuth } from '../../contexts/AuthContext';
+import { getUserFeatures } from '../../utils/subscriptionHelpers';
 
 const AnalyticsPage = () => {
+  const { user } = useAuth();
+  const userFeatures = getUserFeatures(user);
   const [timeRange, setTimeRange] = useState('30');
   
   // Mock analytics data
@@ -100,6 +105,22 @@ const AnalyticsPage = () => {
         return 'Actividad';
     }
   };
+
+  // Check if user has analytics access
+  if (!userFeatures.analytics) {
+    return (
+      <PageContainer
+        title="Estadísticas y Análisis"
+        subtitle="Analiza tu rendimiento y crecimiento"
+        maxWidth="full"
+      >
+        <UpgradePrompt 
+          title="Actualiza tu plan para acceder a esta funcionalidad"
+          description="Las estadísticas y análisis están disponibles solo para usuarios con plan Premium o superior"
+        />
+      </PageContainer>
+    );
+  }
 
   return (
     <PageContainer

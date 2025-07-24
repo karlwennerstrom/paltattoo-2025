@@ -65,7 +65,10 @@ const OfferDetailPage = () => {
               avatar: proposal.profile_image,
               rating: proposal.rating || 0,
               reviewsCount: 0,
-              specialties: []
+              specialties: [],
+              phone: proposal.phone,
+              email: proposal.email,
+              whatsapp: proposal.whatsapp
             },
             message: proposal.message,
             estimatedPrice: proposal.proposed_price,
@@ -73,7 +76,8 @@ const OfferDetailPage = () => {
             sessionCount: 1,
             portfolioImages: [],
             createdAt: proposal.created_at,
-            status: proposal.status
+            status: proposal.status,
+            priceHistory: proposal.priceHistory || []
           }));
           
           setOffer(transformedOffer);
@@ -145,6 +149,48 @@ const OfferDetailPage = () => {
 
   const handleSendProposal = () => {
     navigate(`/proposals/send/${offer.id}`);
+  };
+
+  const handleProposalStatusChange = async (proposalId, newStatus) => {
+    try {
+      await proposalService.updateStatus(proposalId, { status: newStatus });
+      toast.success(
+        newStatus === 'accepted' ? 'Propuesta aceptada exitosamente' :
+        newStatus === 'rejected' ? 'Propuesta rechazada' :
+        'Estado actualizado'
+      );
+      
+      // Reload the offer to get updated proposal statuses
+      const response = await offerService.getById(id);
+      if (response.data) {
+        const transformedProposals = (response.data.proposals || []).map(proposal => ({
+          id: proposal.id,
+          artist: {
+            id: proposal.artist_id,
+            name: `${proposal.first_name || ''} ${proposal.last_name || ''}`.trim() || 'Tatuador',
+            location: proposal.comuna_name || 'Chile',
+            avatar: proposal.profile_image,
+            rating: proposal.rating || 0,
+            reviewsCount: 0,
+            specialties: [],
+            phone: proposal.phone,
+            email: proposal.email,
+            whatsapp: proposal.whatsapp
+          },
+          message: proposal.message,
+          estimatedPrice: proposal.proposed_price,
+          estimatedDuration: proposal.estimated_duration,
+          sessionCount: 1,
+          portfolioImages: [],
+          createdAt: proposal.created_at,
+          status: proposal.status,
+          priceHistory: proposal.priceHistory || []
+        }));
+        setProposals(transformedProposals);
+      }
+    } catch (error) {
+      toast.error('Error al actualizar el estado de la propuesta');
+    }
   };
 
   if (loading) {
@@ -286,98 +332,190 @@ const OfferDetailPage = () => {
 
               {proposals.length > 0 ? (
                 <div className="space-y-4">
-                  {proposals.map((proposal) => (
-                    <div key={proposal.id} className="border border-primary-600 rounded-lg p-4">
-                      <div className="flex items-start space-x-4">
-                        {/* Artist Avatar */}
-                        <div className="h-12 w-12 bg-primary-600 rounded-full flex items-center justify-center flex-shrink-0">
-                          {proposal.artist.avatar ? (
-                            <img 
-                              src={getProfileImageUrl(proposal.artist.avatar)} 
-                              alt={proposal.artist.name} 
-                              className="h-full w-full rounded-full object-cover" 
-                            />
-                          ) : (
-                            <span className="text-sm font-medium text-primary-200">
-                              {proposal.artist.name?.[0] || '?'}
-                            </span>
-                          )}
+                  {proposals.map((proposal) => {
+                    const getStatusBadge = (status) => {
+                      const badges = {
+                        pending: { color: 'bg-yellow-600', text: 'Pendiente' },
+                        accepted: { color: 'bg-green-600', text: 'Aceptada' },
+                        rejected: { color: 'bg-red-600', text: 'Rechazada' },
+                        withdrawn: { color: 'bg-gray-600', text: 'Retirada' }
+                      };
+                      return badges[status] || badges.pending;
+                    };
+
+                    const statusBadge = getStatusBadge(proposal.status);
+                    const isAccepted = proposal.status === 'accepted';
+
+                    return (
+                      <div key={proposal.id} className="border border-primary-600 rounded-lg p-4">
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex items-start space-x-4">
+                            {/* Artist Avatar */}
+                            <div className="h-12 w-12 bg-primary-600 rounded-full flex items-center justify-center flex-shrink-0">
+                              {proposal.artist.avatar ? (
+                                <img 
+                                  src={getProfileImageUrl(proposal.artist.avatar)} 
+                                  alt={proposal.artist.name} 
+                                  className="h-full w-full rounded-full object-cover" 
+                                />
+                              ) : (
+                                <span className="text-sm font-medium text-primary-200">
+                                  {proposal.artist.name?.[0] || '?'}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex-1 min-w-0">
+                              {/* Artist Info */}
+                              <div className="flex items-center space-x-2 mb-2">
+                                <Link 
+                                  to={`/artists/${proposal.artist.id}`}
+                                  className="font-medium text-white hover:text-accent-400 transition-colors"
+                                >
+                                  {proposal.artist.name}
+                                </Link>
+                                <span className="text-primary-400">•</span>
+                                <span className="text-sm text-primary-400">{proposal.artist.location}</span>
+                                <span className="text-primary-400">•</span>
+                                <div className="flex items-center">
+                                  <svg className="h-4 w-4 text-yellow-400 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                  </svg>
+                                  <span className="text-sm text-primary-300">
+                                    {proposal.artist.rating} ({proposal.artist.reviewsCount})
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Specialties */}
+                              <div className="flex flex-wrap gap-1 mb-3">
+                                {proposal.artist.specialties.map((specialty, index) => (
+                                  <span 
+                                    key={index}
+                                    className="px-2 py-1 bg-accent-500/20 text-accent-400 text-xs rounded"
+                                  >
+                                    {specialty}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Status Badge */}
+                          <span className={`px-3 py-1 text-sm rounded-full text-white ${statusBadge.color}`}>
+                            {statusBadge.text}
+                          </span>
                         </div>
 
-                        <div className="flex-1 min-w-0">
-                          {/* Artist Info */}
-                          <div className="flex items-center space-x-2 mb-2">
-                            <Link 
-                              to={`/artists/${proposal.artist.id}`}
-                              className="font-medium text-white hover:text-accent-400 transition-colors"
-                            >
-                              {proposal.artist.name}
-                            </Link>
-                            <span className="text-primary-400">•</span>
-                            <span className="text-sm text-primary-400">{proposal.artist.location}</span>
-                            <span className="text-primary-400">•</span>
-                            <div className="flex items-center">
-                              <svg className="h-4 w-4 text-yellow-400 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                              </svg>
-                              <span className="text-sm text-primary-300">
-                                {proposal.artist.rating} ({proposal.artist.reviewsCount})
-                              </span>
+                        {/* Proposal Details */}
+                        <p className="text-primary-300 mb-3">{proposal.message}</p>
+                        
+                        {/* Price with History */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
+                          <div>
+                            <span className="text-primary-400">Precio:</span>
+                            <div className="font-medium text-accent-400">
+                              {proposal.priceHistory && proposal.priceHistory.length > 0 ? (
+                                <div>
+                                  {proposal.priceHistory.map((change, index) => (
+                                    <div key={index}>
+                                      {change.old_price && (
+                                        <span className="line-through text-gray-500 text-xs">
+                                          {formatCurrency(change.old_price)}
+                                        </span>
+                                      )}
+                                    </div>
+                                  ))}
+                                  <span>{formatCurrency(proposal.estimatedPrice)}</span>
+                                </div>
+                              ) : (
+                                formatCurrency(proposal.estimatedPrice)
+                              )}
                             </div>
                           </div>
-
-                          {/* Specialties */}
-                          <div className="flex flex-wrap gap-1 mb-3">
-                            {proposal.artist.specialties.map((specialty, index) => (
-                              <span 
-                                key={index}
-                                className="px-2 py-1 bg-accent-500/20 text-accent-400 text-xs rounded"
-                              >
-                                {specialty}
-                              </span>
-                            ))}
+                          <div>
+                            <span className="text-primary-400">Duración:</span>
+                            <p className="font-medium text-primary-200">{proposal.estimatedDuration} días</p>
                           </div>
+                          <div>
+                            <span className="text-primary-400">Sesiones:</span>
+                            <p className="font-medium text-primary-200">{proposal.sessionCount}</p>
+                          </div>
+                          <div>
+                            <span className="text-primary-400">Enviada:</span>
+                            <p className="font-medium text-primary-200">{timeAgo(proposal.createdAt)}</p>
+                          </div>
+                        </div>
 
-                          {/* Proposal Details */}
-                          <p className="text-primary-300 mb-3">{proposal.message}</p>
-                          
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                            <div>
-                              <span className="text-primary-400">Precio:</span>
-                              <p className="font-medium text-accent-400">{formatCurrency(proposal.estimatedPrice)}</p>
-                            </div>
-                            <div>
-                              <span className="text-primary-400">Duración:</span>
-                              <p className="font-medium text-primary-200">{proposal.estimatedDuration}</p>
-                            </div>
-                            <div>
-                              <span className="text-primary-400">Sesiones:</span>
-                              <p className="font-medium text-primary-200">{proposal.sessionCount}</p>
-                            </div>
-                            <div>
-                              <span className="text-primary-400">Enviada:</span>
-                              <p className="font-medium text-primary-200">{timeAgo(proposal.createdAt)}</p>
+                        {/* Contact Info - Only show when accepted */}
+                        {isAccepted && (
+                          <div className="bg-green-900/20 border border-green-600 rounded-lg p-4 mb-4">
+                            <h4 className="text-green-400 font-medium mb-2">📞 Información de contacto del artista</h4>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                              {proposal.artist.email && (
+                                <div className="flex items-center space-x-2">
+                                  <span className="text-primary-400">Email:</span>
+                                  <a href={`mailto:${proposal.artist.email}`} className="text-green-400 hover:underline">
+                                    {proposal.artist.email}
+                                  </a>
+                                </div>
+                              )}
+                              {proposal.artist.phone && (
+                                <div className="flex items-center space-x-2">
+                                  <span className="text-primary-400">Teléfono:</span>
+                                  <a href={`tel:${proposal.artist.phone}`} className="text-green-400 hover:underline">
+                                    {proposal.artist.phone}
+                                  </a>
+                                </div>
+                              )}
+                              {proposal.artist.whatsapp && (
+                                <div className="flex items-center space-x-2">
+                                  <span className="text-primary-400">WhatsApp:</span>
+                                  <a 
+                                    href={`https://wa.me/${proposal.artist.whatsapp.replace(/\D/g, '')}`} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="text-green-400 hover:underline"
+                                  >
+                                    {proposal.artist.whatsapp}
+                                  </a>
+                                </div>
+                              )}
                             </div>
                           </div>
+                        )}
 
-                          {/* Actions for client */}
-                          {user && user.id === offer.user.id && (
-                            <div className="flex space-x-3 mt-4 pt-3 border-t border-primary-600">
-                              <Button variant="primary" size="sm">
-                                Aceptar Propuesta
-                              </Button>
-                              <Button variant="secondary" size="sm">
+                        {/* Actions for client */}
+                        {user && user.id === offer.user.id && (
+                          <div className="flex space-x-3 mt-4 pt-3 border-t border-primary-600">
+                            {proposal.status === 'pending' && (
+                              <>
+                                <Button 
+                                  variant="primary" 
+                                  size="sm"
+                                  onClick={() => handleProposalStatusChange(proposal.id, 'accepted')}
+                                >
+                                  Aceptar Propuesta
+                                </Button>
+                                <Button 
+                                  variant="secondary" 
+                                  size="sm"
+                                  onClick={() => handleProposalStatusChange(proposal.id, 'rejected')}
+                                >
+                                  Rechazar
+                                </Button>
+                              </>
+                            )}
+                            <Button variant="ghost" size="sm">
+                              <Link to={`/artists/${proposal.artist.id}`}>
                                 Ver Perfil
-                              </Button>
-                              <Button variant="ghost" size="sm">
-                                Mensaje
-                              </Button>
-                            </div>
-                          )}
-                        </div>
+                              </Link>
+                            </Button>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="text-center py-8">

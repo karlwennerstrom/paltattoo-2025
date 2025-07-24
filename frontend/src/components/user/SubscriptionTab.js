@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { twMerge } from 'tailwind-merge';
 import { FiCreditCard, FiDownload, FiCalendar, FiCheckCircle, FiXCircle, FiClock, FiDollarSign, FiFileText, FiRefreshCw, FiAlertTriangle } from 'react-icons/fi';
-import { paymentService } from '../../services/api';
+import { paymentService, subscriptionsAPI } from '../../services/api';
 import toast from 'react-hot-toast';
 import Button from '../common/Button';
 import SubscriptionBadge from '../common/SubscriptionBadge';
@@ -24,8 +24,8 @@ const SubscriptionTab = () => {
       setLoading(true);
       const [subRes, historyRes, changesRes] = await Promise.all([
         paymentService.getActiveSubscription().catch(() => ({ data: null })),
-        paymentService.getPaymentHistory().catch(() => ({ data: [] })),
-        paymentService.getSubscriptionHistory().catch(() => ({ data: [] }))
+        paymentService.getPaymentHistoryByUser().catch(() => ({ data: [] })),
+        paymentService.getSubscriptionChanges().catch(() => ({ data: [] }))
       ]);
       
       setSubscription(subRes.data);

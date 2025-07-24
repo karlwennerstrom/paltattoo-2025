@@ -133,12 +133,12 @@ export const profileService = {
   update: (data) => api.put('/profile', data),
   uploadAvatar: (file) => {
     const formData = new FormData();
-    formData.append('avatar', file);
-    return api.post('/profile/avatar', formData, {
+    formData.append('profileImage', file);
+    return api.post('/profile/upload-image', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
-  deleteAvatar: () => api.delete('/profile/avatar'),
+  deleteAvatar: () => api.delete('/profile/image'),
   getMyOffers: () => api.get('/offers/my'),
   getMyProposals: () => api.get('/proposals/my'),
   getFavorites: () => api.get('/profile/favorites'),
@@ -221,11 +221,11 @@ export const paymentService = {
   createCardToken: (data) => api.post('/payments/card-token', data),
   
   // Payment history for a specific subscription
-  getPaymentHistory: (subscriptionId) => 
+  getSubscriptionPaymentHistory: (subscriptionId) => 
     api.get(`/payments/subscription/${subscriptionId}/payments`),
     
   // Get payment history for current user
-  getPaymentHistoryByUser: () => api.get('/payments/payments/history'),
+  getPaymentHistoryByUser: () => api.get('/payments/history'),
   
   // Get subscription changes
   getSubscriptionChanges: (limit = 50) => 
@@ -233,6 +233,7 @@ export const paymentService = {
   
   // Legacy methods for compatibility
   getMySubscription: () => api.get('/payments/subscription/active'),
+  getPaymentHistory: () => api.get('/payments/history'), // Legacy alias for getPaymentHistoryByUser
   getPaymentDetails: (paymentId) => api.get(`/payments/payment/${paymentId}`),
   retryPayment: (paymentId) => api.post(`/payments/payment/${paymentId}/retry`),
   
@@ -434,6 +435,7 @@ export const subscriptionsAPI = {
   getPlans: () => api.get('/subscriptions/plans'),
   getMySubscription: () => api.get('/subscriptions/my-subscription'),
   subscribe: (planId) => api.post('/subscriptions/subscribe', { planId }),
+  changePlan: (subscriptionId, newPlanId) => api.put(`/subscriptions/${subscriptionId}/change-plan`, { planId: newPlanId }),
   cancelSubscription: () => api.post('/subscriptions/cancel'),
   renewSubscription: () => api.post('/subscriptions/renew'),
   getInvoices: () => api.get('/subscriptions/invoices'),

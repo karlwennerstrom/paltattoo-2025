@@ -104,7 +104,7 @@ const ArtistDashboard = () => {
 
   const OverviewTab = () => (
     <div className="space-y-6">
-      <Grid cols={4} className="mb-6">
+      <Grid cols={3} className="mb-6">
         <Card className="text-center">
           <FiEye className="mx-auto mb-2 text-accent-500" size={24} />
           <p className="text-2xl font-bold text-primary-100">{stats.totalViews || 0}</p>
@@ -120,27 +120,139 @@ const ArtistDashboard = () => {
           <p className="text-2xl font-bold text-primary-100">{stats.totalProposals || 0}</p>
           <p className="text-sm text-primary-400">Propuestas</p>
         </Card>
-        <Card className="text-center">
-          <FiDollarSign className="mx-auto mb-2 text-accent-500" size={24} />
-          <p className="text-2xl font-bold text-primary-100">${stats.totalEarnings || 0}</p>
-          <p className="text-sm text-primary-400">Ingresos</p>
-        </Card>
       </Grid>
 
       <Grid cols={2}>
-        <Section title="Actividad Reciente">
+        <Section title="Próxima Cita">
           <div className="space-y-4">
-            {stats.recentActivity?.map((activity, index) => (
-              <div key={index} className="flex items-center space-x-3 p-3 bg-primary-700 rounded-lg">
-                <div className="w-8 h-8 bg-accent-500 rounded-full flex items-center justify-center">
-                  <FiCheckCircle className="text-white" size={16} />
+            {stats.nextAppointment ? (
+              <div className="p-4 bg-primary-700 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="font-medium text-primary-100">{stats.nextAppointment.title}</h4>
+                  <span className="px-2 py-1 rounded text-xs bg-accent-500 text-white">
+                    {stats.nextAppointment.status === 'confirmed' ? 'Confirmada' : 'Programada'}
+                  </span>
                 </div>
-                <div>
-                  <p className="text-sm text-primary-100">{activity.description}</p>
-                  <p className="text-xs text-primary-400">{activity.date}</p>
+                <p className="text-sm text-primary-400 mb-1">
+                  📅 {new Date(stats.nextAppointment.appointment_date).toLocaleDateString('es-ES', {
+                    weekday: 'long',
+                    day: 'numeric',
+                    month: 'long'
+                  })}
+                </p>
+                <p className="text-sm text-primary-400 mb-1">
+                  ⏰ {stats.nextAppointment.start_time} - {stats.nextAppointment.end_time}
+                </p>
+                <p className="text-sm text-primary-400 mb-3">
+                  👤 {stats.nextAppointment.client_name}
+                </p>
+                <div className="flex space-x-2">
+                  <button 
+                    onClick={() => setActiveTab('calendar')}
+                    className="flex-1 px-3 py-2 bg-accent-600 text-white text-xs rounded hover:bg-accent-700 transition-colors"
+                  >
+                    Ver Detalles
+                  </button>
+                  <button 
+                    onClick={() => setActiveTab('calendar')}
+                    className="px-3 py-2 bg-primary-600 text-primary-100 text-xs rounded hover:bg-primary-500 transition-colors"
+                  >
+                    Ver Todas
+                  </button>
                 </div>
               </div>
-            )) || <p className="text-primary-400">No hay actividad reciente</p>}
+            ) : (
+              <div className="p-4 bg-primary-700 rounded-lg text-center">
+                <FiCalendar className="mx-auto mb-2 text-primary-400" size={24} />
+                <p className="text-primary-300 mb-3">No tienes citas próximas</p>
+                <button 
+                  onClick={() => setActiveTab('calendar')}
+                  className="px-4 py-2 bg-accent-600 text-white text-sm rounded hover:bg-accent-700 transition-colors"
+                >
+                  Programar Cita
+                </button>
+              </div>
+            )}
+          </div>
+        </Section>
+        <Section title="Actividad Reciente">
+          <div className="space-y-4">
+            {(() => {
+              const activities = [];
+              
+              // Profile updates
+              if (profile?.user?.updatedAt) {
+                activities.push({
+                  icon: FiUser,
+                  description: 'Perfil actualizado',
+                  date: new Date(profile.user.updatedAt).toLocaleDateString('es-ES'),
+                  type: 'profile'
+                });
+              }
+              
+              // Portfolio updates
+              if (stats.recentPortfolioUpdate) {
+                activities.push({
+                  icon: FiImage,
+                  description: 'Portfolio actualizado',
+                  date: stats.recentPortfolioUpdate,
+                  type: 'portfolio'
+                });
+              }
+              
+              // Recent appointments
+              if (stats.recentAppointments > 0) {
+                activities.push({
+                  icon: FiCalendar,
+                  description: `${stats.recentAppointments} nueva${stats.recentAppointments > 1 ? 's' : ''} cita${stats.recentAppointments > 1 ? 's' : ''} programada${stats.recentAppointments > 1 ? 's' : ''}`,
+                  date: 'Esta semana',
+                  type: 'appointment'
+                });
+              }
+              
+              // Recent proposals
+              if (stats.recentProposals > 0) {
+                activities.push({
+                  icon: FiMessageCircle,
+                  description: `${stats.recentProposals} nueva${stats.recentProposals > 1 ? 's' : ''} propuesta${stats.recentProposals > 1 ? 's' : ''} enviada${stats.recentProposals > 1 ? 's' : ''}`,
+                  date: 'Esta semana',
+                  type: 'proposal'
+                });
+              }
+              
+              // Subscription updates
+              if (subscription?.status === 'active' && subscription?.updatedAt) {
+                activities.push({
+                  icon: FiCreditCard,
+                  description: 'Suscripción activada',
+                  date: new Date(subscription.updatedAt).toLocaleDateString('es-ES'),
+                  type: 'subscription'
+                });
+              }
+              
+              // Sort by priority and limit to 5
+              const sortedActivities = activities.slice(0, 5);
+              
+              return sortedActivities.length > 0 ? sortedActivities.map((activity, index) => (
+                <div key={index} className="flex items-center space-x-3 p-3 bg-primary-700 rounded-lg">
+                  <div className="w-8 h-8 bg-accent-500 rounded-full flex items-center justify-center">
+                    <activity.icon className="text-white" size={16} />
+                  </div>
+                  <div>
+                    <p className="text-sm text-primary-100">{activity.description}</p>
+                    <p className="text-xs text-primary-400">{activity.date}</p>
+                  </div>
+                </div>
+              )) : (
+                <div className="text-center py-6">
+                  <FiSettings className="mx-auto mb-2 text-primary-400" size={24} />
+                  <p className="text-primary-400">No hay actividad reciente</p>
+                  <p className="text-xs text-primary-500 mt-1">
+                    Actualiza tu perfil o portfolio para ver actividad
+                  </p>
+                </div>
+              );
+            })()}
           </div>
         </Section>
 

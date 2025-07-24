@@ -19,6 +19,7 @@ const UserDashboard = () => {
   const [editedProfile, setEditedProfile] = useState({});
   const [avatarFile, setAvatarFile] = useState(null);
   const [previewAvatar, setPreviewAvatar] = useState(null);
+  const [imageTimestamp, setImageTimestamp] = useState(Date.now());
 
   useEffect(() => {
     loadInitialData();
@@ -72,17 +73,24 @@ const UserDashboard = () => {
 
   const handleSaveProfile = async () => {
     try {
+      let updatedProfileData = { ...editedProfile };
+      
       // Upload avatar if changed
       if (avatarFile) {
-        await profileService.uploadAvatar(avatarFile);
-        toast.success('Avatar actualizado exitosamente');
+        const avatarResponse = await profileService.uploadAvatar(avatarFile);
+        if (avatarResponse.data && avatarResponse.data.profileImage) {
+          updatedProfileData.profileImage = avatarResponse.data.profileImage;
+          setImageTimestamp(Date.now()); // Force image refresh
+          toast.success('Avatar actualizado exitosamente');
+        }
       }
 
       // Update profile data
-      await profileService.update(editedProfile);
+      await profileService.update(updatedProfileData);
       toast.success('Perfil actualizado exitosamente');
       
-      setProfile(editedProfile);
+      setProfile(updatedProfileData);
+      setEditedProfile(updatedProfileData);
       setIsEditing(false);
       setAvatarFile(null);
       setPreviewAvatar(null);
@@ -153,7 +161,7 @@ const UserDashboard = () => {
             <div className="text-center">
               <div className="relative inline-block mb-4">
                 <img
-                  src={previewAvatar || getProfileImageUrl(profile?.avatar)}
+                  src={previewAvatar || `${getProfileImageUrl(profile?.profileImage)}${profile?.profileImage ? `?t=${imageTimestamp}` : ''}`}
                   alt="Avatar"
                   className="w-32 h-32 rounded-full object-cover border-4 border-accent-500"
                 />
@@ -354,7 +362,7 @@ const UserDashboard = () => {
         <div className="flex items-center justify-between h-16 px-6 border-b border-border">
           <div className="flex items-center space-x-3">
             <img
-              src={getProfileImageUrl(profile?.avatar)}
+              src={`${getProfileImageUrl(profile?.profileImage)}${profile?.profileImage ? `?t=${imageTimestamp}` : ''}`}
               alt="Avatar"
               className="w-8 h-8 rounded-full object-cover"
             />

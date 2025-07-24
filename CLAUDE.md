@@ -111,8 +111,16 @@ Frontend requires: `REACT_APP_API_URL`, `REACT_APP_GOOGLE_CLIENT_ID`
 - Subscription plans structure
 
 ### In Progress
-- Portfolio management system
-- Payment integration with MercadoPago
+
+- las imagenes del portafolio, se deben poder eliminar. con un lightbox que pregunte si estoy seguro
+- cuando se envíe una propuesta, el sistema tiene que enviarle un correo al usuario que generó la oferta publica y al usuario que generó la propuesta
+- si el cliente acepta la propuesta del artista, se le envía un correo al artista confirmando que se ha aceptado su propuesta. 
+- La propuesta al ser aceptada, recien ahí se pueden ver los datos de contacto del cliente. 
+- Si se edita el precio de la propuesta que ya hizo el artista, se le envía un correo al cliente informando que se ha modificado el precio de la propuesta. 
+- Se debe mantener un historial de los precios de laas propuestas. el precio anterior y el precio nuevo.
+- Se tiene que tachar el precio anterior y mostrar el nuevo precio en la propuesta.
+- si el cliente rechaza la propuesta del artista, se le envía un correo al artista informando que su propuesta ha sido rechazada.
+- si el artista rechaza la propuesta del cliente, se le envía un correo al cliente informando que su propuesta ha sido rechazada.
 - Calendar/appointment system
 - Real-time chat functionality
 

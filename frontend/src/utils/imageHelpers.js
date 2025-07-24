@@ -24,7 +24,24 @@ export const getImageUrl = (imagePath) => {
 
 export const getProfileImageUrl = (imagePath) => {
   if (!imagePath) return '/placeholder-avatar.jpg';
-  return getImageUrl(imagePath);
+  
+  // Return as-is if it's already a full URL
+  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+    return imagePath;
+  }
+  
+  // Return as-is if it's a placeholder image
+  if (imagePath.startsWith('/placeholder')) {
+    return imagePath;
+  }
+  
+  // Return as-is if it's an absolute path starting with /uploads
+  if (imagePath.startsWith('/uploads/')) {
+    return API_BASE_URL.replace('/api', '') + imagePath;
+  }
+  
+  // For profile images, prepend the correct profiles directory
+  return `${API_BASE_URL.replace('/api', '')}/uploads/profiles/${imagePath}`;
 };
 
 export const getTattooImageUrl = (imagePath, index = null) => {

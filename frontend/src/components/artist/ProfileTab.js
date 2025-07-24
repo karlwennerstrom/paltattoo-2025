@@ -5,12 +5,14 @@ import Button from '../common/Button';
 import Input from '../common/Input';
 import { getProfileImageUrl } from '../../utils/imageHelpers';
 import toast from 'react-hot-toast';
+import { profileService } from '../../services/api';
 
 const ProfileTab = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [availableComunas, setAvailableComunas] = useState([]);
+  const [imageTimestamp, setImageTimestamp] = useState(Date.now());
   
   // Datos de regiones y comunas de Chile
   const regionesData = {
@@ -370,17 +372,37 @@ const ProfileTab = () => {
     }
   };
 
-  const handleImageUpload = (event) => {
+  const handleImageUpload = async (event) => {
     const file = event.target.files[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setProfileData(prev => ({
-          ...prev,
-          profileImage: e.target.result
-        }));
-      };
-      reader.readAsDataURL(file);
+      try {
+        // Show loading state
+        toast.loading('Subiendo imagen...');
+        
+        // Upload the image to the server
+        const response = await profileService.uploadAvatar(file);
+        
+        if (response.data && response.data.profileImage) {
+          // Update the profile data with the new image filename
+          setProfileData(prev => ({
+            ...prev,
+            profileImage: response.data.profileImage
+          }));
+          
+          // Force image refresh by updating timestamp
+          setImageTimestamp(Date.now());
+          
+          toast.dismiss();
+          toast.success('Imagen de perfil actualizada');
+        } else {
+          toast.dismiss();
+          toast.error('Error al subir la imagen');
+        }
+      } catch (error) {
+        toast.dismiss();
+        console.error('Error uploading image:', error);
+        toast.error('Error al subir la imagen. Inténtalo de nuevo.');
+      }
     }
   };
 
@@ -443,7 +465,7 @@ const ProfileTab = () => {
             {/* Profile Image */}
             <div className="flex items-center space-x-4">
               <img
-                src={getProfileImageUrl(profileData.profileImage)}
+                src={`${getProfileImageUrl(profileData.profileImage)}${profileData.profileImage ? `?t=${imageTimestamp}` : ''}`}
                 alt="Profile"
                 className="h-20 w-20 rounded-full object-cover"
               />

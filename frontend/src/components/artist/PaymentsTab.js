@@ -4,11 +4,17 @@ import { Card, Grid } from '../common/Layout';
 import Button from '../common/Button';
 import Input from '../common/Input';
 import Modal from '../common/Modal';
+import PlanChangeModal from '../common/PlanChangeModal';
 import { paymentService, subscriptionsAPI } from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
+import { getUserPlanName } from '../../utils/subscriptionHelpers';
 import toast from 'react-hot-toast';
 import { FiDownload, FiCalendar, FiCreditCard, FiCheck, FiX, FiClock, FiTrendingUp, FiTrendingDown } from 'react-icons/fi';
 
 const PaymentsTab = () => {
+  const { user } = useAuth();
+  const userPlanName = getUserPlanName(user);
+  
   const [isAddingPaymentMethod, setIsAddingPaymentMethod] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [newPaymentMethod, setNewPaymentMethod] = useState({
@@ -24,10 +30,45 @@ const PaymentsTab = () => {
   const [subscriptionHistory, setSubscriptionHistory] = useState([]);
   const [plans, setPlans] = useState([]);
   const [paymentMethods, setPaymentMethods] = useState([]);
+  const [billingInfo, setBillingInfo] = useState({
+    fullName: '',
+    email: '',
+    rut: '',
+    address: '',
+    city: '',
+    postalCode: ''
+  });
+  const [isEditingBilling, setIsEditingBilling] = useState(false);
+  
+  // Plan change modal states
+  const [planChangeModal, setPlanChangeModal] = useState({
+    isOpen: false,
+    targetPlan: null,
+    loading: false
+  });
 
   useEffect(() => {
     loadSubscriptionData();
-  }, []);
+    loadUserBillingInfo();
+  }, [user]); // Add user as dependency
+
+  const loadUserBillingInfo = async () => {
+    try {
+      // Load user profile info for billing
+      if (user) {
+        setBillingInfo({
+          fullName: `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.name || 'Nombre Usuario',
+          email: user.email || '',
+          rut: user.rut || '',
+          address: user.address || '',
+          city: user.city || user.comuna || '',
+          postalCode: user.postal_code || ''
+        });
+      }
+    } catch (error) {
+      console.error('Error loading user billing info:', error);
+    }
+  };
 
   const loadSubscriptionData = async () => {
     try {
@@ -42,11 +83,43 @@ const PaymentsTab = () => {
       ]);
       
       if (subscriptionRes.data) {
-        setCurrentSubscription(subscriptionRes.data);
+        // Handle nested data structure from API
+        const subscriptionData = subscriptionRes.data.data || subscriptionRes.data;
+        
+        // Ensure features is an array
+        const processedSubscription = {
+          ...subscriptionData,
+          features: Array.isArray(subscriptionData.features) 
+            ? subscriptionData.features 
+            : defaultSubscription.features
+        };
+        
+        setCurrentSubscription(processedSubscription);
+      } else {
+        // If no subscription data, use default based on user context
+        setCurrentSubscription({
+          ...defaultSubscription,
+          plan_name: userPlanName.toLowerCase()
+        });
       }
       
       if (plansRes.data) {
-        setPlans(plansRes.data);
+        const apiPlans = plansRes.data.data || plansRes.data;
+        
+        // Always include basic plan if not present
+        const hasBasicPlan = apiPlans.some(plan => 
+          plan.id === 'basic' || 
+          plan.plan_type === 'basic' || 
+          plan.name?.toLowerCase().includes('básico')
+        );
+        
+        if (!hasBasicPlan) {
+          setPlans([defaultPlans[0], ...apiPlans]); // Add basic plan from defaultPlans
+        } else {
+          setPlans(apiPlans);
+        }
+      } else {
+        setPlans(defaultPlans);
       }
       
       if (historyRes.data && Array.isArray(historyRes.data)) {
@@ -63,8 +136,16 @@ const PaymentsTab = () => {
       
     } catch (error) {
       console.error('Error loading subscription data:', error);
-      // Use default data if API fails
-      setCurrentSubscription(defaultSubscription);
+      // Use default data if API fails, but adapt to user's actual plan
+      const fallbackSubscription = {
+        ...defaultSubscription,
+        plan_name: userPlanName.toLowerCase(),
+        features: Array.isArray(defaultSubscription.features) 
+          ? defaultSubscription.features 
+          : []
+      };
+      
+      setCurrentSubscription(fallbackSubscription);
       setPlans(Array.isArray(defaultPlans) ? defaultPlans : []);
       setPaymentHistory(Array.isArray(defaultPaymentHistory) ? defaultPaymentHistory : []);
       setSubscriptionHistory(Array.isArray(defaultSubscriptionHistory) ? defaultSubscriptionHistory : []);
@@ -76,19 +157,20 @@ const PaymentsTab = () => {
 
   // Default data for when API is not available
   const defaultSubscription = {
-    plan: 'Premium',
+    plan_id: 'basic',
+    plan: 'Básico',
+    plan_name: 'basico',
     status: 'active',
-    price: 29990,
+    price: 0,
+    amount: 0,
     currency: 'CLP',
-    nextBilling: '2024-02-20',
+    nextBilling: null,
     startDate: '2024-01-20',
     features: [
-      'Portfolio ilimitado',
-      'Propuestas sin límite',
-      'Estadísticas avanzadas',
-      'Soporte prioritario',
-      'Badge verificado',
-      'Herramientas promocionales'
+      'Perfil básico',
+      'Galería de hasta 10 imágenes',
+      'Hasta 5 propuestas por mes',
+      'Soporte por email'
     ]
   };
 
@@ -181,51 +263,53 @@ const PaymentsTab = () => {
     {
       id: 'basic',
       name: 'Básico',
-      price: 19990,
+      price: 0,
       currency: 'CLP',
       period: 'mes',
       features: [
-        'Hasta 20 trabajos en portfolio',
-        'Hasta 10 propuestas por mes',
-        'Estadísticas básicas',
+        'Perfil básico',
+        'Galería de hasta 10 imágenes',
+        'Hasta 5 propuestas por mes',
         'Soporte por email'
       ],
       limitations: [
-        'Sin badge verificado',
-        'Sin herramientas promocionales'
+        'Sin acceso a calendario',
+        'Sin estadísticas',
+        'Sin badge verificado'
       ]
     },
     {
       id: 'premium',
       name: 'Premium',
-      price: 29990,
+      price: 3990,
       currency: 'CLP',
       period: 'mes',
       features: [
-        'Portfolio ilimitado',
-        'Propuestas sin límite',
-        'Estadísticas avanzadas',
+        'Propuestas ilimitadas',
+        'Perfil destacado',
+        'Galería ilimitada',
+        'Calendario de citas completo',
+        'Estadísticas básicas',
         'Soporte prioritario',
-        'Badge verificado',
-        'Herramientas promocionales',
-        'Calendario avanzado',
-        'Reportes detallados'
+        'Badge Premium'
       ],
       popular: true
     },
     {
       id: 'pro',
-      name: 'Profesional',
-      price: 49990,
+      name: 'Pro',
+      price: 7990,
       currency: 'CLP',
       period: 'mes',
       features: [
-        'Todo lo de Premium',
-        'Página web personalizada',
-        'API de integración',
-        'Múltiples ubicaciones',
-        'Gestión de equipo',
-        'Análisis de mercado'
+        'Todo lo incluido en Premium',
+        'Múltiples calendarios',
+        'Estadísticas avanzadas',
+        'Integración con redes sociales',
+        'API access',
+        'Soporte dedicado 24/7',
+        'Badge Pro',
+        'Promoción destacada en búsquedas'
       ]
     }
   ];
@@ -325,51 +409,91 @@ const PaymentsTab = () => {
 
   const handleSetDefaultPaymentMethod = (methodId) => {
     // Simulate API call
-    console.log('Setting default payment method:', methodId);
   };
 
   const handleRemovePaymentMethod = (methodId) => {
     if (window.confirm('¿Estás seguro de que quieres eliminar este método de pago?')) {
-      console.log('Removing payment method:', methodId);
     }
   };
 
-  const handlePlanChange = async (planId) => {
-    const selectedPlan = plans.find(p => p.id === planId) || defaultPlans.find(p => p.id === planId);
-    if (window.confirm(`¿Estás seguro de que quieres cambiar al plan ${selectedPlan?.name}?`)) {
-      try {
-        const response = await subscriptionsAPI.subscribe(planId);
-        
-        // Send confirmation email for subscription change
-        try {
-          await paymentService.sendSubscriptionChangeEmail({
-            oldPlan: currentSubscription?.plan_name || currentSubscription?.plan,
-            newPlan: selectedPlan?.name,
-            effectiveDate: new Date().toISOString()
-          });
-        } catch (emailError) {
-          console.warn('Email notification failed:', emailError);
-          // Don't block the subscription change if email fails
-        }
-
-        toast.success('Plan actualizado exitosamente. Se ha enviado un correo de confirmación.');
-        await loadSubscriptionData();
-        
-        // Add to subscription history
-        const historyEntry = {
-          id: Date.now(),
-          date: new Date().toISOString(),
-          fromPlan: currentSubscription?.plan_name || currentSubscription?.plan || 'Actual',
-          toPlan: selectedPlan?.name,
-          action: 'upgrade',
-          reason: 'Cambio manual del usuario'
-        };
-        setSubscriptionHistory(prev => [historyEntry, ...prev]);
-      } catch (error) {
-        console.error('Error changing plan:', error);
-        toast.error('Error al cambiar de plan');
-      }
+  const handlePlanChange = (planId) => {
+    const targetPlan = plans.find(p => p.id === planId) || defaultPlans.find(p => p.id === planId);
+    if (!targetPlan) {
+      toast.error('Plan no encontrado');
+      return;
     }
+
+    setPlanChangeModal({
+      isOpen: true,
+      targetPlan,
+      loading: false
+    });
+  };
+
+  const handlePlanChangeConfirm = async () => {
+    const { targetPlan } = planChangeModal;
+    
+    setPlanChangeModal(prev => ({ ...prev, loading: true }));
+    
+    try {
+      // For plan changes (not new subscriptions), we need different API call
+      let response;
+      if (currentSubscription && currentSubscription.id) {
+        // Change existing subscription
+        response = await subscriptionsAPI.changePlan(currentSubscription.id, targetPlan.id);
+      } else {
+        // New subscription
+        response = await subscriptionsAPI.subscribe(targetPlan.id);
+      }
+      
+      // Send confirmation email for subscription change
+      try {
+        await paymentService.sendSubscriptionChangeEmail({
+          oldPlan: currentSubscription?.plan_name || currentSubscription?.plan || 'Básico',
+          newPlan: targetPlan?.name,
+          effectiveDate: new Date().toISOString()
+        });
+      } catch (emailError) {
+        console.warn('Email notification failed:', emailError);
+        // Don't block the subscription change if email fails
+      }
+
+      toast.success('Plan actualizado exitosamente. Se ha enviado un correo de confirmación.');
+      await loadSubscriptionData();
+      
+      // Add to subscription history
+      const historyEntry = {
+        id: Date.now(),
+        date: new Date().toISOString(),
+        fromPlan: currentSubscription?.plan_name || currentSubscription?.plan || 'Básico',
+        toPlan: targetPlan?.name,
+        action: targetPlan.price > (currentSubscription?.price || 0) ? 'upgrade' : 'downgrade',
+        reason: 'Cambio manual del usuario'
+      };
+      setSubscriptionHistory(prev => [historyEntry, ...prev]);
+      
+      // Close modal
+      setPlanChangeModal({
+        isOpen: false,
+        targetPlan: null,
+        loading: false
+      });
+      
+    } catch (error) {
+      console.error('Error changing subscription:', error);
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Error al cambiar el plan';
+      toast.error(errorMessage);
+      
+      setPlanChangeModal(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  const handlePlanChangeCancel = () => {
+    setPlanChangeModal({
+      isOpen: false,
+      targetPlan: null,
+      loading: false
+    });
   };
 
   const handleCancelSubscription = async () => {
@@ -415,10 +539,16 @@ const PaymentsTab = () => {
               </span>
             </div>
             <p className="text-2xl font-bold text-accent-400 mb-1">
-              {formatCurrency(currentSubscription.price || currentSubscription.amount || 0)}/mes
+              {(currentSubscription.price || currentSubscription.amount || 0) === 0 
+                ? 'Plan Básico (gratis)' 
+                : `${formatCurrency(currentSubscription.price || currentSubscription.amount || 0)}/mes`
+              }
             </p>
             <p className="text-sm text-primary-400">
-              Próximo pago: {new Date(currentSubscription.next_billing_date || currentSubscription.nextBilling || Date.now()).toLocaleDateString('es-CL')}
+              {(currentSubscription.price || currentSubscription.amount || 0) === 0 
+                ? 'Plan gratuito - Sin cargos automáticos' 
+                : `Próximo pago: ${new Date(currentSubscription.next_billing_date || currentSubscription.nextBilling || Date.now()).toLocaleDateString('es-CL')}`
+              }
             </p>
           </div>
           <div className="flex items-center space-x-2">
@@ -435,14 +565,21 @@ const PaymentsTab = () => {
           <div>
             <h4 className="text-sm font-semibold text-primary-200 mb-2">Funciones incluidas</h4>
             <ul className="space-y-1">
-              {(currentSubscription.features || defaultSubscription.features).map((feature, index) => (
-                <li key={index} className="flex items-center space-x-2 text-sm text-primary-300">
-                  <svg className="h-4 w-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <span>{feature}</span>
-                </li>
-              ))}
+              {(() => {
+                // Ensure features is always an array
+                const features = currentSubscription?.features || defaultSubscription.features || [];
+                const featuresArray = Array.isArray(features) ? features : [];
+                
+                
+                return featuresArray.map((feature, index) => (
+                  <li key={index} className="flex items-center space-x-2 text-sm text-primary-300">
+                    <svg className="h-4 w-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>{feature}</span>
+                  </li>
+                ));
+              })()}
             </ul>
           </div>
           <div>
@@ -454,11 +591,21 @@ const PaymentsTab = () => {
               </div>
               <div className="flex justify-between">
                 <span className="text-primary-400">Método de pago:</span>
-                <span className="text-primary-200">Visa •••• 4242</span>
+                <span className="text-primary-200">
+                  {(currentSubscription.price || currentSubscription.amount || 0) === 0 
+                    ? 'No requerido' 
+                    : 'Visa •••• 4242'
+                  }
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-primary-400">Próximo cargo:</span>
-                <span className="text-primary-200">{formatCurrency(currentSubscription.price || currentSubscription.amount || 0)}</span>
+                <span className="text-primary-200">
+                  {(currentSubscription.price || currentSubscription.amount || 0) === 0 
+                    ? 'Gratis' 
+                    : formatCurrency(currentSubscription.price || currentSubscription.amount || 0)
+                  }
+                </span>
               </div>
             </div>
           </div>
@@ -479,7 +626,52 @@ const PaymentsTab = () => {
       <Card title="Planes Disponibles">
         <Grid cols={3} gap={6}>
           {(Array.isArray(plans) && plans.length > 0 ? plans : defaultPlans).map((plan) => {
-            const isCurrentPlan = currentSubscription && plan.id === currentSubscription.plan_id;
+            // Debug current subscription structure
+            
+            // Robust plan detection using multiple sources
+            let isCurrentPlan = false;
+            
+            // First try to use user context plan info (most reliable)
+            const contextPlanName = userPlanName.toLowerCase();
+            
+            // Strict plan matching - prioritize exact matches
+            if (plan.id === contextPlanName) {
+              isCurrentPlan = true;
+            }
+            else if (plan.name?.toLowerCase() === contextPlanName) {
+              isCurrentPlan = true;
+            }
+            // Special handling for basic plan (free)
+            else if (contextPlanName === 'basic' && 
+                     (plan.id === 'basic' || 
+                      plan.name?.toLowerCase() === 'básico' ||
+                      (plan.price === 0 && plan.name?.toLowerCase().includes('básico')))) {
+              isCurrentPlan = true;
+            }
+            else {
+              // Fallback to subscription data
+              if (currentSubscription) {
+                const currentPlanId = currentSubscription.plan_id;
+                const currentPlanName = (currentSubscription.plan_name || currentSubscription.plan || '').toLowerCase();
+                const currentPrice = currentSubscription.price || currentSubscription.amount || 0;
+                
+                
+                // Check by direct ID match first
+                if (plan.id === currentPlanId) {
+                  isCurrentPlan = true;
+                }
+                // Check by plan name
+                else if (plan.name?.toLowerCase() === currentPlanName) {
+                  isCurrentPlan = true;
+                }
+                // Special case: Basic/Free plan (price = 0)
+                else if ((plan.id === 'basic' || plan.name?.toLowerCase() === 'básico') && 
+                         (currentPrice === 0 && (currentPlanName === 'basico' || currentPlanName === 'básico' || currentPlanName === ''))) {
+                  isCurrentPlan = true;
+                }
+              }
+            }
+            
             return (
               <div
                 key={plan.id}
@@ -502,9 +694,11 @@ const PaymentsTab = () => {
                 <div className="text-center mb-4">
                   <h3 className="text-lg font-semibold text-primary-100 mb-2">{plan.name}</h3>
                   <div className="text-2xl font-bold text-primary-100 mb-1">
-                    {formatCurrency(plan.price)}
+                    {plan.price === 0 ? 'Gratis' : formatCurrency(plan.price)}
                   </div>
-                  <p className="text-sm text-primary-400">por {plan.period}</p>
+                  {plan.price > 0 && (
+                    <p className="text-sm text-primary-400">por {plan.period}</p>
+                  )}
                 </div>
 
                 <ul className="space-y-2 mb-6">
@@ -526,14 +720,22 @@ const PaymentsTab = () => {
                   ))}
                 </ul>
 
-                <Button
-                  variant={isCurrentPlan ? "secondary" : "primary"}
-                  fullWidth
-                  disabled={isCurrentPlan}
-                  onClick={() => handlePlanChange(plan.id)}
-                >
-                  {isCurrentPlan ? 'Plan Actual' : 'Cambiar a este Plan'}
-                </Button>
+                {!isCurrentPlan && (
+                  <Button
+                    variant="primary"
+                    fullWidth
+                    onClick={() => handlePlanChange(plan.id)}
+                  >
+                    Cambiar a este Plan
+                  </Button>
+                )}
+                {isCurrentPlan && (
+                  <div className="w-full text-center">
+                    <span className="inline-flex items-center px-4 py-2 rounded-md bg-accent-600 text-white text-sm font-medium">
+                      Plan Actual
+                    </span>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -604,43 +806,78 @@ const PaymentsTab = () => {
           <div className="space-y-4">
             <Input
               label="Nombre completo"
-              value="Carlos Mendoza"
-              disabled
+              value={billingInfo.fullName}
+              onChange={(e) => setBillingInfo({...billingInfo, fullName: e.target.value})}
+              disabled={!isEditingBilling}
             />
             <Input
               label="Email de facturación"
-              value="carlos.mendoza@email.com"
-              disabled
+              value={billingInfo.email}
+              onChange={(e) => setBillingInfo({...billingInfo, email: e.target.value})}
+              disabled={!isEditingBilling}
             />
             <Input
               label="RUT"
-              value="12.345.678-9"
+              value={billingInfo.rut}
+              onChange={(e) => setBillingInfo({...billingInfo, rut: e.target.value})}
               placeholder="12.345.678-9"
-              readOnly
+              disabled={!isEditingBilling}
             />
             <Input
               label="Dirección"
-              value="Providencia 1234"
+              value={billingInfo.address}
+              onChange={(e) => setBillingInfo({...billingInfo, address: e.target.value})}
               placeholder="Dirección de facturación"
-              readOnly
+              disabled={!isEditingBilling}
             />
             <Grid cols={2} gap={4}>
               <Input
                 label="Ciudad"
-                value="Santiago"
+                value={billingInfo.city}
+                onChange={(e) => setBillingInfo({...billingInfo, city: e.target.value})}
                 placeholder="Ciudad"
-                readOnly
+                disabled={!isEditingBilling}
               />
               <Input
                 label="Código Postal"
-                value="7500000"
+                value={billingInfo.postalCode}
+                onChange={(e) => setBillingInfo({...billingInfo, postalCode: e.target.value})}
                 placeholder="Código postal"
-                readOnly
+                disabled={!isEditingBilling}
               />
             </Grid>
-            <Button variant="secondary" fullWidth>
-              Actualizar Información
-            </Button>
+            
+            <div className="flex space-x-3">
+              {!isEditingBilling ? (
+                <Button variant="secondary" fullWidth onClick={() => setIsEditingBilling(true)}>
+                  Editar Información
+                </Button>
+              ) : (
+                <>
+                  <Button 
+                    variant="ghost" 
+                    fullWidth 
+                    onClick={() => {
+                      setIsEditingBilling(false);
+                      loadUserBillingInfo(); // Reset to original values
+                    }}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button 
+                    variant="primary" 
+                    fullWidth 
+                    onClick={() => {
+                      setIsEditingBilling(false);
+                      // TODO: Save billing info to backend
+                      toast.success('Información de facturación actualizada');
+                    }}
+                  >
+                    Guardar Cambios
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
         </Card>
       </Grid>
@@ -809,6 +1046,21 @@ const PaymentsTab = () => {
           </div>
         </div>
       </Modal>
+
+      {/* Plan Change Modal */}
+      <PlanChangeModal
+        isOpen={planChangeModal.isOpen}
+        onClose={handlePlanChangeCancel}
+        currentPlan={currentSubscription ? {
+          id: currentSubscription.id,
+          name: currentSubscription.plan_name || currentSubscription.plan || 'basic',
+          price: currentSubscription.price || 0,
+          features: currentSubscription.features || {}
+        } : { id: 'basic', name: 'basic', price: 0, features: {} }}
+        targetPlan={planChangeModal.targetPlan}
+        onConfirm={handlePlanChangeConfirm}
+        loading={planChangeModal.loading}
+      />
     </div>
   );
 };

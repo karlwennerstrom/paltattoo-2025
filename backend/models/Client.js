@@ -163,6 +163,11 @@ class Client {
     
     return rows;
   }
+
+  // Alias for notification controller compatibility
+  static async findByIdWithUser(id) {
+    return this.findById(id);
+  }
 }
 
 module.exports = Client;

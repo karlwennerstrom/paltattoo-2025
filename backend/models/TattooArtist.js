@@ -216,6 +216,11 @@ class TattooArtist {
     return result.affectedRows > 0;
   }
 
+  // Alias for notification controller compatibility
+  static async findByIdWithUser(id) {
+    return this.findById(id);
+  }
+
   static camelToSnake(str) {
     return str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
   }

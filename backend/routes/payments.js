@@ -19,7 +19,7 @@ router.get('/subscription/active', paymentController.getActiveSubscription);
 router.get('/subscription/history', paymentController.getSubscriptionHistory);
 
 // Obtener historial de pagos del usuario
-router.get('/payments/history', paymentController.getPaymentHistory);
+router.get('/history', paymentController.getPaymentHistory);
 
 // Obtener cambios de suscripción
 router.get('/subscription/changes', paymentController.getSubscriptionChanges);
@@ -27,7 +27,7 @@ router.get('/subscription/changes', paymentController.getSubscriptionChanges);
 // Rutas para artistas solamente
 router.post('/subscription', authorizeArtist, paymentController.createSubscription);
 router.delete('/subscription/:subscriptionId', authorizeArtist, paymentController.cancelSubscription);
-router.get('/subscription/:subscriptionId/payments', authorizeArtist, paymentController.getPaymentHistory);
+router.get('/subscription/:subscriptionId/payments', authorizeArtist, paymentController.getSubscriptionPaymentHistory);
 
 // Utilidades para pagos
 router.post('/card-token', paymentController.createCardToken);

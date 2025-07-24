@@ -2,6 +2,8 @@ const emailService = require('../services/emailService');
 const User = require('../models/User');
 const TattooArtist = require('../models/TattooArtist');
 const Client = require('../models/Client');
+const TattooRequest = require('../models/TattooRequest');
+const Proposal = require('../models/Proposal');
 
 const notificationController = {
   async sendWelcomeEmail(req, res) {
@@ -68,14 +70,27 @@ const notificationController = {
         throw new Error('Datos requeridos no encontrados para notificación');
       }
       
-      const result = await emailService.sendProposalNotification(
+      // Send notification to client
+      const clientResult = await emailService.sendProposalNotification(
         client, 
         artist, 
         offer, 
         proposal
       );
       
-      return result;
+      // Send notification to artist
+      const artistResult = await emailService.sendProposalCreatedToArtist(
+        artist,
+        client,
+        offer,
+        proposal
+      );
+      
+      return { 
+        success: clientResult.success && artistResult.success, 
+        clientResult, 
+        artistResult 
+      };
     } catch (error) {
       console.error('Error triggering proposal notification:', error);
       return { success: false, error: error.message };
@@ -125,6 +140,56 @@ const notificationController = {
       return result;
     } catch (error) {
       console.error('Error triggering proposal rejected notification:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  async triggerProposalPriceChanged(clientId, artistId, offerId, proposalId, oldPrice, newPrice) {
+    try {
+      const [client, artist, offer, proposal] = await Promise.all([
+        Client.findByIdWithUser(clientId),
+        TattooArtist.findByIdWithUser(artistId),
+        TattooRequest.findById(offerId),
+        Proposal.findById(proposalId)
+      ]);
+      
+      if (!client || !artist || !offer || !proposal) {
+        throw new Error('Datos requeridos no encontrados para notificación');
+      }
+      
+      const result = await emailService.sendProposalPriceChanged(
+        client,
+        artist,
+        offer,
+        proposal,
+        oldPrice,
+        newPrice
+      );
+      
+      return result;
+    } catch (error) {
+      console.error('Error triggering proposal price changed notification:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  async triggerProposalWithdrawn(clientId, artistId, offerId) {
+    try {
+      const [client, artist, offer] = await Promise.all([
+        Client.findByIdWithUser(clientId),
+        TattooArtist.findByIdWithUser(artistId),
+        TattooRequest.findById(offerId)
+      ]);
+      
+      if (!client || !artist || !offer) {
+        throw new Error('Datos requeridos no encontrados para notificación');
+      }
+      
+      const result = await emailService.sendProposalWithdrawn(client, artist, offer);
+      
+      return result;
+    } catch (error) {
+      console.error('Error triggering proposal withdrawn notification:', error);
       return { success: false, error: error.message };
     }
   },

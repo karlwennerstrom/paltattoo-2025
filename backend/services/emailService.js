@@ -106,6 +106,56 @@ class EmailService {
     );
   }
 
+  async sendProposalCreatedToArtist(artist, client, offer, proposal) {
+    const html = await this.loadTemplate('proposal-created-artist', {
+      artistName: artist.firstName || artist.email,
+      clientName: client.firstName || client.email,
+      offerTitle: offer.title,
+      proposedPrice: this.formatCurrency(proposal.proposedPrice),
+      artistMessage: proposal.message,
+      dashboardUrl: `${process.env.FRONTEND_URL}/dashboard/proposals`
+    });
+
+    return this.send(
+      artist.email,
+      `Tu propuesta ha sido enviada: ${offer.title}`,
+      html || this.getDefaultProposalCreatedToArtistHtml(artist, client, offer, proposal)
+    );
+  }
+
+  async sendProposalPriceChanged(client, artist, offer, proposal, oldPrice, newPrice) {
+    const html = await this.loadTemplate('proposal-price-changed', {
+      clientName: client.firstName || client.email,
+      artistName: artist.studioName || artist.firstName,
+      offerTitle: offer.title,
+      oldPrice: this.formatCurrency(oldPrice),
+      newPrice: this.formatCurrency(newPrice),
+      artistMessage: proposal.message,
+      offerUrl: `${process.env.FRONTEND_URL}/offers/${offer.id}`
+    });
+
+    return this.send(
+      client.email,
+      `Precio actualizado en propuesta: ${offer.title}`,
+      html || this.getDefaultProposalPriceChangedHtml(client, artist, offer, proposal, oldPrice, newPrice)
+    );
+  }
+
+  async sendProposalWithdrawn(client, artist, offer) {
+    const html = await this.loadTemplate('proposal-withdrawn', {
+      clientName: client.firstName || client.email,
+      artistName: artist.studioName || artist.firstName,
+      offerTitle: offer.title,
+      offerUrl: `${process.env.FRONTEND_URL}/offers/${offer.id}`
+    });
+
+    return this.send(
+      client.email,
+      `Propuesta retirada por el artista: ${offer.title}`,
+      html || this.getDefaultProposalWithdrawnHtml(client, artist, offer)
+    );
+  }
+
   async sendProposalAccepted(artist, client, offer, proposal) {
     const html = await this.loadTemplate('proposal-accepted', {
       artistName: artist.firstName || artist.email,
@@ -195,7 +245,7 @@ class EmailService {
   }
 
   async sendAppointmentConfirmation(data) {
-    const { email, clientName, appointmentDate, startTime, endTime, artistName, title, location, notes } = data;
+    const { email, clientName, appointmentDate, startTime, endTime, artistName, title, location, notes, durationHours, estimatedPrice, depositAmount, artistId } = data;
     
     const appointmentDateTime = new Date(`${appointmentDate} ${startTime}`);
     const formattedDate = appointmentDateTime.toLocaleDateString('es-CL', {
@@ -204,19 +254,29 @@ class EmailService {
       month: 'long',
       day: 'numeric'
     });
-
-    const html = await this.loadTemplate('appointment-confirmation', {
+    
+    // Calculate duration if not provided
+    const duration = durationHours || this.calculateDuration(startTime, endTime);
+    
+    // Use appointment-notification template since appointment-confirmation doesn't exist
+    const html = await this.loadTemplate('appointment-notification', {
       clientName: clientName,
       artistName: artistName,
       appointmentTitle: title,
       appointmentDate: formattedDate,
       startTime: startTime,
       endTime: endTime,
+      durationHours: duration,
       location: location || 'Estudio del tatuador',
-      notes: notes || 'Sin notas adicionales',
-      contactInfo: 'Contacta al artista si tienes alguna pregunta'
+      notes: notes || null,
+      estimatedPrice: estimatedPrice ? this.formatCurrency(estimatedPrice) : null,
+      depositAmount: depositAmount ? this.formatCurrency(depositAmount) : null,
+      dashboardUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/dashboard`,
+      artistProfileUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/artists/${artistId || ''}`,
+      unsubscribeUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/unsubscribe`,
+      supportUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/support`
     });
-
+    
     return this.send(
       email,
       `Cita confirmada con ${artistName} - ${formattedDate}`,
@@ -249,12 +309,58 @@ class EmailService {
     );
   }
 
+  async sendAppointmentUpdate(recipientEmail, recipientName, appointment, recipientType) {
+    const appointmentDate = new Date(`${appointment.appointment_date} ${appointment.start_time}`);
+    const formattedDate = appointmentDate.toLocaleDateString('es-CL', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+
+    const isArtist = recipientType === 'artist';
+    const otherPartyName = isArtist ? appointment.client_name : appointment.artist_name;
+
+    const html = await this.loadTemplate('appointment-update', {
+      recipientName: recipientName,
+      otherPartyName: otherPartyName,
+      appointmentTitle: appointment.title,
+      appointmentDate: formattedDate,
+      startTime: appointment.start_time,
+      endTime: appointment.end_time,
+      location: appointment.location || 'Estudio del artista',
+      notes: appointment.notes || 'Sin notas adicionales',
+      estimatedPrice: appointment.estimated_price ? this.formatCurrency(appointment.estimated_price) : 'A confirmar',
+      durationHours: appointment.duration_hours,
+      isArtist: isArtist,
+      dashboardUrl: `${process.env.FRONTEND_URL}/dashboard`,
+      supportUrl: `${process.env.FRONTEND_URL}/support`
+    });
+
+    const subject = isArtist 
+      ? `Cita actualizada con ${otherPartyName} - ${formattedDate}`
+      : `Tu cita con ${otherPartyName} ha sido actualizada - ${formattedDate}`;
+
+    return this.send(
+      recipientEmail,
+      subject,
+      html || this.getDefaultAppointmentUpdateHtml(recipientName, otherPartyName, appointment, formattedDate, isArtist)
+    );
+  }
+
   // Utility methods
   formatCurrency(amount) {
     return new Intl.NumberFormat('es-CL', {
       style: 'currency',
       currency: 'CLP'
     }).format(amount);
+  }
+  
+  calculateDuration(startTime, endTime) {
+    const start = new Date(`2000-01-01 ${startTime}`);
+    const end = new Date(`2000-01-01 ${endTime}`);
+    const diff = end - start;
+    return Math.round(diff / (1000 * 60 * 60)); // Convert to hours
   }
 
   // Default HTML templates (fallbacks)
@@ -404,6 +510,44 @@ class EmailService {
           </ul>
         </div>
         <p style="color: #666; font-size: 14px;">¡Esperamos verte pronto!</p>
+      </div>
+    `;
+  }
+
+  getDefaultAppointmentUpdateHtml(recipientName, otherPartyName, appointment, formattedDate, isArtist) {
+    const actionBy = isArtist ? 'el cliente' : 'el artista';
+    const actionText = isArtist 
+      ? 'Los detalles de tu cita han sido actualizados por el cliente.'
+      : 'El artista ha actualizado los detalles de tu cita.';
+
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #f39c12;">📅 Cita actualizada</h1>
+        <p>Hola ${recipientName},</p>
+        <p>${actionText}</p>
+        <div style="background-color: #fffbeb; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #f59e0b;">
+          <h3 style="margin-top: 0; color: #d97706;">Detalles actualizados de la cita:</h3>
+          <p><strong>Título:</strong> ${appointment.title || 'Sin título'}</p>
+          <p><strong>Con:</strong> ${otherPartyName}</p>
+          <p><strong>Fecha:</strong> ${formattedDate}</p>
+          <p><strong>Hora:</strong> ${appointment.start_time} - ${appointment.end_time}</p>
+          <p><strong>Duración:</strong> ${appointment.duration_hours} hora${appointment.duration_hours > 1 ? 's' : ''}</p>
+          <p><strong>Ubicación:</strong> ${appointment.location || 'Estudio del artista'}</p>
+          ${appointment.estimated_price ? `<p><strong>Precio estimado:</strong> ${this.formatCurrency(appointment.estimated_price)}</p>` : ''}
+          ${appointment.notes ? `<p><strong>Notas:</strong> ${appointment.notes}</p>` : ''}
+        </div>
+        <div style="background-color: #dbeafe; padding: 15px; border-radius: 8px; border: 1px solid #60a5fa; margin: 20px 0;">
+          <p style="margin: 0;"><strong>💡 Importante:</strong> Revisa los nuevos detalles y confirma tu disponibilidad para la fecha y hora actualizada.</p>
+        </div>
+        <p>
+          <a href="${process.env.FRONTEND_URL}/dashboard" 
+             style="display: inline-block; padding: 12px 24px; background-color: #f59e0b; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">
+            Ver en mi dashboard
+          </a>
+        </p>
+        <p style="color: #666; font-size: 14px;">
+          Si tienes alguna pregunta sobre estos cambios, puedes contactar directamente con ${actionBy}.
+        </p>
       </div>
     `;
   }
@@ -562,6 +706,57 @@ class EmailService {
         <p style="color: #666; font-size: 14px;">
           Si tienes alguna pregunta, puedes contactarnos en ${process.env.EMAIL_USER || 'soporte@paltattoo.cl'}
         </p>
+      </div>
+    `;
+  }
+
+  getDefaultProposalCreatedToArtistHtml(artist, client, offer, proposal) {
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #28a745;">¡Propuesta enviada exitosamente!</h1>
+        <p>Hola ${artist.firstName || artist.email},</p>
+        <p>Tu propuesta para la oferta "<strong>${offer.title}</strong>" ha sido enviada al cliente.</p>
+        <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px;">
+          <p><strong>Cliente:</strong> ${client.firstName || client.email}</p>
+          <p><strong>Precio propuesto:</strong> ${this.formatCurrency(proposal.proposedPrice)}</p>
+          <p><strong>Tu mensaje:</strong></p>
+          <p style="font-style: italic;">"${proposal.message}"</p>
+        </div>
+        <p>El cliente recibirá una notificación y podrá revisar tu propuesta. Te notificaremos cuando haya una respuesta.</p>
+        <a href="${process.env.FRONTEND_URL}/dashboard/proposals" style="display: inline-block; margin-top: 15px; padding: 10px 20px; background-color: #28a745; color: white; text-decoration: none; border-radius: 5px;">Ver mis propuestas</a>
+      </div>
+    `;
+  }
+
+  getDefaultProposalPriceChangedHtml(client, artist, offer, proposal, oldPrice, newPrice) {
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #f39c12;">Precio de propuesta actualizado</h1>
+        <p>Hola ${client.firstName || client.email},</p>
+        <p><strong>${artist.studioName || artist.firstName}</strong> ha actualizado el precio de su propuesta para:</p>
+        <h2 style="color: #555;">"${offer.title}"</h2>
+        <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px;">
+          <p><strong>Precio anterior:</strong> <span style="text-decoration: line-through; color: #666;">${this.formatCurrency(oldPrice)}</span></p>
+          <p><strong>Nuevo precio:</strong> <span style="color: #e74c3c; font-weight: bold;">${this.formatCurrency(newPrice)}</span></p>
+          <p><strong>Mensaje del artista:</strong></p>
+          <p style="font-style: italic;">"${proposal.message}"</p>
+        </div>
+        <p>Puedes revisar la propuesta actualizada y decidir si deseas aceptarla.</p>
+        <a href="${process.env.FRONTEND_URL}/offers/${offer.id}" style="display: inline-block; margin-top: 15px; padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px;">Ver propuesta</a>
+      </div>
+    `;
+  }
+
+  getDefaultProposalWithdrawnHtml(client, artist, offer) {
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #dc3545;">Propuesta retirada</h1>
+        <p>Hola ${client.firstName || client.email},</p>
+        <p><strong>${artist.studioName || artist.firstName}</strong> ha retirado su propuesta para la oferta:</p>
+        <h2 style="color: #555;">"${offer.title}"</h2>
+        <p>Esta propuesta ya no está disponible para aceptación.</p>
+        <p>Puedes revisar otras propuestas disponibles para esta oferta o esperar nuevas propuestas.</p>
+        <a href="${process.env.FRONTEND_URL}/offers/${offer.id}" style="display: inline-block; margin-top: 15px; padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px;">Ver oferta</a>
       </div>
     `;
   }

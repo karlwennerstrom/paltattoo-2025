@@ -11,42 +11,42 @@ router.use(authenticate);
 const validateAppointment = [
   body('proposal_id').isInt({ min: 1 }).withMessage('ID de propuesta válido requerido'),
   body('appointment_date').isISO8601().withMessage('Fecha válida requerida'),
-  body('start_time').matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).withMessage('Hora de inicio válida requerida (HH:MM)'),
-  body('end_time').matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).withMessage('Hora de fin válida requerida (HH:MM)'),
+  body('start_time').matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$/).withMessage('Hora de inicio válida requerida (HH:MM o HH:MM:SS)'),
+  body('end_time').matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$/).withMessage('Hora de fin válida requerida (HH:MM o HH:MM:SS)'),
   body('duration_hours').isFloat({ min: 0.5, max: 12 }).withMessage('Duración debe ser entre 0.5 y 12 horas'),
-  body('estimated_price').optional().isFloat({ min: 0 }).withMessage('Precio estimado debe ser mayor a 0'),
-  body('deposit_amount').optional().isFloat({ min: 0 }).withMessage('Depósito debe ser mayor a 0'),
-  body('notes').optional().isLength({ max: 1000 }).withMessage('Notas no pueden exceder 1000 caracteres'),
-  body('location').optional().isLength({ max: 255 }).withMessage('Ubicación no puede exceder 255 caracteres')
+  body('estimated_price').optional({ checkFalsy: true }).isFloat({ min: 0 }).withMessage('Precio estimado debe ser mayor a 0'),
+  body('deposit_amount').optional({ checkFalsy: true }).isFloat({ min: 0 }).withMessage('Depósito debe ser mayor a 0'),
+  body('notes').optional({ checkFalsy: true }).isLength({ max: 1000 }).withMessage('Notas no pueden exceder 1000 caracteres'),
+  body('location').optional({ checkFalsy: true }).isLength({ max: 255 }).withMessage('Ubicación no puede exceder 255 caracteres')
 ];
 
 // Validation for standalone appointments (without proposal)
 const validateStandaloneAppointment = [
   body('appointment_date').isISO8601().withMessage('Fecha válida requerida'),
-  body('start_time').matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).withMessage('Hora de inicio válida requerida (HH:MM)'),
-  body('end_time').matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).withMessage('Hora de fin válida requerida (HH:MM)'),
+  body('start_time').matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$/).withMessage('Hora de inicio válida requerida (HH:MM o HH:MM:SS)'),
+  body('end_time').matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$/).withMessage('Hora de fin válida requerida (HH:MM o HH:MM:SS)'),
   body('duration_hours').isFloat({ min: 0.5, max: 12 }).withMessage('Duración debe ser entre 0.5 y 12 horas'),
   body('title').isLength({ min: 1, max: 255 }).withMessage('Título es requerido y no puede exceder 255 caracteres'),
   body('client_name').isLength({ min: 1, max: 255 }).withMessage('Nombre del cliente es requerido'),
-  body('client_email').optional().isEmail().withMessage('Email del cliente debe ser válido'),
-  body('client_phone').optional().isLength({ min: 1, max: 50 }).withMessage('Teléfono del cliente no puede exceder 50 caracteres'),
-  body('estimated_price').optional().isFloat({ min: 0 }).withMessage('Precio estimado debe ser mayor a 0'),
-  body('deposit_amount').optional().isFloat({ min: 0 }).withMessage('Depósito debe ser mayor a 0'),
-  body('notes').optional().isLength({ max: 1000 }).withMessage('Notas no pueden exceder 1000 caracteres'),
-  body('location').optional().isLength({ max: 255 }).withMessage('Ubicación no puede exceder 255 caracteres')
+  body('client_email').notEmpty().withMessage('Email del cliente es obligatorio').isEmail().withMessage('Email del cliente debe ser válido'),
+  body('client_phone').optional({ checkFalsy: true }).isLength({ max: 50 }).withMessage('Teléfono del cliente no puede exceder 50 caracteres'),
+  body('estimated_price').optional({ checkFalsy: true }).isFloat({ min: 0 }).withMessage('Precio estimado debe ser mayor a 0'),
+  body('deposit_amount').optional({ checkFalsy: true }).isFloat({ min: 0 }).withMessage('Depósito debe ser mayor a 0'),
+  body('notes').optional({ checkFalsy: true }).isLength({ max: 1000 }).withMessage('Notas no pueden exceder 1000 caracteres'),
+  body('location').optional({ checkFalsy: true }).isLength({ max: 255 }).withMessage('Ubicación no puede exceder 255 caracteres')
 ];
 
 const validateAppointmentUpdate = [
   body('appointment_date').optional().isISO8601().withMessage('Fecha válida requerida'),
-  body('start_time').optional().matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).withMessage('Hora de inicio válida requerida (HH:MM)'),
-  body('end_time').optional().matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).withMessage('Hora de fin válida requerida (HH:MM)'),
+  body('start_time').optional().matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$/).withMessage('Hora de inicio válida requerida (HH:MM o HH:MM:SS)'),
+  body('end_time').optional().matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$/).withMessage('Hora de fin válida requerida (HH:MM o HH:MM:SS)'),
   body('duration_hours').optional().isFloat({ min: 0.5, max: 12 }).withMessage('Duración debe ser entre 0.5 y 12 horas'),
   body('status').optional().isIn(['scheduled', 'confirmed', 'cancelled', 'completed', 'no_show']).withMessage('Estado inválido'),
-  body('estimated_price').optional().isFloat({ min: 0 }).withMessage('Precio estimado debe ser mayor a 0'),
-  body('deposit_amount').optional().isFloat({ min: 0 }).withMessage('Depósito debe ser mayor a 0'),
+  body('estimated_price').optional({ checkFalsy: true }).isFloat({ min: 0 }).withMessage('Precio estimado debe ser mayor a 0'),
+  body('deposit_amount').optional({ checkFalsy: true }).isFloat({ min: 0 }).withMessage('Depósito debe ser mayor a 0'),
   body('deposit_paid').optional().isBoolean().withMessage('Depósito pagado debe ser true o false'),
-  body('notes').optional().isLength({ max: 1000 }).withMessage('Notas no pueden exceder 1000 caracteres'),
-  body('location').optional().isLength({ max: 255 }).withMessage('Ubicación no puede exceder 255 caracteres')
+  body('notes').optional({ checkFalsy: true }).isLength({ max: 1000 }).withMessage('Notas no pueden exceder 1000 caracteres'),
+  body('location').optional({ checkFalsy: true }).isLength({ max: 255 }).withMessage('Ubicación no puede exceder 255 caracteres')
 ];
 
 const validateAvailability = [

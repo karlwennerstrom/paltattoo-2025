@@ -6,7 +6,12 @@ class Appointment {
     this.artist_id = data.artist_id;
     this.client_id = data.client_id;
     this.proposal_id = data.proposal_id;
-    this.appointment_date = data.appointment_date;
+    // Format date to YYYY-MM-DD string
+    this.appointment_date = data.appointment_date ? 
+      (typeof data.appointment_date === 'string' ? 
+        data.appointment_date.split('T')[0] : 
+        new Date(data.appointment_date).toISOString().split('T')[0]
+      ) : null;
     this.start_time = data.start_time;
     this.end_time = data.end_time;
     this.duration_hours = data.duration_hours;
@@ -31,9 +36,9 @@ class Appointment {
       let query = `
         SELECT 
           a.*,
-          CONCAT(up_client.first_name, ' ', up_client.last_name) as client_name,
-          u_client.email as client_email,
-          up_client.phone as client_phone,
+          COALESCE(a.client_name, CONCAT(up_client.first_name, ' ', up_client.last_name)) as client_name,
+          COALESCE(a.client_email, u_client.email) as client_email,
+          COALESCE(a.client_phone, up_client.phone) as client_phone,
           CONCAT(up_artist.first_name, ' ', up_artist.last_name) as artist_name,
           u_artist.email as artist_email,
           to_offer.title as request_title,
@@ -89,9 +94,9 @@ class Appointment {
       const query = `
         SELECT 
           a.*,
-          CONCAT(up_client.first_name, ' ', up_client.last_name) as client_name,
-          u_client.email as client_email,
-          up_client.phone as client_phone,
+          COALESCE(a.client_name, CONCAT(up_client.first_name, ' ', up_client.last_name)) as client_name,
+          COALESCE(a.client_email, u_client.email) as client_email,
+          COALESCE(a.client_phone, up_client.phone) as client_phone,
           CONCAT(up_artist.first_name, ' ', up_artist.last_name) as artist_name,
           u_artist.email as artist_email,
           to_offer.title as request_title,
@@ -250,8 +255,8 @@ class Appointment {
       const query = `
         SELECT 
           a.*,
-          u_client.name as client_name,
-          u_client.email as client_email,
+          COALESCE(a.client_name, u_client.name) as client_name,
+          COALESCE(a.client_email, u_client.email) as client_email,
           u_artist.name as artist_name,
           u_artist.email as artist_email
         FROM appointments a
@@ -273,9 +278,9 @@ class Appointment {
       const query = `
         SELECT 
           a.*,
-          u_client.name as client_name,
-          u_client.email as client_email,
-          u_client.phone as client_phone,
+          COALESCE(a.client_name, u_client.name) as client_name,
+          COALESCE(a.client_email, u_client.email) as client_email,
+          COALESCE(a.client_phone, u_client.phone) as client_phone,
           to_offer.title as request_title
         FROM appointments a
         LEFT JOIN users u_client ON a.client_id = u_client.id

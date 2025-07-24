@@ -72,6 +72,56 @@ router.post('/subscribe', authenticate, async (req, res) => {
   }
 });
 
+// Change subscription plan
+router.put('/:subscriptionId/change-plan', authenticate, async (req, res) => {
+  try {
+    const { subscriptionId } = req.params;
+    const { planId } = req.body;
+    
+    if (!planId) {
+      return res.status(400).json({ error: 'Plan ID es requerido' });
+    }
+    
+    // Verify subscription belongs to user
+    const subscription = await Subscription.getById(subscriptionId);
+    
+    if (!subscription) {
+      return res.status(404).json({ error: 'Suscripción no encontrada' });
+    }
+    
+    if (subscription.user_id !== req.user.id) {
+      return res.status(403).json({ error: 'No autorizado' });
+    }
+    
+    // Get new plan details
+    const newPlan = await Subscription.getPlanById(planId);
+    
+    if (!newPlan) {
+      return res.status(404).json({ error: 'Plan no encontrado' });
+    }
+    
+    // Update subscription plan
+    const success = await Subscription.changePlan(subscriptionId, planId);
+    
+    if (success) {
+      // Get updated subscription
+      const updatedSubscription = await Subscription.getById(subscriptionId);
+      
+      res.json({
+        message: 'Plan actualizado exitosamente',
+        subscription: updatedSubscription,
+        // In production, return MercadoPago payment URL for upgrades
+        paymentUrl: newPlan.price > subscription.price ? `/payments/subscription/${subscriptionId}/upgrade` : null
+      });
+    } else {
+      res.status(500).json({ error: 'Error al cambiar plan' });
+    }
+  } catch (error) {
+    console.error('Change plan error:', error);
+    res.status(500).json({ error: 'Error al cambiar plan' });
+  }
+});
+
 // Cancel subscription
 router.post('/cancel', authenticate, async (req, res) => {
   try {

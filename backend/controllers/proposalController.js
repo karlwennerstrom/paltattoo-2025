@@ -119,6 +119,17 @@ const proposalController = {
           break;
         case 'withdrawn':
           success = await Proposal.withdraw(proposalId);
+          if (success) {
+            // Send notification to client
+            const client = await Client.findById(offer.client_id);
+            if (client) {
+              notificationController.triggerProposalWithdrawn(
+                client.id,
+                proposal.artist_id,
+                proposal.offer_id
+              ).catch(err => console.error('Email notification error:', err));
+            }
+          }
           break;
       }
       
@@ -163,10 +174,31 @@ const proposalController = {
       if (proposedPrice !== undefined) updateData.proposed_price = proposedPrice;
       if (estimatedDuration !== undefined) updateData.estimated_duration = estimatedDuration;
       
-      const success = await Proposal.update(proposalId, updateData);
+      const oldProposal = await Proposal.findById(proposalId);
+      const priceChanged = proposedPrice !== undefined && oldProposal.proposed_price !== proposedPrice;
+      
+      const success = await Proposal.update(proposalId, updateData, req.user.id);
       
       if (success) {
         const updatedProposal = await Proposal.findById(proposalId);
+        
+        // If price changed, send notification to client
+        if (priceChanged) {
+          const offer = await TattooRequest.findById(proposal.offer_id);
+          const client = await Client.findById(offer.client_id);
+          
+          if (client) {
+            notificationController.triggerProposalPriceChanged(
+              client.id,
+              artist.id,
+              proposal.offer_id,
+              proposalId,
+              oldProposal.proposed_price,
+              proposedPrice
+            ).catch(err => console.error('Email notification error:', err));
+          }
+        }
+        
         res.json({
           message: 'Propuesta actualizada exitosamente',
           proposal: updatedProposal

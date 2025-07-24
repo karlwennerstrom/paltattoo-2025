@@ -27,25 +27,19 @@ router.get('/artist', authenticate, authorizeArtist, async (req, res) => {
       });
     }
     
+    // First get the artist's ID from tattoo_artists table
+    const artistRecord = artistCheck[0];
+    const tattooArtistId = artistRecord.id;
+    
     // Get basic stats
     const [statsResults] = await db.execute(`
       SELECT 
-        (SELECT COUNT(*) FROM proposals p 
-         JOIN tattoo_artists ta ON p.artist_id = ta.id 
-         WHERE ta.user_id = ?) as total_proposals,
-        (SELECT COUNT(*) FROM proposals p 
-         JOIN tattoo_artists ta ON p.artist_id = ta.id 
-         WHERE ta.user_id = ? AND p.status = 'accepted') as accepted_proposals,
-        (SELECT COUNT(*) FROM appointments a 
-         JOIN tattoo_artists ta ON a.artist_id = ta.id 
-         WHERE ta.user_id = ?) as total_appointments,
-        (SELECT COUNT(*) FROM portfolio_images p 
-         JOIN tattoo_artists ta ON p.artist_id = ta.id 
-         WHERE ta.user_id = ?) as portfolio_items,
-        (SELECT COALESCE(AVG(r.rating), 0) FROM reviews r 
-         JOIN tattoo_artists ta ON r.artist_id = ta.id 
-         WHERE ta.user_id = ?) as average_rating
-    `, [artistId, artistId, artistId, artistId, artistId]);
+        (SELECT COUNT(*) FROM proposals p WHERE p.artist_id = ?) as total_proposals,
+        (SELECT COUNT(*) FROM proposals p WHERE p.artist_id = ? AND p.status = 'accepted') as accepted_proposals,
+        (SELECT COUNT(*) FROM appointments a WHERE a.artist_id = ?) as total_appointments,
+        (SELECT COUNT(*) FROM portfolio_images p WHERE p.artist_id = ?) as portfolio_items,
+        (SELECT COALESCE(AVG(r.rating), 0) FROM reviews r WHERE r.artist_id = ?) as average_rating
+    `, [tattooArtistId, tattooArtistId, tattooArtistId, tattooArtistId, tattooArtistId]);
     
     const stats = statsResults[0] || {
       total_proposals: 0,
@@ -60,18 +54,46 @@ router.get('/artist', authenticate, authorizeArtist, async (req, res) => {
       ? (stats.accepted_proposals / stats.total_proposals * 100).toFixed(1)
       : 0;
     
+    // Get next appointment
+    const [nextAppointmentResult] = await db.execute(`
+      SELECT 
+        a.id,
+        a.title,
+        a.appointment_date,
+        a.start_time,
+        a.end_time,
+        a.client_name,
+        a.status
+      FROM appointments a
+      WHERE a.artist_id = ? 
+        AND a.appointment_date >= CURDATE()
+        AND a.status IN ('scheduled', 'confirmed')
+      ORDER BY a.appointment_date ASC, a.start_time ASC
+      LIMIT 1
+    `, [tattooArtistId]);
+    
+    // Get recent activity stats
+    const [recentActivity] = await db.execute(`
+      SELECT 
+        (SELECT COUNT(*) FROM appointments a 
+         WHERE a.artist_id = ? AND a.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)) as recent_appointments,
+        (SELECT COUNT(*) FROM proposals p 
+         WHERE p.artist_id = ? AND p.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)) as recent_proposals
+    `, [tattooArtistId, tattooArtistId]);
+    
     // Get monthly stats for the last 6 months
     const [monthlyResults] = await db.execute(`
       SELECT 
         DATE_FORMAT(p.created_at, '%Y-%m') as month,
         COUNT(*) as count
       FROM proposals p
-      JOIN tattoo_artists ta ON p.artist_id = ta.id
-      WHERE ta.user_id = ? 
+      WHERE p.artist_id = ? 
         AND p.created_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
       GROUP BY DATE_FORMAT(p.created_at, '%Y-%m')
       ORDER BY month DESC
-    `, [artistId]);
+    `, [tattooArtistId]);
+    
+    const recentStats = recentActivity[0] || { recent_appointments: 0, recent_proposals: 0 };
     
     res.json({
       totalProposals: parseInt(stats.total_proposals) || 0,
@@ -80,6 +102,9 @@ router.get('/artist', authenticate, authorizeArtist, async (req, res) => {
       portfolioItems: parseInt(stats.portfolio_items) || 0,
       averageRating: parseFloat(stats.average_rating) || 0,
       acceptanceRate: parseFloat(acceptanceRate),
+      nextAppointment: nextAppointmentResult.length > 0 ? nextAppointmentResult[0] : null,
+      recentAppointments: parseInt(recentStats.recent_appointments) || 0,
+      recentProposals: parseInt(recentStats.recent_proposals) || 0,
       monthlyStats: monthlyResults || []
     });
   } catch (error) {

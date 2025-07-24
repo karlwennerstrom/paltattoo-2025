@@ -300,6 +300,27 @@ class Subscription {
     return { subscriptionStats: stats, changeStats: changes };
   }
 
+  // Obtener suscripción por ID
+  static async getById(subscriptionId) {
+    const [rows] = await db.execute(
+      `SELECT s.*, p.name as plan_name, p.price, p.features 
+       FROM user_subscriptions s 
+       JOIN subscription_plans p ON s.plan_id = p.id 
+       WHERE s.id = ?`,
+      [subscriptionId]
+    );
+    return rows[0];
+  }
+
+  // Cambiar plan de suscripción
+  static async changePlan(subscriptionId, newPlanId) {
+    const [result] = await db.execute(
+      'UPDATE user_subscriptions SET plan_id = ? WHERE id = ?',
+      [newPlanId, subscriptionId]
+    );
+    return result.affectedRows > 0;
+  }
+
   // Actualizar suscripción con registro de cambio
   static async updateSubscriptionWithChange(userId, oldSubscription, newPlanId, changeType, changeReason = null) {
     const connection = await db.getConnection();

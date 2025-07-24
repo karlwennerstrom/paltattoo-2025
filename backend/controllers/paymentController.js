@@ -391,8 +391,8 @@ const paymentController = {
     }
   },
 
-  // Obtener historial de pagos
-  getPaymentHistory: async (req, res) => {
+  // Obtener historial de pagos para una suscripción específica
+  getSubscriptionPaymentHistory: async (req, res) => {
     try {
       const { subscriptionId } = req.params;
 
@@ -410,6 +410,51 @@ const paymentController = {
     } catch (error) {
       console.error('Error getting payment history:', error);
       res.status(500).json({ error: 'Error al obtener el historial de pagos' });
+    }
+  },
+
+  // Obtener suscripción activa del usuario
+  getActiveSubscription: async (req, res) => {
+    try {
+      const subscription = await Subscription.getActiveByUserId(req.user.id);
+      res.json({ success: true, data: subscription });
+    } catch (error) {
+      console.error('Error getting active subscription:', error);
+      res.status(500).json({ success: false, message: 'Error al obtener la suscripción activa' });
+    }
+  },
+
+  // Obtener historial de suscripciones del usuario
+  getSubscriptionHistory: async (req, res) => {
+    try {
+      const subscriptions = await Subscription.getByUserId(req.user.id);
+      res.json({ success: true, data: subscriptions });
+    } catch (error) {
+      console.error('Error getting subscription history:', error);
+      res.status(500).json({ success: false, message: 'Error al obtener el historial de suscripciones' });
+    }
+  },
+
+  // Obtener historial de pagos del usuario
+  getPaymentHistory: async (req, res) => {
+    try {
+      const payments = await Subscription.getPaymentHistoryByUser(req.user.id);
+      res.json({ success: true, data: payments });
+    } catch (error) {
+      console.error('Error getting payment history:', error);
+      res.status(500).json({ success: false, message: 'Error al obtener el historial de pagos' });
+    }
+  },
+
+  // Obtener cambios de suscripción del usuario
+  getSubscriptionChanges: async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit) || 50;
+      const changes = await Subscription.getSubscriptionChanges(req.user.id, limit);
+      res.json({ success: true, data: changes });
+    } catch (error) {
+      console.error('Error getting subscription changes:', error);
+      res.status(500).json({ success: false, message: 'Error al obtener los cambios de suscripción' });
     }
   },
 

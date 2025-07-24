@@ -1,4 +1,5 @@
 const promisePool = require('../config/database');
+const ProposalPriceHistory = require('./ProposalPriceHistory');
 
 class Proposal {
   static async create(proposalData) {
@@ -23,8 +24,9 @@ class Proposal {
   static async findById(id) {
     const [rows] = await promisePool.execute(
       `SELECT p.*, 
-              ta.studio_name, ta.rating, ta.instagram_url, ta.years_experience,
-              up.first_name, up.last_name, up.profile_image,
+              ta.studio_name, ta.rating, ta.instagram_url, ta.years_experience, ta.whatsapp,
+              up.first_name, up.last_name, up.profile_image, up.phone,
+              u.email,
               o.title as offer_title, o.description as offer_description
        FROM proposals p
        JOIN tattoo_artists ta ON p.artist_id = ta.id
@@ -47,11 +49,20 @@ class Proposal {
     return rows[0];
   }
 
-  static async update(proposalId, updateData) {
+  static async update(proposalId, updateData, userId = null) {
     const fields = [];
     const values = [];
     
     const allowedFields = ['message', 'proposed_price', 'estimated_duration', 'status'];
+    
+    // Check if price is being updated and get current price for history
+    let oldPrice = null;
+    if (updateData.proposed_price !== undefined && userId) {
+      const currentProposal = await this.findById(proposalId);
+      if (currentProposal && currentProposal.proposed_price !== updateData.proposed_price) {
+        oldPrice = currentProposal.proposed_price;
+      }
+    }
     
     Object.entries(updateData).forEach(([key, value]) => {
       if (allowedFields.includes(key) && value !== undefined) {
@@ -68,6 +79,17 @@ class Proposal {
       `UPDATE proposals SET ${fields.join(', ')} WHERE id = ?`,
       values
     );
+    
+    // If price was updated and we have user info, record the change
+    if (result.affectedRows > 0 && oldPrice !== null && userId) {
+      await ProposalPriceHistory.create(
+        proposalId, 
+        oldPrice, 
+        updateData.proposed_price, 
+        userId,
+        'Propuesta actualizada por el artista'
+      );
+    }
     
     return result.affectedRows > 0;
   }
@@ -162,8 +184,9 @@ class Proposal {
   static async getByOffer(offerId) {
     const [rows] = await promisePool.execute(
       `SELECT p.*, 
-              ta.studio_name, ta.rating, ta.instagram_url, ta.years_experience,
-              up.first_name, up.last_name, up.profile_image,
+              ta.studio_name, ta.rating, ta.instagram_url, ta.years_experience, ta.whatsapp,
+              up.first_name, up.last_name, up.profile_image, up.phone,
+              u.email,
               c.name as comuna_name
        FROM proposals p
        JOIN tattoo_artists ta ON p.artist_id = ta.id
@@ -174,6 +197,12 @@ class Proposal {
        ORDER BY p.created_at DESC`,
       [offerId]
     );
+    
+    // Add price history for each proposal
+    for (let i = 0; i < rows.length; i++) {
+      const priceHistory = await ProposalPriceHistory.getByProposal(rows[i].id);
+      rows[i].priceHistory = priceHistory;
+    }
     
     return rows;
   }
@@ -194,6 +223,18 @@ class Proposal {
     );
     
     return result.affectedRows > 0;
+  }
+
+  static async findByIdWithHistory(id) {
+    const proposal = await this.findById(id);
+    if (!proposal) return null;
+    
+    const priceHistory = await ProposalPriceHistory.getByProposal(id);
+    
+    return {
+      ...proposal,
+      priceHistory
+    };
   }
 }
 

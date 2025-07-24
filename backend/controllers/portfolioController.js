@@ -270,7 +270,7 @@ const uploadPortfolioMedia = async (req, res) => {
       return res.status(404).json({ error: 'Perfil de tatuador no encontrado' });
     }
     
-    const { itemId, title, description, styleId, category, isFeatured } = req.body;
+    const { itemId, title, description, styleId, category, isFeatured, collectionId } = req.body;
     
     const uploadsPath = path.join(__dirname, '..', 'uploads', 'portfolio');
     const isVideo = req.file.mimetype.startsWith('video/');
@@ -353,17 +353,27 @@ const uploadPortfolioMedia = async (req, res) => {
           fileSize: mediaData.fileSize
         });
 
-        // Automatically add to default collection
+        // Add to specified collection or default collection
         try {
-          // Find the default collection (first collection with sort_order 0 or name 'Mi Portfolio')
-          const defaultCollections = await Collection.findByArtist(artist.id, true);
-          const defaultCollection = defaultCollections.find(c => c.sort_order === 0) || defaultCollections[0];
+          let targetCollection = null;
           
-          if (defaultCollection) {
-            await Collection.addImage(defaultCollection.id, portfolioId, 0);
+          if (collectionId) {
+            // Use the specified collection if provided
+            const collections = await Collection.findByArtist(artist.id, true);
+            targetCollection = collections.find(c => c.id === parseInt(collectionId));
+          }
+          
+          if (!targetCollection) {
+            // Fallback to default collection if no collection specified or collection not found
+            const defaultCollections = await Collection.findByArtist(artist.id, true);
+            targetCollection = defaultCollections.find(c => c.sort_order === 0) || defaultCollections[0];
+          }
+          
+          if (targetCollection) {
+            await Collection.addImage(targetCollection.id, portfolioId, 0);
           }
         } catch (collectionError) {
-          console.error('Error adding image to default collection:', collectionError);
+          console.error('Error adding image to collection:', collectionError);
           // Continue without failing the upload
         }
       }

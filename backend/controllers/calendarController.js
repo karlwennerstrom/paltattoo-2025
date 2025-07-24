@@ -15,7 +15,18 @@ class CalendarController {
       const filters = {};
       
       if (userType === 'artist') {
-        filters.artist_id = userId;
+        // Get the artist record to get the correct artist_id
+        const TattooArtist = require('../models/TattooArtist');
+        const artist = await TattooArtist.findByUserId(userId);
+        
+        if (!artist) {
+          return res.status(404).json({
+            success: false,
+            message: 'Perfil de artista no encontrado'
+          });
+        }
+        
+        filters.artist_id = artist.id;
       } else if (userType === 'client') {
         filters.client_id = userId;
       }
@@ -63,7 +74,17 @@ class CalendarController {
       }
       
       // Check if user has permission to view this appointment
-      if (appointment.artist_id !== req.user.id && appointment.client_id !== req.user.id) {
+      let hasPermission = false;
+      
+      if (req.user.user_type === 'artist') {
+        const TattooArtist = require('../models/TattooArtist');
+        const artist = await TattooArtist.findByUserId(req.user.id);
+        hasPermission = artist && appointment.artist_id === artist.id;
+      } else if (req.user.user_type === 'client') {
+        hasPermission = appointment.client_id === req.user.id;
+      }
+      
+      if (!hasPermission) {
         return res.status(403).json({
           success: false,
           message: 'No tienes permisos para ver esta cita'
@@ -117,8 +138,19 @@ class CalendarController {
         });
       }
       
+      // Get the artist record to get the correct artist_id
+      const TattooArtist = require('../models/TattooArtist');
+      const artist = await TattooArtist.findByUserId(req.user.id);
+      
+      if (!artist) {
+        return res.status(404).json({
+          success: false,
+          message: 'Perfil de artista no encontrado'
+        });
+      }
+      
       // Only artist can create appointments
-      if (req.user.user_type !== 'artist' || proposal.artist_id !== req.user.id) {
+      if (req.user.user_type !== 'artist' || proposal.artist_id !== artist.id) {
         return res.status(403).json({
           success: false,
           message: 'No tienes permisos para crear esta cita'
@@ -135,7 +167,7 @@ class CalendarController {
       
       // Check availability
       const isAvailable = await Appointment.checkAvailability(
-        req.user.id,
+        artist.id,
         appointment_date,
         start_time,
         end_time
@@ -149,8 +181,8 @@ class CalendarController {
       }
       
       // Create appointment
-      const appointment = await Appointment.create({
-        artist_id: req.user.id,
+      const appointmentId = await Appointment.create({
+        artist_id: artist.id,
         client_id: proposal.client_id,
         proposal_id,
         appointment_date,
@@ -163,6 +195,8 @@ class CalendarController {
         deposit_amount,
         status: 'scheduled'
       });
+      
+      const appointment = await Appointment.findById(appointmentId);
       
       // Send email notification to client
       try {
@@ -226,25 +260,35 @@ class CalendarController {
         });
       }
       
-      // Check for conflicts
-      const conflicts = await Appointment.checkConflicts(
-        req.user.id, 
-        appointment_date, 
-        start_time, 
+      // Get the artist record to get the correct artist_id
+      const TattooArtist = require('../models/TattooArtist');
+      const artist = await TattooArtist.findByUserId(req.user.id);
+      
+      if (!artist) {
+        return res.status(404).json({
+          success: false,
+          message: 'Perfil de artista no encontrado'
+        });
+      }
+      
+      // Check availability using the correct artist_id
+      const isAvailable = await Appointment.checkAvailability(
+        artist.id, // Use artist.id instead of req.user.id
+        appointment_date,
+        start_time,
         end_time
       );
       
-      if (conflicts.length > 0) {
-        return res.status(409).json({
+      if (!isAvailable) {
+        return res.status(400).json({
           success: false,
-          message: 'Ya tienes una cita programada en este horario',
-          conflicts
+          message: 'Ya tienes una cita programada en este horario'
         });
       }
       
       // Create appointment data
       const appointmentData = {
-        artist_id: req.user.id,
+        artist_id: artist.id, // Use the correct artist_id from tattoo_artists table
         client_id: null, // External client (not in system)
         proposal_id: null, // Standalone appointment
         appointment_date,
@@ -266,7 +310,16 @@ class CalendarController {
       const appointmentId = await Appointment.create(appointmentData);
       const appointment = await Appointment.findById(appointmentId);
       
-      // Send notifications (email to client if email provided)
+      // Get artist information for emails (artist already obtained above)
+      let artistWithUser = null;
+      if (artist) {
+        artistWithUser = await TattooArtist.findById(artist.id);
+      }
+      const artistName = artistWithUser ? 
+        `${artistWithUser.first_name || ''} ${artistWithUser.last_name || ''}`.trim() || 
+        artistWithUser.studio_name || 'Tu Artista' : 'Tu Artista';
+
+      // Send email notification to client if email provided
       if (client_email && emailService) {
         try {
           await emailService.sendAppointmentConfirmation({
@@ -275,29 +328,43 @@ class CalendarController {
             appointmentDate: appointment_date,
             startTime: start_time,
             endTime: end_time,
-            artistName: `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim() || 'Tu Artista',
+            artistName: artistName,
             title: title,
-            location: location,
-            notes: notes
+            location: location || artist?.studio_name || 'Estudio del artista',
+            notes: notes,
+            durationHours: duration_hours,
+            estimatedPrice: estimated_price,
+            depositAmount: deposit_amount,
+            artistId: artist.id
           });
+          console.log(`✅ Email sent to client: ${client_email}`);
         } catch (emailError) {
-          console.error('Error sending appointment email:', emailError);
-          // Don't fail the appointment creation if email fails
+          console.error('❌ Error sending appointment email to client:', emailError);
         }
       }
 
-      // Send in-app notification to artist (confirmation of created appointment)
-      try {
-        // This could be extended to use a real-time notification system like Socket.io
-        console.log(`[NOTIFICATION] New appointment created for artist ${req.user.id}:`, {
-          title,
-          clientName: client_name,
-          date: appointment_date,
-          time: `${start_time} - ${end_time}`,
-          appointmentId: appointmentId
-        });
-      } catch (notificationError) {
-        console.error('Error sending in-app notification:', notificationError);
+      // Send email notification to artist (confirmation)
+      if (artistWithUser?.email && emailService) {
+        try {
+          await emailService.sendAppointmentNotification(
+            artistWithUser.email,
+            artistName,
+            client_name,
+            {
+              ...appointment,
+              appointment_date,
+              start_time,
+              end_time,
+              duration_hours,
+              location: location || artistWithUser?.studio_name || 'Tu estudio',  
+              notes,
+              estimated_price
+            }
+          );
+          console.log(`✅ Email sent to artist: ${artistWithUser.email}`);
+        } catch (emailError) {
+          console.error('❌ Error sending appointment email to artist:', emailError);
+        }
       }
       
       res.status(201).json({
@@ -338,7 +405,21 @@ class CalendarController {
       }
       
       // Check permissions
-      if (appointment.artist_id !== req.user.id && appointment.client_id !== req.user.id) {
+      let hasPermission = false;
+      let userArtistId = null;
+      
+      if (req.user.user_type === 'artist') {
+        const TattooArtist = require('../models/TattooArtist');
+        const artist = await TattooArtist.findByUserId(req.user.id);
+        if (artist) {
+          userArtistId = artist.id;
+          hasPermission = appointment.artist_id === artist.id;
+        }
+      } else if (req.user.user_type === 'client') {
+        hasPermission = appointment.client_id === req.user.id;
+      }
+      
+      if (!hasPermission) {
         return res.status(403).json({
           success: false,
           message: 'No tienes permisos para modificar esta cita'
@@ -365,7 +446,7 @@ class CalendarController {
         const newEndTime = req.body.end_time || appointment.end_time;
         
         const isAvailable = await Appointment.checkAvailability(
-          appointment.artist_id,
+          userArtistId || appointment.artist_id,
           newDate,
           newStartTime,
           newEndTime,
@@ -381,6 +462,43 @@ class CalendarController {
       }
       
       const updatedAppointment = await appointment.update(req.body);
+
+      // Send email notifications for appointment updates
+      const TattooArtist = require('../models/TattooArtist');
+      let artist = null;
+      
+      if (req.user.user_type === 'artist') {
+        artist = await TattooArtist.findByUserId(req.user.id);
+      } else {
+        // If client updated, get artist info from appointment
+        artist = await TattooArtist.findById(appointment.artist_id);
+      }
+
+      try {
+        // Send email to artist about the update
+        if (artist?.email && emailService) {
+          await emailService.sendAppointmentUpdate(
+            artist.email,
+            artist.studio_name || `${artist.first_name} ${artist.last_name}`.trim(),
+            updatedAppointment,
+            'artist'
+          );
+          console.log(`✅ Update email sent to artist: ${artist.email}`);
+        }
+
+        // Send email to client about the update
+        if (updatedAppointment.client_email && emailService) {
+          await emailService.sendAppointmentUpdate(
+            updatedAppointment.client_email,
+            updatedAppointment.client_name,
+            updatedAppointment,
+            'client'
+          );
+          console.log(`✅ Update email sent to client: ${updatedAppointment.client_email}`);
+        }
+      } catch (emailError) {
+        console.error('❌ Error sending appointment update emails:', emailError);
+      }
       
       res.json({
         success: true,
@@ -413,7 +531,17 @@ class CalendarController {
       }
       
       // Check permissions
-      if (appointment.artist_id !== req.user.id && appointment.client_id !== req.user.id) {
+      let hasPermission = false;
+      
+      if (req.user.user_type === 'artist') {
+        const TattooArtist = require('../models/TattooArtist');
+        const artist = await TattooArtist.findByUserId(req.user.id);
+        hasPermission = artist && appointment.artist_id === artist.id;
+      } else if (req.user.user_type === 'client') {
+        hasPermission = appointment.client_id === req.user.id;
+      }
+      
+      if (!hasPermission) {
         return res.status(403).json({
           success: false,
           message: 'No tienes permisos para cancelar esta cita'
@@ -591,7 +719,18 @@ class CalendarController {
         });
       }
       
-      const appointments = await Appointment.findUpcoming(req.user.id, parseInt(days));
+      // Get the artist record to get the correct artist_id
+      const TattooArtist = require('../models/TattooArtist');
+      const artist = await TattooArtist.findByUserId(req.user.id);
+      
+      if (!artist) {
+        return res.status(404).json({
+          success: false,
+          message: 'Perfil de artista no encontrado'
+        });
+      }
+      
+      const appointments = await Appointment.findUpcoming(artist.id, parseInt(days));
       
       res.json({
         success: true,
@@ -617,7 +756,18 @@ class CalendarController {
         });
       }
       
-      const stats = await Appointment.getStats(req.user.id);
+      // Get the artist record to get the correct artist_id
+      const TattooArtist = require('../models/TattooArtist');
+      const artist = await TattooArtist.findByUserId(req.user.id);
+      
+      if (!artist) {
+        return res.status(404).json({
+          success: false,
+          message: 'Perfil de artista no encontrado'
+        });
+      }
+      
+      const stats = await Appointment.getStats(artist.id);
       
       res.json({
         success: true,
@@ -648,8 +798,18 @@ class CalendarController {
         });
       }
       
-      // Only artist can mark as completed
-      if (req.user.user_type !== 'artist' || appointment.artist_id !== req.user.id) {
+      // Only artist can mark as completed  
+      if (req.user.user_type !== 'artist') {
+        return res.status(403).json({
+          success: false,
+          message: 'Solo el artista puede marcar la cita como completada'
+        });
+      }
+      
+      const TattooArtist = require('../models/TattooArtist');
+      const artist = await TattooArtist.findByUserId(req.user.id);
+      
+      if (!artist || appointment.artist_id !== artist.id) {
         return res.status(403).json({
           success: false,
           message: 'Solo el artista puede marcar la cita como completada'

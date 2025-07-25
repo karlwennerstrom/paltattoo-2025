@@ -474,6 +474,7 @@ const CalendarTab = () => {
     );
   }
 
+
   // Check if user has calendar access
   if (!userFeatures.calendar) {
     return (

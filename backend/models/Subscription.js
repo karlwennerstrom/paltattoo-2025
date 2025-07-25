@@ -166,6 +166,51 @@ class Subscription {
     return features[featureName] || 0;
   }
 
+  // Get collection limits based on subscription plan
+  static async getCollectionLimit(userId) {
+    const subscription = await this.getActiveByUserId(userId);
+    
+    if (!subscription) {
+      return 3; // Basic/free plan limit
+    }
+
+    const planType = subscription.plan_type?.toLowerCase();
+    
+    switch (planType) {
+      case 'basic':
+      case 'basico':
+        return 3;
+      case 'premium':
+        return 20;
+      case 'pro':
+        return -1; // Unlimited
+      default:
+        return 3;
+    }
+  }
+
+  // Get portfolio item limits based on subscription plan
+  static async getPortfolioLimit(userId) {
+    const subscription = await this.getActiveByUserId(userId);
+    
+    if (!subscription) {
+      return 10; // Basic/free plan limit
+    }
+
+    const planType = subscription.plan_type?.toLowerCase();
+    
+    switch (planType) {
+      case 'basic':
+      case 'basico':
+        return 10;
+      case 'premium':
+      case 'pro':
+        return -1; // Unlimited
+      default:
+        return 10;
+    }
+  }
+
   // Crear registro de pago
   static async createPaymentRecord(paymentData) {
     const {

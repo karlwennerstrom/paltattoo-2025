@@ -105,3 +105,5 @@ public/
 .cache/
 node_modules/
 .cache/
+backend/node_modules/
+frontend/node_modules/

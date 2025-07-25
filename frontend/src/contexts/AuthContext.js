@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { authService } from '../services/api';
-import { autoLoginForDev } from '../utils/authHelper';
 import toast from 'react-hot-toast';
 
 const AuthContext = createContext();
@@ -28,19 +27,11 @@ export const AuthProvider = ({ children }) => {
           const response = await authService.getProfile();
           // Extract user data from response
           const userData = response.data.user || response.data;
+          
+          
           setUser(userData);
           // Update localStorage with correct user data
           localStorage.setItem('user', JSON.stringify(userData));
-        } else {
-          // Auto-login for development
-          console.log('No token found, attempting auto-login...');
-          const autoLoginSuccess = await autoLoginForDev();
-          if (autoLoginSuccess) {
-            const response = await authService.getProfile();
-            const userData = response.data.user || response.data;
-            setUser(userData);
-            localStorage.setItem('user', JSON.stringify(userData));
-          }
         }
       } catch (error) {
         console.error('Error checking auth:', error);
@@ -180,6 +171,21 @@ export const AuthProvider = ({ children }) => {
     return token ? { 'Authorization': `Bearer ${token}` } : {};
   };
 
+  const refreshUserData = async () => {
+    try {
+      const token = localStorage.getItem('authToken');
+      if (token) {
+        const response = await authService.getProfile();
+        const userData = response.data.user || response.data;
+        setUser(userData);
+        localStorage.setItem('user', JSON.stringify(userData));
+        return userData;
+      }
+    } catch (error) {
+      console.error('Error refreshing user data:', error);
+    }
+  };
+
   const value = {
     user,
     loading,
@@ -191,6 +197,7 @@ export const AuthProvider = ({ children }) => {
     updateUser,
     forgotPassword,
     resetPassword,
+    refreshUserData,
     getAuthHeader,
     isAuthenticated: !!user,
     isArtist: user?.userType === 'artist' || user?.user_type === 'artist',

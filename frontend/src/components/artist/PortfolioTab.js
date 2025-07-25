@@ -27,7 +27,7 @@ import {
 } from 'react-icons/fi';
 
 const PortfolioTab = () => {
-  const { user } = useAuth();
+  const { user, refreshUserData } = useAuth();
   const userFeatures = getUserFeatures(user);
   
   // View states
@@ -99,6 +99,19 @@ const PortfolioTab = () => {
     }
   }, [selectedCollection]);
 
+  // Listen for subscription changes
+  useEffect(() => {
+    const handleSubscriptionChange = () => {
+      refreshUserData();
+      loadCollections(); // Reload collections to reflect new limits
+    };
+
+    window.addEventListener('subscriptionChanged', handleSubscriptionChange);
+    return () => {
+      window.removeEventListener('subscriptionChanged', handleSubscriptionChange);
+    };
+  }, [refreshUserData]);
+
   const loadCollections = async () => {
     try {
       setLoading(true);
@@ -125,9 +138,9 @@ const PortfolioTab = () => {
   };
 
   const getCurrentCollectionLimit = () => {
-    const maxImages = userFeatures.maxImages;
-    if (maxImages === -1) return Infinity; // Unlimited
-    return maxImages;
+    const maxCollections = userFeatures.maxCollections;
+    if (maxCollections === -1) return Infinity; // Unlimited
+    return maxCollections;
   };
 
   const getCurrentImageLimit = () => {
@@ -137,8 +150,9 @@ const PortfolioTab = () => {
   };
 
   const canCreateNewCollection = () => {
-    if (userFeatures.unlimitedGallery) return true;
-    return collections.length < getCurrentCollectionLimit();
+    const maxCollections = userFeatures.maxCollections;
+    if (maxCollections === -1) return true; // Unlimited
+    return collections.length < maxCollections;
   };
 
   const canAddMoreImages = () => {
@@ -148,8 +162,9 @@ const PortfolioTab = () => {
   };
 
   const isCollectionBlocked = (collectionIndex) => {
-    if (userFeatures.unlimitedGallery) return false;
-    return collectionIndex >= getCurrentCollectionLimit();
+    const maxCollections = userFeatures.maxCollections;
+    if (maxCollections === -1) return false; // Unlimited
+    return collectionIndex >= maxCollections;
   };
 
   const loadCollectionImages = async (collectionId) => {

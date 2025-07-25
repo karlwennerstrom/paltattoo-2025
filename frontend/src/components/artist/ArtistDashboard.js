@@ -81,7 +81,6 @@ const ArtistDashboard = () => {
     { id: 'proposals', label: 'Mis Propuestas', icon: FiMail },
     { id: 'calendar', label: 'Calendario', icon: FiCalendar },
     { id: 'payments', label: 'Pagos', icon: FiCreditCard },
-    { id: 'analytics', label: 'Análisis', icon: FiTrendingUp },
   ];
 
   const TabButton = ({ tab, active, onClick, isMobile = false }) => (
@@ -313,11 +312,19 @@ const ArtistDashboard = () => {
       )}>
         <div className="flex items-center justify-between h-16 px-6 border-b border-border">
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-accent-500 rounded-lg flex items-center justify-center">
-              <FiUser className="text-white" size={16} />
+            <div className="w-8 h-8 bg-accent-500 rounded-full flex items-center justify-center overflow-hidden">
+              {profile?.avatar ? (
+                <img 
+                  src={profile.avatar} 
+                  alt="Avatar" 
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <FiUser className="text-white" size={16} />
+              )}
             </div>
             <div>
-              <h2 className="font-semibold text-white">{profile?.name || 'Artista'}</h2>
+              <h2 className="font-semibold text-white text-sm">{profile?.user?.email || 'artista@email.com'}</h2>
               <div className="flex items-center space-x-2">
                 <SubscriptionBadge subscriptionType={subscription?.plan?.plan_type} size="xs" />
                 {subscription?.status === 'active' && (
@@ -350,7 +357,7 @@ const ArtistDashboard = () => {
           {/* Logout Button at Bottom */}
           <div className="p-6 border-t border-primary-700">
             <button 
-              className="flex items-center space-x-3 w-full px-4 py-3 rounded-lg transition-all duration-200 text-left text-red-400 hover:text-red-300 hover:bg-red-500/10 border border-red-500/20 hover:border-red-500/30"
+              className="flex items-center space-x-2 w-full px-3 py-2 rounded-lg transition-all duration-200 text-left text-red-400 hover:text-red-300 hover:bg-red-500/10 border border-red-500/20 hover:border-red-500/30 text-sm"
               onClick={() => {
                 if (window.confirm('¿Estás seguro de que quieres cerrar sesión?')) {
                   localStorage.removeItem('authToken');
@@ -359,7 +366,7 @@ const ArtistDashboard = () => {
                 }
               }}
             >
-              <FiX size={18} />
+              <FiX size={14} />
               <span className="font-medium">Cerrar Sesión</span>
             </button>
           </div>
@@ -389,19 +396,12 @@ const ArtistDashboard = () => {
                 {activeTab === 'proposals' && 'Gestiona tus propuestas'}
                 {activeTab === 'calendar' && 'Administra tus citas y horarios'}
                 {activeTab === 'payments' && 'Suscripción y facturación'}
-                {activeTab === 'analytics' && 'Estadísticas y análisis'}
               </p>
             </div>
           </div>
           
           <div className="flex items-center space-x-3">
-            <button className="btn-secondary hidden sm:flex">
-              <FiSettings className="mr-2" size={16} />
-              Configuración
-            </button>
-            <button className="btn-secondary sm:hidden">
-              <FiSettings size={16} />
-            </button>
+            {/* Configuration button removed */}
           </div>
         </header>
 
@@ -420,7 +420,6 @@ const ArtistDashboard = () => {
               {activeTab === 'proposals' && <ProposalsTab />}
               {activeTab === 'calendar' && <CalendarTab />}
               {activeTab === 'payments' && <PaymentsTab />}
-              {activeTab === 'analytics' && <ArtistAnalytics />}
             </div>
           )}
         </main>

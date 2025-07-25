@@ -12,7 +12,7 @@ import toast from 'react-hot-toast';
 import { FiDownload, FiCalendar, FiCreditCard, FiCheck, FiX, FiClock, FiTrendingUp, FiTrendingDown } from 'react-icons/fi';
 
 const PaymentsTab = () => {
-  const { user } = useAuth();
+  const { user, refreshUserData } = useAuth();
   const userPlanName = getUserPlanName(user);
   
   const [isAddingPaymentMethod, setIsAddingPaymentMethod] = useState(false);
@@ -460,6 +460,12 @@ const PaymentsTab = () => {
 
       toast.success('Plan actualizado exitosamente. Se ha enviado un correo de confirmación.');
       await loadSubscriptionData();
+      await refreshUserData(); // Refresh user data to update subscription info
+      
+      // Notify other components about subscription change
+      window.dispatchEvent(new CustomEvent('subscriptionChanged', {
+        detail: { newPlan: targetPlan, oldPlan: currentSubscription }
+      }));
       
       // Add to subscription history
       const historyEntry = {
@@ -502,6 +508,12 @@ const PaymentsTab = () => {
         await subscriptionsAPI.cancelSubscription();
         toast.success('Suscripción cancelada exitosamente');
         await loadSubscriptionData();
+        await refreshUserData(); // Refresh user data to update subscription info
+        
+        // Notify other components about subscription change
+        window.dispatchEvent(new CustomEvent('subscriptionChanged', {
+          detail: { newPlan: null, oldPlan: currentSubscription }
+        }));
       } catch (error) {
         console.error('Error cancelling subscription:', error);
         toast.error('Error al cancelar la suscripción');

@@ -208,7 +208,7 @@ class PaymentService {
       // Check if user already has an active subscription
       const existingSubscription = await Subscription.findByUserId(userId);
       
-      if (existingSubscription && existingSubscription.status === 'active') {
+      if (existingSubscription && existingSubscription.status === 'authorized') {
         // Cancel previous subscription
         await Subscription.cancel(existingSubscription.id);
       }

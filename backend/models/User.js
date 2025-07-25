@@ -63,7 +63,12 @@ class User {
               sp.price as subscription_plan_price
        FROM users u 
        LEFT JOIN user_profiles up ON u.id = up.user_id 
-       LEFT JOIN user_subscriptions us ON u.id = us.user_id AND us.status = 'active'
+       LEFT JOIN user_subscriptions us ON u.id = us.user_id AND us.status = 'authorized'
+         AND us.id = (
+           SELECT id FROM user_subscriptions 
+           WHERE user_id = u.id AND status = 'authorized' 
+           ORDER BY created_at DESC LIMIT 1
+         )
        LEFT JOIN subscription_plans sp ON us.plan_id = sp.id
        WHERE u.id = ?`,
       [userId]

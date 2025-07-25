@@ -70,7 +70,7 @@ class SubscriptionPlan {
     const [rows] = await promisePool.execute(
       `SELECT sp.*, COUNT(s.id) as subscriber_count
        FROM subscription_plans sp
-       LEFT JOIN subscriptions s ON sp.id = s.plan_id AND s.status = 'active'
+       LEFT JOIN user_subscriptions s ON sp.id = s.plan_id AND s.status = 'authorized'
        WHERE sp.is_active = true
        GROUP BY sp.id
        ORDER BY subscriber_count DESC, sp.price ASC`
@@ -82,12 +82,12 @@ class SubscriptionPlan {
   static async getPlanStats(planId) {
     const [rows] = await promisePool.execute(
       `SELECT 
-         COUNT(CASE WHEN s.status = 'active' THEN 1 END) as active_subscriptions,
+         COUNT(CASE WHEN s.status = 'authorized' THEN 1 END) as active_subscriptions,
          COUNT(CASE WHEN s.status = 'cancelled' THEN 1 END) as cancelled_subscriptions,
          COUNT(CASE WHEN s.status = 'pending' THEN 1 END) as pending_subscriptions,
          SUM(CASE WHEN p.status = 'approved' THEN p.amount ELSE 0 END) as total_revenue
        FROM subscription_plans sp
-       LEFT JOIN subscriptions s ON sp.id = s.plan_id
+       LEFT JOIN user_subscriptions s ON sp.id = s.plan_id
        LEFT JOIN payments p ON s.id = p.subscription_id
        WHERE sp.id = ?`,
       [planId]

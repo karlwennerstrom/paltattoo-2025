@@ -24,7 +24,21 @@ export const getUserPlanName = (user) => {
   if (!user || !user.subscription) {
     return 'basic';
   }
-  return user.subscription.planName?.toLowerCase() || 'basic';
+  
+  const planName = user.subscription.planName?.toLowerCase() || 'basic';
+  
+  // Handle different plan name formats
+  if (planName.includes('básico') || planName.includes('basico') || planName.includes('gratis')) {
+    return 'basic';
+  }
+  if (planName.includes('premium')) {
+    return 'premium';
+  }
+  if (planName.includes('pro')) {
+    return 'pro';
+  }
+  
+  return planName;
 };
 
 /**
@@ -64,7 +78,8 @@ export const getUserFeatures = (user) => {
       prioritySupport: false,
       badge: false,
       maxImages: 10,
-      maxProposals: 5
+      maxProposals: 5,
+      maxCollections: 3
     },
     premium: {
       calendar: true,
@@ -74,7 +89,8 @@ export const getUserFeatures = (user) => {
       prioritySupport: true,
       badge: true,
       maxImages: -1, // unlimited
-      maxProposals: -1 // unlimited
+      maxProposals: -1, // unlimited
+      maxCollections: 20
     },
     pro: {
       calendar: true,
@@ -89,7 +105,8 @@ export const getUserFeatures = (user) => {
       apiAccess: true,
       dedicatedSupport: true,
       maxImages: -1, // unlimited
-      maxProposals: -1 // unlimited
+      maxProposals: -1, // unlimited
+      maxCollections: -1 // unlimited
     }
   };
   

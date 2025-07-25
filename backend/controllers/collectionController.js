@@ -111,13 +111,17 @@ const createCollection = async (req, res) => {
     
     const { name, description, coverImageId, isPublic, sortOrder } = req.body;
     
-    // Check collection limits (e.g., max 20 collections per artist)
+    // Check collection limits based on subscription plan
     const currentCount = await Collection.countByArtist(artist.id);
-    const maxCollections = 20;
+    const Subscription = require('../models/Subscription');
+    const maxCollections = await Subscription.getCollectionLimit(artist.id);
     
-    if (currentCount >= maxCollections) {
+    if (maxCollections !== -1 && currentCount >= maxCollections) {
       return res.status(400).json({ 
-        error: `Has alcanzado el límite máximo de ${maxCollections} colecciones` 
+        error: `Has alcanzado el límite máximo de ${maxCollections} colecciones para tu plan actual. Actualiza tu suscripción para crear más colecciones.`,
+        currentCount,
+        maxCollections,
+        needsUpgrade: true
       });
     }
     

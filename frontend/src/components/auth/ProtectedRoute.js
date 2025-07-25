@@ -10,10 +10,10 @@ const ProtectedRoute = ({
   requiredSubscription = null,
   redirectTo = "/login" 
 }) => {
-  const { isAuthenticated, isLoading, user, isArtist, isClient, isAdmin } = useAuth();
+  const { isAuthenticated, loading, user, isArtist, isClient, isAdmin } = useAuth();
   const location = useLocation();
 
-  if (isLoading) {
+  if (loading) {
     return <LoadingPage />;
   }
 

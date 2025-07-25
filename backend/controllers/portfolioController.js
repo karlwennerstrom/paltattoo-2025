@@ -135,13 +135,17 @@ const createPortfolioItem = async (req, res) => {
     
     const { title, description, styleId, category, isFeatured } = req.body;
     
-    // Check portfolio limits
+    // Check portfolio limits based on subscription plan
     const currentCount = await Portfolio.countByArtist(artist.id);
-    const maxItems = 50; // Limit per artist
+    const Subscription = require('../models/Subscription');
+    const maxItems = await Subscription.getPortfolioLimit(artist.id);
     
-    if (currentCount >= maxItems) {
+    if (maxItems !== -1 && currentCount >= maxItems) {
       return res.status(400).json({ 
-        error: `Has alcanzado el límite máximo de ${maxItems} items en tu portafolio` 
+        error: `Has alcanzado el límite máximo de ${maxItems} items en tu portafolio para tu plan actual. Actualiza tu suscripción para añadir más items.`,
+        currentCount,
+        maxItems,
+        needsUpgrade: true
       });
     }
     

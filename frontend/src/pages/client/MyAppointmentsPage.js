@@ -5,6 +5,7 @@ import { getProfileImageUrl } from '../../utils/imageHelpers';
 
 const MyAppointmentsPage = () => {
   const [viewMode, setViewMode] = useState('upcoming');
+  const [isComingSoon] = useState(true); // Temporary flag for development
 
   // Mock appointments data
   const appointments = [
@@ -134,6 +135,21 @@ const MyAppointmentsPage = () => {
       maxWidth="4xl"
     >
       <div className="space-y-6">
+        {/* Development Notice */}
+        {isComingSoon && (
+          <Card className="border-yellow-600 bg-yellow-600/10">
+            <div className="flex items-center space-x-3">
+              <svg className="h-6 w-6 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div>
+                <p className="text-yellow-400 font-medium">Funcionalidad en desarrollo</p>
+                <p className="text-yellow-300 text-sm">El sistema de citas se está implementando. Próximamente podrás agendar y gestionar tus citas con artistas.</p>
+              </div>
+            </div>
+          </Card>
+        )}
+
         {/* View Toggle */}
         <div className="flex items-center justify-between">
           <div className="flex space-x-1 bg-primary-800 rounded-lg p-1">

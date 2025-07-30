@@ -171,6 +171,27 @@ export const AuthProvider = ({ children }) => {
     return token ? { 'Authorization': `Bearer ${token}` } : {};
   };
 
+  const updateProfile = async (profileData) => {
+    try {
+      setLoading(true);
+      const response = await authService.updateProfile(profileData);
+      const updatedUser = response.data.user || response.data;
+      
+      setUser(updatedUser);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      
+      toast.success('Perfil actualizado exitosamente');
+      return { success: true, user: updatedUser };
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      const errorMessage = error.response?.data?.message || 'Error al actualizar el perfil';
+      toast.error(errorMessage);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const refreshUserData = async () => {
     try {
       const token = localStorage.getItem('authToken');
@@ -195,6 +216,7 @@ export const AuthProvider = ({ children }) => {
     register,
     logout,
     updateUser,
+    updateProfile,
     forgotPassword,
     resetPassword,
     refreshUserData,

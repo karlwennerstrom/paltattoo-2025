@@ -39,7 +39,28 @@ router.post('/subscribe', authenticate, async (req, res) => {
     const existingSubscription = await Subscription.getActiveByUserId(req.user.id);
     
     if (existingSubscription) {
-      return res.status(409).json({ error: 'Ya tienes una suscripción activa' });
+      // Allow upgrade from basic/free plan (plan_id = 1)
+      if (existingSubscription.plan_id !== 1) {
+        return res.status(409).json({ error: 'Ya tienes una suscripción activa. Usa la opción de cambio de plan.' });
+      }
+      
+      // If upgrading from basic plan, update existing subscription instead of creating new one
+      console.log('🔄 Upgrading from basic plan, updating existing subscription:', existingSubscription.id);
+      
+      const success = await Subscription.changePlan(existingSubscription.id, planId);
+      
+      if (success) {
+        // Get updated subscription
+        const updatedSubscription = await Subscription.getById(existingSubscription.id);
+        
+        return res.json({
+          message: 'Plan actualizado exitosamente',
+          subscription: updatedSubscription,
+          paymentUrl: `/payments/subscription/${existingSubscription.id}`
+        });
+      } else {
+        return res.status(500).json({ error: 'Error al actualizar plan' });
+      }
     }
     
     // Get plan details
@@ -78,6 +99,12 @@ router.put('/:subscriptionId/change-plan', authenticate, async (req, res) => {
     const { subscriptionId } = req.params;
     const { planId } = req.body;
     
+    console.log('🔄 Change plan request:', { 
+      subscriptionId, 
+      planId, 
+      userId: req.user.id 
+    });
+    
     if (!planId) {
       return res.status(400).json({ error: 'Plan ID es requerido' });
     }
@@ -85,11 +112,15 @@ router.put('/:subscriptionId/change-plan', authenticate, async (req, res) => {
     // Verify subscription belongs to user
     const subscription = await Subscription.getById(subscriptionId);
     
+    console.log('📋 Found subscription:', subscription);
+    
     if (!subscription) {
+      console.log('❌ Subscription not found');
       return res.status(404).json({ error: 'Suscripción no encontrada' });
     }
     
     if (subscription.user_id !== req.user.id) {
+      console.log('❌ Unauthorized - subscription user_id:', subscription.user_id, 'request user_id:', req.user.id);
       return res.status(403).json({ error: 'No autorizado' });
     }
     

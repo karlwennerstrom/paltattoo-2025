@@ -77,35 +77,24 @@ const CollectionsTab = () => {
       setCollections(collectionsData);
     } catch (error) {
       console.error('Error loading collections:', error);
-      // Check if API endpoint exists
+      console.error('Error response:', error.response?.data);
+      console.error('Error status:', error.response?.status);
+      
+      // Check if API endpoint exists or if there's an authentication issue
       if (error.response?.status === 404 || error.response?.data?.error === "Endpoint no encontrado") {
         setApiAvailable(false);
         setCollections([]);
         toast.error('Las colecciones están en desarrollo - funcionalidad próximamente disponible');
+      } else if (error.response?.status === 401) {
+        // Authentication error - API is available but user not properly authenticated
+        setApiAvailable(true);
+        setCollections([]);
+        toast.error('Error de autenticación al cargar colecciones');
       } else {
-        // Fall back to mock data for other errors
-        const mockCollections = [
-          {
-            id: 1,
-            name: 'Retratos',
-            description: 'Colección de mis mejores trabajos de retratos realistas',
-            image_count: 8,
-            is_public: true,
-            cover_image_url: null,
-            created_at: '2024-01-15'
-          },
-          {
-            id: 2,
-            name: 'Geométricos',
-            description: 'Diseños geométricos y mandalas',
-            image_count: 12,
-            is_public: true,
-            cover_image_url: null,
-            created_at: '2024-01-10'
-          }
-        ];
-        setCollections(mockCollections);
-        toast.error('Error al cargar colecciones - mostrando datos de ejemplo');
+        // API is available but there was another error (db connection, etc.)
+        setApiAvailable(true);  // Keep API as available
+        setCollections([]);
+        toast.error('Error al cargar colecciones - inténtalo de nuevo más tarde');
       }
     } finally {
       setLoading(false);
@@ -123,10 +112,6 @@ const CollectionsTab = () => {
   };
 
   const handleCreateCollection = async () => {
-    if (!apiAvailable) {
-      toast.error('Las colecciones están en desarrollo - funcionalidad no disponible');
-      return;
-    }
 
     if (!newCollection.name.trim()) {
       toast.error('El nombre de la colección es obligatorio');
@@ -153,10 +138,6 @@ const CollectionsTab = () => {
   };
 
   const handleUpdateCollection = async () => {
-    if (!apiAvailable) {
-      toast.error('Las colecciones están en desarrollo - funcionalidad no disponible');
-      return;
-    }
     
     try {
       const response = await collectionService.update(selectedCollection.id, {
@@ -184,10 +165,6 @@ const CollectionsTab = () => {
   };
 
   const handleDeleteCollection = async (collectionId) => {
-    if (!apiAvailable) {
-      toast.error('Las colecciones están en desarrollo - funcionalidad no disponible');
-      return;
-    }
 
     if (!window.confirm('¿Estás seguro de que quieres eliminar esta colección? Las imágenes no se eliminarán, solo se removerán de la colección.')) {
       return;
@@ -225,7 +202,6 @@ const CollectionsTab = () => {
   };
 
   const openEditModal = (collection) => {
-    console.log('Opening edit modal for collection:', collection);
     setSelectedCollection(collection);
     const newCollectionData = {
       name: collection.name,
@@ -233,17 +209,11 @@ const CollectionsTab = () => {
       isPublic: Boolean(collection.is_public),
       coverImageId: collection.cover_image_id
     };
-    console.log('Setting newCollection state:', newCollectionData);
     setNewCollection(newCollectionData);
     setShowEditModal(true);
-    console.log('showEditModal set to true');
   };
 
   const handleAddImageToCollection = async (collectionId, imageId) => {
-    if (!apiAvailable) {
-      toast.error('Las colecciones están en desarrollo - funcionalidad no disponible');
-      return;
-    }
 
     try {
       await collectionService.addImage(collectionId, imageId);
@@ -493,7 +463,6 @@ const CollectionsTab = () => {
       </Modal>
 
       {/* Edit Collection Modal */}
-      {console.log('Rendering edit modal, showEditModal:', showEditModal, 'selectedCollection:', selectedCollection)}
       <Modal
         isOpen={showEditModal}
         onClose={() => {
@@ -580,7 +549,6 @@ const CollectionsTab = () => {
                       <button
                         onClick={() => handleAddImageToCollection(showManageImagesModal.id, item.id)}
                         className="px-3 py-1 bg-accent-600 text-white rounded text-sm hover:bg-accent-700 transition-colors"
-                        disabled={!apiAvailable}
                       >
                         Agregar
                       </button>
@@ -644,7 +612,6 @@ const CollectionsTab = () => {
                     setSelectedImageForCollection(null);
                   }}
                   className="w-full p-3 bg-primary-700 hover:bg-primary-600 rounded-lg transition-colors text-left"
-                  disabled={!apiAvailable}
                 >
                   <div className="flex items-center justify-between">
                     <div>

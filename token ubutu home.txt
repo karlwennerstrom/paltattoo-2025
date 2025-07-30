@@ -1,1 +1,7 @@
 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
+
+
+token api gemini
+AIzaSyCl23_imBC2Vjt83Lz7ldQBccTddOlRxVE
+
+export GEMINI_API_KEY="AIzaSyCl23_imBC2Vjt83Lz7ldQBccTddOlRxVE"

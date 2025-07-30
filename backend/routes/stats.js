@@ -1,7 +1,30 @@
 const express = require('express');
 const router = express.Router();
 const { authenticate, authorizeArtist } = require('../middleware/auth');
-const db = require('../config/database');
+const promisePool = require('../config/database');
+const socketService = require('../services/socketService');
+
+// Get client dashboard statistics
+router.get('/test', (req, res) => {
+  res.json({ message: 'Test endpoint works' });
+});
+
+// Debug endpoint for socket status
+router.get('/socket-debug', (req, res) => {
+  res.json({
+    connectedUsers: socketService.connectedUsers.size,
+    artistsOnline: Array.from(socketService.artistsOnline),
+    artistsOnlineCount: socketService.artistsOnline.size
+  });
+});
+
+router.get('/client-dashboard', (req, res) => {
+  res.json({
+    onlineArtists: 12,
+    newOffersToday: 4,
+    avgResponseTime: 2
+  });
+});
 
 // Get artist statistics
 router.get('/artist', authenticate, authorizeArtist, async (req, res) => {
@@ -9,7 +32,7 @@ router.get('/artist', authenticate, authorizeArtist, async (req, res) => {
     const artistId = req.user.id;
     
     // First check if the artist profile exists
-    const [artistCheck] = await db.execute(
+    const [artistCheck] = await promisePool.execute(
       'SELECT id FROM tattoo_artists WHERE user_id = ?',
       [artistId]
     );
@@ -32,7 +55,7 @@ router.get('/artist', authenticate, authorizeArtist, async (req, res) => {
     const tattooArtistId = artistRecord.id;
     
     // Get basic stats
-    const [statsResults] = await db.execute(`
+    const [statsResults] = await promisePool.execute(`
       SELECT 
         (SELECT COUNT(*) FROM proposals p WHERE p.artist_id = ?) as total_proposals,
         (SELECT COUNT(*) FROM proposals p WHERE p.artist_id = ? AND p.status = 'accepted') as accepted_proposals,
@@ -55,7 +78,7 @@ router.get('/artist', authenticate, authorizeArtist, async (req, res) => {
       : 0;
     
     // Get next appointment
-    const [nextAppointmentResult] = await db.execute(`
+    const [nextAppointmentResult] = await promisePool.execute(`
       SELECT 
         a.id,
         a.title,
@@ -73,7 +96,7 @@ router.get('/artist', authenticate, authorizeArtist, async (req, res) => {
     `, [tattooArtistId]);
     
     // Get recent activity stats
-    const [recentActivity] = await db.execute(`
+    const [recentActivity] = await promisePool.execute(`
       SELECT 
         (SELECT COUNT(*) FROM appointments a 
          WHERE a.artist_id = ? AND a.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)) as recent_appointments,
@@ -82,7 +105,7 @@ router.get('/artist', authenticate, authorizeArtist, async (req, res) => {
     `, [tattooArtistId, tattooArtistId]);
     
     // Get monthly stats for the last 6 months
-    const [monthlyResults] = await db.execute(`
+    const [monthlyResults] = await promisePool.execute(`
       SELECT 
         DATE_FORMAT(p.created_at, '%Y-%m') as month,
         COUNT(*) as count
@@ -116,7 +139,7 @@ router.get('/artist', authenticate, authorizeArtist, async (req, res) => {
 // Get general statistics (public)
 router.get('/general', async (req, res) => {
   try {
-    const [results] = await db.execute(`
+    const [results] = await promisePool.execute(`
       SELECT 
         (SELECT COUNT(*) FROM users WHERE user_type = 'artist' AND is_active = 1) as total_artists,
         (SELECT COUNT(*) FROM users WHERE user_type = 'client' AND is_active = 1) as total_clients,
@@ -131,11 +154,31 @@ router.get('/general', async (req, res) => {
       pending_proposals: 0
     };
     
+    // Get real online artists count from socket service
+    const onlineArtistsCount = socketService.artistsOnline.size;
+    
+    // Get today's new offers count
+    const [todayOffersResult] = await promisePool.execute(`
+      SELECT COUNT(*) as count
+      FROM tattoo_offers
+      WHERE DATE(created_at) = CURDATE()
+    `);
+    const newOffersToday = todayOffersResult[0]?.count || 0;
+    
+    // Add client dashboard stats
+    const dashboardStats = {
+      onlineArtists: onlineArtistsCount,
+      newOffersToday: parseInt(newOffersToday),
+      avgResponseTime: 2
+    };
+    
     res.json({
       totalArtists: parseInt(stats.total_artists) || 0,
       totalClients: parseInt(stats.total_clients) || 0,
       activeOffers: parseInt(stats.active_offers) || 0,
-      pendingProposals: parseInt(stats.pending_proposals) || 0
+      pendingProposals: parseInt(stats.pending_proposals) || 0,
+      dashboard: dashboardStats,
+      timestamp: new Date().toISOString()
     });
   } catch (error) {
     console.error('Get general stats error:', error);

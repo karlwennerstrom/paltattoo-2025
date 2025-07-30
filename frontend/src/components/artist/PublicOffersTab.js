@@ -90,36 +90,23 @@ const PublicOffersTab = () => {
 
   const checkProposalStatusForOffers = async (offersData) => {
     try {
-      const statusChecks = offersData.map(async (offer) => {
-        try {
-          const response = await proposalService.checkExisting(offer.id);
-          return {
-            offerId: offer.id,
-            hasProposal: response.data.hasProposal,
-            proposal: response.data.proposal
-          };
-        } catch (error) {
-          console.error(`Error checking proposal for offer ${offer.id}:`, error);
-          return {
-            offerId: offer.id,
-            hasProposal: false,
-            proposal: null
-          };
-        }
-      });
-
-      const results = await Promise.all(statusChecks);
-      const statusMap = {};
-      results.forEach(result => {
-        statusMap[result.offerId] = {
-          hasProposal: result.hasProposal,
-          proposal: result.proposal
-        };
-      });
+      if (offersData.length === 0) {
+        setProposalStatus({});
+        return;
+      }
       
-      setProposalStatus(statusMap);
+      // Extract offer IDs for batch request
+      const offerIds = offersData.map(offer => offer.id);
+      
+      // Make single batch API call instead of N individual calls
+      const response = await proposalService.checkExistingBatch(offerIds);
+      
+      // Response.data is already a map of offerId -> {hasProposal, proposal}
+      setProposalStatus(response.data || {});
     } catch (error) {
       console.error('Error checking proposal status:', error);
+      // Fallback to empty status if batch request fails
+      setProposalStatus({});
     }
   };
 

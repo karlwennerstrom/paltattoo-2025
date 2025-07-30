@@ -35,7 +35,9 @@ class Portfolio {
       SELECT pi.*, ts.name as style_name
       FROM portfolio_images pi
       LEFT JOIN tattoo_styles ts ON pi.style_id = ts.id
-      WHERE pi.artist_id = ?
+      JOIN tattoo_artists ta ON pi.artist_id = ta.id
+      JOIN users u ON ta.user_id = u.id
+      WHERE pi.artist_id = ? AND u.is_active = true
       ORDER BY pi.is_featured DESC, pi.created_at DESC
     `;
     

@@ -24,6 +24,12 @@ router.get('/history', paymentController.getPaymentHistory);
 // Obtener cambios de suscripción
 router.get('/subscription/changes', paymentController.getSubscriptionChanges);
 
+// Obtener preview de prorrateo para cambio de plan
+router.get('/subscription/proration-preview', paymentController.getProrationPreview);
+
+// Enviar email de cambio de suscripción
+router.post('/subscription/send-change-email', paymentController.sendSubscriptionChangeEmail);
+
 // Rutas para artistas solamente
 router.post('/subscription', authorizeArtist, paymentController.createSubscription);
 router.delete('/subscription/:subscriptionId', authorizeArtist, paymentController.cancelSubscription);

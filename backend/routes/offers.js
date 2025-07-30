@@ -9,14 +9,58 @@ const { uploadReferences } = require('../config/multer');
 const { body } = require('express-validator');
 const { handleValidationErrors } = require('../middleware/validation');
 const notificationController = require('../controllers/notificationController');
+const socketService = require('../services/socketService');
 
 const createOfferValidation = [
   body('title').notEmpty().withMessage('El título es requerido'),
   body('description').notEmpty().withMessage('La descripción es requerida'),
   body('bodyPartId').isInt().withMessage('Parte del cuerpo inválida'),
   body('styleId').isInt().withMessage('Estilo inválido'),
-  body('colorTypeId').isInt().withMessage('Tipo de color inválido')
+  body('colorTypeId').isInt().withMessage('Tipo de color inválido'),
+  body('regionId').isInt().withMessage('La región es requerida'),
+  body('comunaId').optional().isInt().withMessage('Comuna inválida')
 ];
+
+// Get user's own offers (for clients)
+router.get('/my', authenticate, authorizeClient, async (req, res) => {
+  try {
+    let client = await Client.findByUserId(req.user.id);
+    
+    // If client profile doesn't exist, create it automatically
+    if (!client) {
+      try {
+        const clientId = await Client.create({
+          userId: req.user.id,
+          comunaId: null,
+          birthDate: null
+        });
+        client = await Client.findById(clientId);
+      } catch (createError) {
+        console.error('Error creating client profile:', createError);
+        return res.status(500).json({ error: 'Error al crear perfil de cliente' });
+      }
+    }
+    
+    const offers = await TattooRequest.findByClient(client.id);
+    
+    const offersWithReferences = await Promise.all(
+      offers.map(async (offer) => {
+        const references = await TattooRequest.getReferences(offer.id);
+        const proposalsCount = await TattooRequest.getProposalsCount(offer.id);
+        return {
+          ...offer,
+          references: references || [],
+          proposals_count: proposalsCount || 0
+        };
+      })
+    );
+    
+    res.json(offersWithReferences);
+  } catch (error) {
+    console.error('Get my offers error:', error);
+    res.status(500).json({ error: 'Error al obtener tus ofertas' });
+  }
+});
 
 router.get('/', optionalAuth, async (req, res) => {
   try {
@@ -27,6 +71,7 @@ router.get('/', optionalAuth, async (req, res) => {
       colorTypeId: req.query.colorType,
       minBudget: req.query.minBudget,
       maxBudget: req.query.maxBudget,
+      regionId: req.query.region,
       comunaId: req.query.comuna,
       limit: req.query.limit || 20,
       offset: req.query.offset || 0
@@ -53,15 +98,26 @@ router.get('/', optionalAuth, async (req, res) => {
 
 router.post('/', authenticate, authorizeClient, createOfferValidation, handleValidationErrors, async (req, res) => {
   try {
-    const client = await Client.findByUserId(req.user.id);
+    let client = await Client.findByUserId(req.user.id);
     
+    // If client profile doesn't exist, create it automatically
     if (!client) {
-      return res.status(404).json({ error: 'Perfil de cliente no encontrado' });
+      try {
+        const clientId = await Client.create({
+          userId: req.user.id,
+          comunaId: null, // Will be updated when user completes profile
+          birthDate: null
+        });
+        client = await Client.findById(clientId);
+      } catch (createError) {
+        console.error('Error creating client profile:', createError);
+        return res.status(500).json({ error: 'Error al crear perfil de cliente' });
+      }
     }
     
     const {
       title, description, bodyPartId, styleId, colorTypeId,
-      sizeDescription, budgetMin, budgetMax, deadline
+      regionId, comunaId, sizeDescription, budgetMin, budgetMax, deadline
     } = req.body;
     
     const offerId = await TattooRequest.create({
@@ -71,6 +127,8 @@ router.post('/', authenticate, authorizeClient, createOfferValidation, handleVal
       bodyPartId,
       styleId,
       colorTypeId,
+      regionId,
+      comunaId,
       sizeDescription,
       budgetMin,
       budgetMax,
@@ -78,6 +136,15 @@ router.post('/', authenticate, authorizeClient, createOfferValidation, handleVal
     });
     
     const offer = await TattooRequest.findById(offerId);
+    
+    // Emit new offer event to all artists
+    socketService.emitOfferCreated(offer);
+    
+    // Send email notifications to artists in the region
+    if (regionId) {
+      notificationController.triggerNewOfferNotification(offerId, regionId, comunaId)
+        .catch(err => console.error('Email notification error:', err));
+    }
     
     res.status(201).json({
       message: 'Oferta creada exitosamente',

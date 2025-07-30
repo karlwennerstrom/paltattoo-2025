@@ -1,13 +1,53 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PageContainer, Card, Grid } from '../../components/common/Layout';
 import Button from '../../components/common/Button';
 import { getTattooImageUrl } from '../../utils/imageHelpers';
+import { offerService } from '../../services/api';
+import toast from 'react-hot-toast';
 
 const MyRequestsPage = () => {
   const [activeFilter, setActiveFilter] = useState('all');
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Mock requests data
-  const requests = [
+  useEffect(() => {
+    loadMyRequests();
+  }, []);
+
+  const loadMyRequests = async () => {
+    try {
+      setLoading(true);
+      const response = await offerService.getMyOffers();
+      
+      // Transform API data to match component expectations
+      const transformedRequests = response.data?.map(offer => ({
+        id: offer.id,
+        title: offer.title || 'Solicitud de tatuaje',
+        description: offer.description || 'Sin descripción',
+        budget: parseFloat(offer.budget_max) || 0,
+        style: offer.style_name || 'No especificado',
+        size: offer.size_description || 'No especificado',
+        bodyPart: offer.body_part_name || 'No especificado',
+        status: offer.status || 'active',
+        proposalsCount: offer.proposals_count || 0,
+        createdAt: offer.created_at,
+        deadline: offer.deadline,
+        referenceImage: offer.reference_image,
+        views_count: offer.views_count || 0
+      })) || [];
+      
+      setRequests(transformedRequests);
+    } catch (error) {
+      console.error('Error loading requests:', error);
+      toast.error('Error al cargar las solicitudes');
+      setRequests([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fallback mock data for development
+  const mockRequests = [
     {
       id: 1,
       title: 'Tatuaje de León Realista',
@@ -52,16 +92,19 @@ const MyRequestsPage = () => {
     }
   ];
 
-  const statusFilters = [
-    { value: 'all', label: 'Todas', count: requests.length },
-    { value: 'active', label: 'Activas', count: requests.filter(r => r.status === 'active').length },
-    { value: 'in_progress', label: 'En Proceso', count: requests.filter(r => r.status === 'in_progress').length },
-    { value: 'completed', label: 'Completadas', count: requests.filter(r => r.status === 'completed').length }
-  ];
+  // Use real data if available, otherwise fallback to mock data for development
+  const displayRequests = requests.length > 0 ? requests : mockRequests;
 
+  const statusFilters = [
+    { value: 'all', label: 'Todas', count: displayRequests.length },
+    { value: 'active', label: 'Activas', count: displayRequests.filter(r => r.status === 'active').length },
+    { value: 'in_progress', label: 'En Proceso', count: displayRequests.filter(r => r.status === 'in_progress').length },
+    { value: 'completed', label: 'Completadas', count: displayRequests.filter(r => r.status === 'completed').length }
+  ];
+  
   const filteredRequests = activeFilter === 'all' 
-    ? requests 
-    : requests.filter(r => r.status === activeFilter);
+    ? displayRequests 
+    : displayRequests.filter(r => r.status === activeFilter);
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('es-CL', {
@@ -131,7 +174,12 @@ const MyRequestsPage = () => {
 
         {/* Requests List */}
         <div className="space-y-4">
-          {filteredRequests.length === 0 ? (
+          {loading ? (
+            <Card className="text-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent-500 mx-auto mb-4"></div>
+              <p className="text-primary-400">Cargando tus solicitudes...</p>
+            </Card>
+          ) : filteredRequests.length === 0 ? (
             <Card className="text-center py-12">
               <svg className="h-16 w-16 text-primary-600 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -206,10 +254,10 @@ const MyRequestsPage = () => {
                         <div className="flex items-center space-x-2">
                           {request.status === 'active' && (
                             <>
-                              <Button variant="ghost" size="sm" href={`/requests/${request.id}/proposals`}>
+                              <Button variant="ghost" size="sm" href={`/offers/${request.id}`}>
                                 Ver Propuestas
                               </Button>
-                              <Button variant="secondary" size="sm" href={`/requests/${request.id}/edit`}>
+                              <Button variant="secondary" size="sm" href={`/offers/${request.id}/edit`}>
                                 Editar
                               </Button>
                             </>

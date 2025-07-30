@@ -4,19 +4,51 @@ class TattooRequest {
   static async create(requestData) {
     const {
       clientId, title, description, bodyPartId, styleId,
-      colorTypeId, sizeDescription, budgetMin, budgetMax, deadline
+      colorTypeId, regionId, comunaId, sizeDescription, budgetMin, budgetMax, deadline
     } = requestData;
     
     const [result] = await promisePool.execute(
       `INSERT INTO tattoo_offers 
        (client_id, title, description, body_part_id, style_id, color_type_id, 
-        size_description, budget_min, budget_max, deadline)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        region_id, comuna_id, size_description, budget_min, budget_max, deadline)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [clientId, title, description, bodyPartId, styleId, colorTypeId,
-       sizeDescription, budgetMin, budgetMax, deadline]
+       regionId, comunaId, sizeDescription, budgetMin, budgetMax, deadline]
     );
     
     return result.insertId;
+  }
+
+  static async findByClient(clientId) {
+    const [rows] = await promisePool.execute(
+      `SELECT o.*, 
+              bp.name as body_part_name, 
+              ts.name as style_name,
+              ct.name as color_type_name,
+              r.name as region_name,
+              c.name as comuna_name,
+              (SELECT COUNT(*) FROM proposals p WHERE p.offer_id = o.id) as proposals_count,
+              0 as views_count
+       FROM tattoo_offers o
+       JOIN body_parts bp ON o.body_part_id = bp.id
+       JOIN tattoo_styles ts ON o.style_id = ts.id
+       JOIN color_types ct ON o.color_type_id = ct.id
+       LEFT JOIN comunas c ON o.comuna_id = c.id
+       WHERE o.client_id = ?
+       ORDER BY o.created_at DESC`,
+      [clientId]
+    );
+    
+    return rows;
+  }
+
+  static async getProposalsCount(offerId) {
+    const [rows] = await promisePool.execute(
+      'SELECT COUNT(*) as count FROM proposals WHERE offer_id = ?',
+      [offerId]
+    );
+    
+    return rows[0].count;
   }
 
   static async findById(id) {
@@ -88,20 +120,26 @@ class TattooRequest {
       SELECT o.*, 
              up.first_name as client_first_name, 
              up.last_name as client_last_name,
+             up.profile_image as client_avatar,
              bp.name as body_part_name, 
              ts.name as style_name,
              ct.name as color_type_name,
              co.name as comuna_name,
              co.region,
-             (SELECT COUNT(*) FROM proposals p WHERE p.offer_id = o.id) as proposal_count
+             COALESCE(pc.proposal_count, 0) as proposal_count
       FROM tattoo_offers o
       JOIN clients c ON o.client_id = c.id
       JOIN users u ON c.user_id = u.id
       LEFT JOIN user_profiles up ON u.id = up.user_id
-      LEFT JOIN comunas co ON c.comuna_id = co.id
+      LEFT JOIN comunas co ON o.comuna_id = co.id
       JOIN body_parts bp ON o.body_part_id = bp.id
       JOIN tattoo_styles ts ON o.style_id = ts.id
       JOIN color_types ct ON o.color_type_id = ct.id
+      LEFT JOIN (
+        SELECT offer_id, COUNT(*) as proposal_count 
+        FROM proposals 
+        GROUP BY offer_id
+      ) pc ON o.id = pc.offer_id
       WHERE u.is_active = true
     `;
     
@@ -138,8 +176,13 @@ class TattooRequest {
       values.push(filters.maxBudget);
     }
     
+    if (filters.regionId) {
+      conditions.push('o.region_id = ?');
+      values.push(filters.regionId);
+    }
+    
     if (filters.comunaId) {
-      conditions.push('co.id = ?');
+      conditions.push('o.comuna_id = ?');
       values.push(filters.comunaId);
     }
     

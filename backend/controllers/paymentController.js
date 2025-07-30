@@ -4,6 +4,7 @@ const SubscriptionPlan = require('../models/SubscriptionPlan');
 const subscriptionPlanService = require('../services/subscriptionPlanService');
 const emailService = require('../services/emailService');
 const subscriptionNotificationService = require('../services/subscriptionNotificationService');
+const ProrationService = require('../services/prorationService');
 const User = require('../models/User');
 
 const paymentController = {
@@ -100,20 +101,52 @@ const paymentController = {
       if (isDevelopmentMode) {
         console.log('Running in development mode - MercadoPago requires HTTPS URLs');
         
-        // Create subscription in development mode with authorized status
         const now = new Date();
-        const nextMonth = new Date(now);
-        nextMonth.setMonth(nextMonth.getMonth() + 1);
+        let prorationDetails = null;
+        let immediateCharge = 0;
+        let nextPaymentDate;
         
+        // Calculate proration if changing plans
+        if (activeSubscription && activeSubscription.plan_id !== planId) {
+          console.log('Calculating proration for plan change...');
+          
+          // Get current plan details
+          const currentPlan = await SubscriptionPlan.findById(activeSubscription.plan_id);
+          
+          // Calculate billing period
+          const billingPeriod = ProrationService.getCurrentBillingPeriod(activeSubscription);
+          
+          // Calculate proration
+          prorationDetails = ProrationService.calculateProration(
+            currentPlan,
+            plan,
+            now,
+            billingPeriod.start,
+            billingPeriod.end
+          );
+          
+          immediateCharge = prorationDetails.proration.immediateCharge;
+          nextPaymentDate = prorationDetails.proration.nextBillingDate;
+          
+          console.log('Proration calculated:', {
+            immediateCharge,
+            description: prorationDetails.summary.description
+          });
+        } else {
+          // New subscription - next payment in 1 month
+          const nextMonth = new Date(now);
+          nextMonth.setMonth(nextMonth.getMonth() + 1);
+          nextPaymentDate = nextMonth.toISOString().split('T')[0];
+        }
+        
+        // Create subscription in development mode with authorized status
         const subscriptionId = await Subscription.create({
           userId,
           planId,
           mercadopagoPreapprovalId: `dev_preapproval_${Date.now()}`,
           status: 'authorized', // Set as authorized in development
-          externalReference: `dev_user_${userId}_plan_${planId}_${Date.now()}`,
-          payerEmail: req.user.email,
           startDate: now.toISOString().split('T')[0],
-          nextPaymentDate: nextMonth.toISOString().split('T')[0]
+          nextPaymentDate: nextPaymentDate
         });
 
         // Send success email (skip in development if using test emails)
@@ -148,7 +181,14 @@ const paymentController = {
             developmentMode: true,
             status: 'authorized',
             planChange: !!activeSubscription,
-            message: activeSubscription ? 'Plan cambiado exitosamente' : 'Suscripción creada exitosamente'
+            message: activeSubscription ? 'Plan cambiado exitosamente' : 'Suscripción creada exitosamente',
+            proration: prorationDetails ? {
+              immediateCharge,
+              isUpgrade: prorationDetails.proration.isUpgrade,
+              isDowngrade: prorationDetails.proration.isDowngrade,
+              description: prorationDetails.summary.description,
+              details: prorationDetails
+            } : null
           }
         });
       }
@@ -491,8 +531,138 @@ const paymentController = {
       console.error('Error creating card token:', error);
       res.status(500).json({ error: 'Error al procesar tarjeta' });
     }
+  },
+
+  // Send subscription change email notification
+  sendSubscriptionChangeEmail: async (req, res) => {
+    try {
+      const { oldPlan, newPlan, effectiveDate } = req.body;
+      const userId = req.user.id;
+
+      if (!oldPlan || !newPlan) {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Old plan and new plan are required' 
+        });
+      }
+
+      // Get user data
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json({ 
+          success: false, 
+          error: 'User not found' 
+        });
+      }
+
+      const profile = await User.getProfile(userId);
+      
+      // Send subscription change email
+      try {
+        await emailService.sendSubscriptionChanged(user.email, {
+          userName: profile.first_name || user.email,
+          oldPlanName: oldPlan,
+          newPlanName: newPlan,
+          effectiveDate: effectiveDate ? new Date(effectiveDate) : new Date()
+        });
+
+        res.json({
+          success: true,
+          message: 'Subscription change email sent successfully'
+        });
+      } catch (emailError) {
+        console.error('Error sending subscription change email:', emailError);
+        res.status(500).json({ 
+          success: false, 
+          error: 'Error sending email notification' 
+        });
+      }
+    } catch (error) {
+      console.error('Error in sendSubscriptionChangeEmail:', error);
+      res.status(500).json({ 
+        success: false, 
+        error: 'Error processing email notification' 
+      });
+    }
+  },
+
+  // Get proration preview for plan change
+  getProrationPreview: async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { planId } = req.query;
+
+    if (!planId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Plan ID is required' 
+      });
+    }
+
+    // Get current active subscription
+    const activeSubscription = await Subscription.getActiveByUserId(userId);
+    if (!activeSubscription) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'No active subscription found' 
+      });
+    }
+
+    // Get target plan
+    const targetPlan = await SubscriptionPlan.findById(planId);
+    if (!targetPlan) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Target plan not found' 
+      });
+    }
+
+    // Get current plan
+    const currentPlan = await SubscriptionPlan.findById(activeSubscription.plan_id);
+    if (!currentPlan) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Current plan not found' 
+      });
+    }
+
+    // Calculate billing period
+    const billingPeriod = ProrationService.getCurrentBillingPeriod(activeSubscription);
+
+    // Calculate proration
+    const prorationDetails = ProrationService.calculateProration(
+      currentPlan,
+      targetPlan,
+      new Date(),
+      billingPeriod.start,
+      billingPeriod.end
+    );
+
+    res.json({
+      success: true,
+      data: {
+        proration: {
+          immediateCharge: prorationDetails.proration.immediateCharge,
+          isUpgrade: prorationDetails.proration.isUpgrade,
+          isDowngrade: prorationDetails.proration.isDowngrade,
+          description: prorationDetails.summary.description,
+          details: prorationDetails
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Error getting proration preview:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Error al calcular el prorrateo' 
+    });
   }
+}
+
 };
+
+module.exports = paymentController;
 
 // Función auxiliar para manejar notificaciones de preaprobación
 async function handlePreapprovalNotification(preapprovalId) {
@@ -547,5 +717,3 @@ async function handlePaymentNotification(paymentId) {
     console.error('Error handling payment notification:', error);
   }
 }
-
-module.exports = paymentController;

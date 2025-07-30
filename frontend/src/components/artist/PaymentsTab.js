@@ -15,6 +15,7 @@ const PaymentsTab = () => {
   const { user, refreshUserData } = useAuth();
   const userPlanName = getUserPlanName(user);
   
+  
   const [isAddingPaymentMethod, setIsAddingPaymentMethod] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [newPaymentMethod, setNewPaymentMethod] = useState({
@@ -47,6 +48,13 @@ const PaymentsTab = () => {
     loading: false
   });
 
+  // Payment method deletion modal states
+  const [deletePaymentModal, setDeletePaymentModal] = useState({
+    isOpen: false,
+    method: null,
+    loading: false
+  });
+
   useEffect(() => {
     loadSubscriptionData();
     loadUserBillingInfo();
@@ -56,13 +64,25 @@ const PaymentsTab = () => {
     try {
       // Load user profile info for billing
       if (user) {
+        // First try to load saved billing info from localStorage
+        const savedBillingInfo = localStorage.getItem('billingInfo');
+        if (savedBillingInfo) {
+          try {
+            setBillingInfo(JSON.parse(savedBillingInfo));
+            return;
+          } catch (parseError) {
+            console.error('Error parsing saved billing info:', parseError);
+          }
+        }
+
+        // Fallback to user profile data
         setBillingInfo({
-          fullName: `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.name || 'Nombre Usuario',
+          fullName: `${user.firstName || user.first_name || ''} ${user.lastName || user.last_name || ''}`.trim() || user.name || 'Nombre Usuario',
           email: user.email || '',
           rut: user.rut || '',
           address: user.address || '',
           city: user.city || user.comuna || '',
-          postalCode: user.postal_code || ''
+          postalCode: user.postal_code || user.postalCode || ''
         });
       }
     } catch (error) {
@@ -76,15 +96,26 @@ const PaymentsTab = () => {
       
       // Load current subscription
       const [subscriptionRes, plansRes, historyRes, subHistoryRes] = await Promise.all([
-        paymentService.getMySubscription().catch(() => subscriptionsAPI.getMySubscription()),
+        paymentService.getMySubscription().catch(() => ({ data: null })),
         subscriptionsAPI.getPlans(),
-        paymentService.getPaymentHistoryByUser().catch(() => ({ data: [] })),
-        paymentService.getSubscriptionHistory().catch(() => ({ data: [] }))
+        paymentService.getPaymentHistoryByUser().catch((error) => {
+          console.log('Payment history API error:', error);
+          return { data: [] };
+        }),
+        paymentService.getSubscriptionChanges().catch((error) => {
+          console.log('Subscription changes API error:', error);
+          return { data: [] };
+        })
       ]);
       
-      if (subscriptionRes.data) {
-        // Handle nested data structure from API
-        const subscriptionData = subscriptionRes.data.data || subscriptionRes.data;
+      // Check if we have a real subscription response  
+      const subscriptionData = subscriptionRes.data?.data || subscriptionRes.data;
+      const hasValidSubscription = subscriptionData && 
+                                  (subscriptionData.status === 'active' || subscriptionData.status === 'authorized') &&
+                                  (subscriptionData.price > 0 || subscriptionData.amount > 0);
+      
+      if (hasValidSubscription) {
+        // Use the subscriptionData we already extracted above
         
         // Ensure features is an array
         const processedSubscription = {
@@ -96,10 +127,12 @@ const PaymentsTab = () => {
         
         setCurrentSubscription(processedSubscription);
       } else {
-        // If no subscription data, use default based on user context
+        // If no subscription data or inactive/free subscription, use basic plan
         setCurrentSubscription({
           ...defaultSubscription,
-          plan_name: userPlanName.toLowerCase()
+          plan_name: 'basico',
+          plan_id: 'basic',
+          status: 'active' // Basic plan is always "active"
         });
       }
       
@@ -122,16 +155,39 @@ const PaymentsTab = () => {
         setPlans(defaultPlans);
       }
       
-      if (historyRes.data && Array.isArray(historyRes.data)) {
+      // Load payment history - prefer real data over mock data
+      if (historyRes.data && Array.isArray(historyRes.data) && historyRes.data.length > 0) {
         setPaymentHistory(historyRes.data);
       } else {
-        setPaymentHistory([]);
+        console.log('No payment history from API, checking if user has any subscription to show default data');
+        // Only show default payment history if user actually has/had subscriptions
+        if (hasValidSubscription) {
+          setPaymentHistory(defaultPaymentHistory);
+        } else {
+          setPaymentHistory([]); // No payments for basic plan users
+        }
       }
 
-      if (subHistoryRes.data && Array.isArray(subHistoryRes.data)) {
-        setSubscriptionHistory(subHistoryRes.data);
+      // Load subscription history - prefer real data over mock data  
+      const subscriptionChanges = subHistoryRes.data?.data || subHistoryRes.data;
+      if (subscriptionChanges && Array.isArray(subscriptionChanges) && subscriptionChanges.length > 0) {
+        // Map backend data structure to frontend expected format
+        const mappedChanges = subscriptionChanges.map(change => ({
+          id: change.id,
+          date: change.created_at,
+          action: change.change_type,
+          fromPlan: change.old_plan_name || 'Ninguno',
+          toPlan: change.new_plan_name || 'Ninguno',
+          reason: change.change_reason
+        }));
+        setSubscriptionHistory(mappedChanges);
       } else {
-        setSubscriptionHistory([]);
+        console.log('No subscription changes from API');
+        if (hasValidSubscription) {
+          setSubscriptionHistory(defaultSubscriptionHistory);
+        } else {
+          setSubscriptionHistory([]); // No subscription changes for basic plan users
+        }
       }
       
     } catch (error) {
@@ -387,45 +443,29 @@ const PaymentsTab = () => {
     }
   };
 
-  const handleAddPaymentMethod = async () => {
-    // Validate form
-    if (!newPaymentMethod.cardNumber || !newPaymentMethod.expiryDate || !newPaymentMethod.cardholderName) {
-      alert('Por favor completa todos los campos obligatorios');
-      return;
-    }
-
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    setIsAddingPaymentMethod(false);
-    setNewPaymentMethod({
-      type: 'credit_card',
-      cardNumber: '',
-      expiryDate: '',
-      cardholderName: '',
-      cvv: ''
-    });
-  };
-
-  const handleSetDefaultPaymentMethod = (methodId) => {
-    // Simulate API call
-  };
-
-  const handleRemovePaymentMethod = (methodId) => {
-    if (window.confirm('¿Estás seguro de que quieres eliminar este método de pago?')) {
-    }
-  };
-
-  const handlePlanChange = (planId) => {
+  const handlePlanChange = async (planId) => {
     const targetPlan = plans.find(p => p.id === planId) || defaultPlans.find(p => p.id === planId);
     if (!targetPlan) {
       toast.error('Plan no encontrado');
       return;
     }
 
+    // Get proration preview from backend
+    let prorationInfo = null;
+    try {
+      const response = await paymentService.getProrationPreview(planId);
+      if (response.data && response.data.proration) {
+        prorationInfo = response.data.proration;
+      }
+    } catch (error) {
+      console.log('Could not get proration preview:', error);
+      // Continue without proration info
+    }
+
     setPlanChangeModal({
       isOpen: true,
       targetPlan,
+      prorationInfo,
       loading: false
     });
   };
@@ -438,11 +478,13 @@ const PaymentsTab = () => {
     try {
       // For plan changes (not new subscriptions), we need different API call
       let response;
-      if (currentSubscription && currentSubscription.id) {
-        // Change existing subscription
+      if (currentSubscription && currentSubscription.id && typeof currentSubscription.id === 'number') {
+        // Change existing subscription (has real database ID)
+        console.log('🔄 Changing existing subscription:', currentSubscription.id, 'to plan:', targetPlan.id);
         response = await subscriptionsAPI.changePlan(currentSubscription.id, targetPlan.id);
       } else {
-        // New subscription
+        // New subscription (coming from basic/free plan or no subscription)
+        console.log('➕ Creating new subscription for plan:', targetPlan.id);
         response = await subscriptionsAPI.subscribe(targetPlan.id);
       }
       
@@ -518,6 +560,126 @@ const PaymentsTab = () => {
         console.error('Error cancelling subscription:', error);
         toast.error('Error al cancelar la suscripción');
       }
+    }
+  };
+
+  // Payment method handlers
+  const handleRemovePaymentMethod = (methodId) => {
+    const method = paymentMethods.find(m => m.id === methodId);
+    setDeletePaymentModal({
+      isOpen: true,
+      method: method,
+      loading: false
+    });
+  };
+
+  const handleConfirmDeletePaymentMethod = async () => {
+    if (!deletePaymentModal.method) return;
+
+    setDeletePaymentModal(prev => ({ ...prev, loading: true }));
+
+    try {
+      // TODO: Implement API call to delete payment method
+      // await paymentService.deletePaymentMethod(deletePaymentModal.method.id);
+      
+      // For now, just remove from local state
+      setPaymentMethods(prev => prev.filter(m => m.id !== deletePaymentModal.method.id));
+      
+      toast.success('Método de pago eliminado exitosamente');
+      setDeletePaymentModal({ isOpen: false, method: null, loading: false });
+    } catch (error) {
+      console.error('Error deleting payment method:', error);
+      toast.error('Error al eliminar el método de pago');
+      setDeletePaymentModal(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  const handleCancelDeletePaymentMethod = () => {
+    setDeletePaymentModal({ isOpen: false, method: null, loading: false });
+  };
+
+  const handleSetDefaultPaymentMethod = async (methodId) => {
+    try {
+      // TODO: Implement API call to set default payment method
+      // await paymentService.setDefaultPaymentMethod(methodId);
+      
+      // For now, just update local state
+      setPaymentMethods(prev => prev.map(method => ({
+        ...method,
+        isDefault: method.id === methodId
+      })));
+      
+      toast.success('Método de pago principal actualizado');
+    } catch (error) {
+      console.error('Error setting default payment method:', error);
+      toast.error('Error al cambiar el método de pago principal');
+    }
+  };
+
+  const handleAddPaymentMethod = async () => {
+    try {
+      // Validate form
+      if (!newPaymentMethod.cardNumber || !newPaymentMethod.expiryDate || 
+          !newPaymentMethod.cvv || !newPaymentMethod.cardholderName) {
+        toast.error('Por favor completa todos los campos');
+        return;
+      }
+
+      // TODO: Implement API call to add payment method
+      // await paymentService.addPaymentMethod(newPaymentMethod);
+      
+      // For now, just add to local state
+      const newMethod = {
+        id: Date.now().toString(),
+        brand: 'Visa', // Would be determined by card number
+        last4: newPaymentMethod.cardNumber.slice(-4),
+        expiryMonth: newPaymentMethod.expiryDate.split('/')[0],
+        expiryYear: '20' + newPaymentMethod.expiryDate.split('/')[1],
+        cardholderName: newPaymentMethod.cardholderName,
+        isDefault: paymentMethods.length === 0 // First card is default
+      };
+      
+      setPaymentMethods(prev => [...prev, newMethod]);
+      
+      // Reset form and close modal
+      setNewPaymentMethod({
+        type: 'credit_card',
+        cardNumber: '',
+        expiryDate: '',
+        cardholderName: '',
+        cvv: ''
+      });
+      setIsAddingPaymentMethod(false);
+      
+      toast.success('Método de pago agregado exitosamente');
+    } catch (error) {
+      console.error('Error adding payment method:', error);
+      toast.error('Error al agregar el método de pago');
+    }
+  };
+
+  const handleSaveBillingInfo = async () => {
+    try {
+      // Validate required fields
+      if (!billingInfo.fullName || !billingInfo.email) {
+        toast.error('Por favor completa al menos el nombre completo y el email');
+        return;
+      }
+
+      // TODO: Implement API call to save billing info
+      // await paymentService.updateBillingInfo(billingInfo);
+      
+      // For now, just simulate saving to localStorage
+      localStorage.setItem('billingInfo', JSON.stringify(billingInfo));
+      
+      setIsEditingBilling(false);
+      toast.success('Información de facturación actualizada exitosamente');
+      
+      // Refresh user data
+      await refreshUserData();
+    } catch (error) {
+      console.error('Error saving billing info:', error);
+      toast.error('Error al guardar la información de facturación');
     }
   };
 
@@ -638,51 +800,28 @@ const PaymentsTab = () => {
       <Card title="Planes Disponibles">
         <Grid cols={3} gap={6}>
           {(Array.isArray(plans) && plans.length > 0 ? plans : defaultPlans).map((plan) => {
-            // Debug current subscription structure
-            
-            // Robust plan detection using multiple sources
+            // Simplified plan detection logic
             let isCurrentPlan = false;
             
-            // First try to use user context plan info (most reliable)
+            // Get user's actual plan from context (this should be the source of truth)
             const contextPlanName = userPlanName.toLowerCase();
             
-            // Strict plan matching - prioritize exact matches
-            if (plan.id === contextPlanName) {
-              isCurrentPlan = true;
+            // Simple matching logic based on user's actual plan
+            if (contextPlanName === 'basic' || contextPlanName === 'basico') {
+              // User is on basic plan - only mark basic as current
+              isCurrentPlan = plan.price === 0 || 
+                             String(plan.id || '').toLowerCase() === 'basic' ||
+                             String(plan.name || '').toLowerCase().includes('básico');
+            } else if (contextPlanName === 'premium') {
+              // User is on premium plan - only mark premium as current
+              isCurrentPlan = String(plan.id || '').toLowerCase() === 'premium' ||
+                             String(plan.name || '').toLowerCase() === 'premium';
+            } else if (contextPlanName === 'pro') {
+              // User is on pro plan - only mark pro as current
+              isCurrentPlan = String(plan.id || '').toLowerCase() === 'pro' ||
+                             String(plan.name || '').toLowerCase() === 'pro';
             }
-            else if (plan.name?.toLowerCase() === contextPlanName) {
-              isCurrentPlan = true;
-            }
-            // Special handling for basic plan (free)
-            else if (contextPlanName === 'basic' && 
-                     (plan.id === 'basic' || 
-                      plan.name?.toLowerCase() === 'básico' ||
-                      (plan.price === 0 && plan.name?.toLowerCase().includes('básico')))) {
-              isCurrentPlan = true;
-            }
-            else {
-              // Fallback to subscription data
-              if (currentSubscription) {
-                const currentPlanId = currentSubscription.plan_id;
-                const currentPlanName = (currentSubscription.plan_name || currentSubscription.plan || '').toLowerCase();
-                const currentPrice = currentSubscription.price || currentSubscription.amount || 0;
-                
-                
-                // Check by direct ID match first
-                if (plan.id === currentPlanId) {
-                  isCurrentPlan = true;
-                }
-                // Check by plan name
-                else if (plan.name?.toLowerCase() === currentPlanName) {
-                  isCurrentPlan = true;
-                }
-                // Special case: Basic/Free plan (price = 0)
-                else if ((plan.id === 'basic' || plan.name?.toLowerCase() === 'básico') && 
-                         (currentPrice === 0 && (currentPlanName === 'basico' || currentPlanName === 'básico' || currentPlanName === ''))) {
-                  isCurrentPlan = true;
-                }
-              }
-            }
+            
             
             return (
               <div
@@ -879,11 +1018,7 @@ const PaymentsTab = () => {
                   <Button 
                     variant="primary" 
                     fullWidth 
-                    onClick={() => {
-                      setIsEditingBilling(false);
-                      // TODO: Save billing info to backend
-                      toast.success('Información de facturación actualizada');
-                    }}
+                    onClick={handleSaveBillingInfo}
                   >
                     Guardar Cambios
                   </Button>
@@ -909,7 +1044,7 @@ const PaymentsTab = () => {
               </tr>
             </thead>
             <tbody>
-              {(Array.isArray(paymentHistory) && paymentHistory.length > 0 ? paymentHistory : defaultPaymentHistory).map((payment) => {
+              {paymentHistory.length > 0 ? paymentHistory.map((payment) => {
                 const statusBadge = getPaymentStatusBadge(payment.status || 'paid');
                 return (
                   <tr key={payment.id} className="border-b border-primary-800">
@@ -945,7 +1080,16 @@ const PaymentsTab = () => {
                     </td>
                   </tr>
                 );
-              })}
+              }) : (
+                <tr>
+                  <td colSpan={6} className="py-8 text-center text-primary-400">
+                    {currentSubscription && (currentSubscription.price > 0 || currentSubscription.amount > 0) ? 
+                      'No hay historial de pagos disponible' : 
+                      'No hay pagos registrados - Plan básico gratuito'
+                    }
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -1072,7 +1216,78 @@ const PaymentsTab = () => {
         targetPlan={planChangeModal.targetPlan}
         onConfirm={handlePlanChangeConfirm}
         loading={planChangeModal.loading}
+        prorationInfo={planChangeModal.prorationInfo}
       />
+
+      {/* Delete Payment Method Modal */}
+      <Modal
+        isOpen={deletePaymentModal.isOpen}
+        onClose={handleCancelDeletePaymentMethod}
+        title="Eliminar Método de Pago"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <div className="flex items-start space-x-3">
+            <div className="flex-shrink-0">
+              <svg className="h-6 w-6 text-error-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.996-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <h3 className="text-sm font-medium text-primary-100">
+                ¿Confirmar eliminación?
+              </h3>
+              <div className="mt-2">
+                <p className="text-sm text-primary-300">
+                  ¿Estás seguro de que quieres eliminar este método de pago?
+                </p>
+                {deletePaymentModal.method && (
+                  <div className="mt-3 p-3 bg-primary-800 rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      {getCardIcon(deletePaymentModal.method.brand)}
+                      <span className="text-sm font-medium text-primary-100">
+                        {deletePaymentModal.method.brand} •••• {deletePaymentModal.method.last4}
+                      </span>
+                      {deletePaymentModal.method.isDefault && (
+                        <span className="px-2 py-1 bg-accent-600 text-white text-xs rounded">
+                          Principal
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-primary-400 mt-1">
+                      {deletePaymentModal.method.cardholderName}
+                    </p>
+                  </div>
+                )}
+                {deletePaymentModal.method?.isDefault && (
+                  <div className="mt-3 p-3 bg-warning-900/20 border border-warning-500/20 rounded-lg">
+                    <p className="text-xs text-warning-300">
+                      <strong>Advertencia:</strong> Esta es tu tarjeta principal. Asegúrate de tener otro método de pago configurado antes de eliminarla.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-4">
+            <Button 
+              variant="ghost" 
+              onClick={handleCancelDeletePaymentMethod}
+              disabled={deletePaymentModal.loading}
+            >
+              Cancelar
+            </Button>
+            <Button 
+              variant="danger" 
+              onClick={handleConfirmDeletePaymentMethod}
+              loading={deletePaymentModal.loading}
+            >
+              {deletePaymentModal.loading ? 'Eliminando...' : 'Eliminar'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

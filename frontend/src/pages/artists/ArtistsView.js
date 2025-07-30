@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { PageContainer, Grid, Card } from '../../components/common/Layout';
 import Input from '../../components/common/Input';
 import Button from '../../components/common/Button';
@@ -8,6 +9,7 @@ import Pagination from '../../components/common/Pagination';
 import { artistService } from '../../services/api';
 
 const ArtistsView = () => {
+  const navigate = useNavigate();
   const [artists, setArtists] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -97,15 +99,62 @@ const ArtistsView = () => {
 
       try {
         // Try to load real artist data from API
-        const response = await artistService.getAll({
-          page: pageNum,
+        // Map frontend filters to backend expected parameters
+        const apiParams = {
           limit: 12,
+          offset: (pageNum - 1) * 12,
           search: searchQuery,
-          ...filters
-        });
+          comuna: filters.location,
+          minPrice: filters.priceRange[0],
+          maxPrice: filters.priceRange[1],
+          verified: filters.verified || undefined,
+          // Note: backend doesn't support all filters yet
+        };
         
-        artistData = response.data?.artists || response.data || [];
-        totalPagesCount = response.data?.totalPages || Math.ceil((response.data?.total || 60) / 12);
+        const response = await artistService.getAll(apiParams);
+        
+        // Handle different response formats
+        let rawArtistData = [];
+        if (Array.isArray(response.data)) {
+          rawArtistData = response.data;
+        } else if (response.data?.artists) {
+          rawArtistData = response.data.artists;
+        } else if (response.data?.data) {
+          rawArtistData = response.data.data;
+        }
+        
+        // Transform API data to match frontend expectations
+        artistData = rawArtistData.map(artist => ({
+          id: artist.id,
+          name: `${artist.first_name || ''} ${artist.last_name || ''}`.trim(),
+          profileImage: artist.profile_image,
+          location: artist.comuna_name || artist.location || 'Sin ubicación',
+          specialties: artist.styles ? artist.styles.split(',') : [],
+          rating: parseFloat(artist.rating) || 0,
+          reviewsCount: artist.total_reviews || 0,
+          experienceYears: artist.years_experience || 0,
+          completedWorks: artist.portfolio ? artist.portfolio.length : 0,
+          priceRange: {
+            min: Math.floor(parseFloat(artist.min_price) / 1000) || 0,
+            max: Math.floor(parseFloat(artist.max_price) / 1000) || 0
+          },
+          portfolioImages: artist.portfolio || [],
+          isOnline: false, // Could be calculated based on last_login
+          verified: artist.is_verified === 1,
+          acceptingWork: true, // Default to true
+          isPromoted: false,
+          isFavorited: false,
+          bio: artist.bio || 'Artista tatuador profesional'
+        }));
+        
+        // If no real data, use mock data
+        if (artistData.length === 0) {
+          console.log('No artists found in database, using mock data');
+          artistData = generateMockArtists(pageNum);
+          totalPagesCount = 5;
+        } else {
+          totalPagesCount = response.data?.totalPages || Math.ceil((response.data?.total || artistData.length) / 12);
+        }
       } catch (apiError) {
         console.log('API not available, using mock data:', apiError.message);
         // Fallback to mock data
@@ -175,9 +224,8 @@ const ArtistsView = () => {
   };
 
   const handleContact = (artist) => {
-    // Navigate to contact form or open modal
-    console.log('Contact artist:', artist.name);
-    // In production: navigate to contact form or open contact modal
+    // Navigate to artist profile page
+    navigate(`/artists/${artist.id}`);
   };
 
   return (

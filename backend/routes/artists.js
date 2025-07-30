@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const TattooArtist = require('../models/TattooArtist');
 const Portfolio = require('../models/Portfolio');
+const Subscription = require('../models/Subscription');
 const { authenticate, authorizeArtist, optionalAuth } = require('../middleware/auth');
 const { uploadPortfolio } = require('../config/multer');
 
@@ -45,10 +46,65 @@ router.get('/:id', async (req, res) => {
       Portfolio.findByArtist(artist.id)
     ]);
     
+    // Try to get subscription, but don't fail if it doesn't work
+    let activeSubscription = null;
+    try {
+      activeSubscription = await Subscription.getActiveByUserId(artist.user_id);
+    } catch (error) {
+      console.warn('Could not fetch subscription for user:', artist.user_id, error.message);
+    }
+    
+    // Get portfolio limit based on subscription
+    let portfolioLimit = 10; // Default for free/basic
+    let collectionLimit = 3; // Default for free/basic
+    
+    if (activeSubscription) {
+      try {
+        const plan = await Subscription.getPlanById(activeSubscription.plan_id);
+        portfolioLimit = plan?.max_portfolio_images || 10;
+        collectionLimit = await Subscription.getCollectionLimit(artist.user_id);
+      } catch (error) {
+        console.warn('Could not fetch subscription plan details:', error.message);
+      }
+    }
+    
+    // Limit portfolio based on subscription plan
+    const limitedPortfolio = portfolioLimit === -1 
+      ? portfolio 
+      : portfolio.slice(0, portfolioLimit);
+    
+    // Group portfolio by category for collections
+    const collections = limitedPortfolio.reduce((acc, item) => {
+      const category = item.category || 'Sin categoría';
+      if (!acc[category]) {
+        acc[category] = [];
+      }
+      acc[category].push(item);
+      return acc;
+    }, {});
+    
+    // Limit collections based on subscription
+    const collectionKeys = Object.keys(collections);
+    const limitedCollections = {};
+    const maxCollections = collectionLimit === -1 ? collectionKeys.length : collectionLimit;
+    
+    for (let i = 0; i < Math.min(collectionKeys.length, maxCollections); i++) {
+      const key = collectionKeys[i];
+      limitedCollections[key] = collections[key];
+    }
+    
     res.json({
       ...artist,
       styles,
-      portfolio
+      portfolio: limitedPortfolio,
+      collections: limitedCollections,
+      subscription: activeSubscription ? {
+        plan_type: activeSubscription.plan_type,
+        plan_name: activeSubscription.plan_name,
+        portfolio_limit: portfolioLimit,
+        collection_limit: collectionLimit,
+        features: activeSubscription.features
+      } : null
     });
   } catch (error) {
     console.error('Get artist error:', error);

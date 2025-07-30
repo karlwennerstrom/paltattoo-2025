@@ -306,7 +306,7 @@ const ProposalsTab = () => {
                       <div>
                         <h3 className="text-lg font-semibold text-primary-100">{proposal.offer_title || proposal.title}</h3>
                         <div className="flex items-center space-x-2 text-sm text-primary-400">
-                          <span>Para: {proposal.client_first_name ? `${proposal.client_first_name} ${proposal.client_last_name}` : proposal.client?.name || 'Cliente'}</span>
+                          <span>Para: {proposal.status === 'accepted' && proposal.client_first_name ? `${proposal.client_first_name} ${proposal.client_last_name}` : 'Cliente'}</span>
                           <span>•</span>
                           <div className="flex items-center space-x-1">
                             <svg className="h-3 w-3 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
@@ -506,7 +506,7 @@ const ProposalsTab = () => {
                     className="h-16 w-16 rounded-full object-cover border-2 border-primary-600 mb-2"
                   />
                   <h3 className="text-lg font-semibold text-primary-100">
-                    {viewingProposal.client_first_name ? `${viewingProposal.client_first_name} ${viewingProposal.client_last_name}` : viewingProposal.client?.name || 'Cliente'}
+                    {viewingProposal.status === 'accepted' && viewingProposal.client_first_name ? `${viewingProposal.client_first_name} ${viewingProposal.client_last_name}` : 'Cliente'}
                   </h3>
                   <div className="flex items-center justify-center space-x-2 text-sm text-primary-400">
                     <div className="flex items-center space-x-1">
@@ -530,6 +530,61 @@ const ProposalsTab = () => {
                 {viewingProposal.offer_description || viewingProposal.description}
               </p>
             </div>
+
+            {/* Contact Information Section */}
+            {viewingProposal.status === 'accepted' ? (
+              <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4">
+                <h5 className="text-lg font-semibold text-green-400 mb-3 flex items-center">
+                  <FiCheckCircle className="mr-2" />
+                  Propuesta Aceptada - Información de Contacto
+                </h5>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-primary-500 mb-1">Nombre del cliente</p>
+                    <p className="text-sm text-primary-100">
+                      {viewingProposal.client_first_name} {viewingProposal.client_last_name}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-primary-500 mb-1">Email</p>
+                    <p className="text-sm text-primary-100">
+                      {viewingProposal.client_email || 'No proporcionado'}
+                    </p>
+                  </div>
+                  {viewingProposal.client_phone && (
+                    <div>
+                      <p className="text-xs text-primary-500 mb-1">Teléfono</p>
+                      <p className="text-sm text-primary-100">
+                        {viewingProposal.client_phone}
+                      </p>
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-green-300 mt-3">
+                  Puedes contactar al cliente para coordinar los detalles del tatuaje.
+                </p>
+              </div>
+            ) : viewingProposal.status === 'pending' ? (
+              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
+                <h5 className="text-lg font-semibold text-yellow-400 mb-2 flex items-center">
+                  <FiClock className="mr-2" />
+                  Propuesta Pendiente
+                </h5>
+                <p className="text-sm text-primary-300">
+                  Los datos de contacto del cliente estarán disponibles una vez que acepte tu propuesta.
+                </p>
+              </div>
+            ) : viewingProposal.status === 'rejected' ? (
+              <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
+                <h5 className="text-lg font-semibold text-red-400 mb-2 flex items-center">
+                  <FiXCircle className="mr-2" />
+                  Propuesta Rechazada
+                </h5>
+                <p className="text-sm text-primary-300">
+                  El cliente ha seleccionado otra propuesta para este proyecto.
+                </p>
+              </div>
+            ) : null}
 
             <div className="flex justify-end space-x-3 pt-4 border-t border-primary-700">
               <Button variant="ghost" onClick={() => setViewingProposal(null)}>

@@ -1,33 +1,44 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { PageContainer, Card, Stack } from '../../components/common/Layout';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
 import { useAuth } from '../../contexts/AuthContext';
 import { offerService, catalogService } from '../../services/api';
+import PublishingAnimation from '../../components/animations/PublishingAnimation';
 import toast from 'react-hot-toast';
 
 const CreateOfferView = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const fileInputRef = useRef(null);
   
+  // Get prefilled data from navigation state (from dashboard quick request)
+  const { prefilledData, fromQuickRequest, suggestionType } = location.state || {};
+  
   const [loading, setLoading] = useState(false);
+  const [publishingStatus, setPublishingStatus] = useState(null); // null, 'publishing', 'complete'
+  const [createdOfferId, setCreatedOfferId] = useState(null);
   const [catalogs, setCatalogs] = useState({
     styles: [],
     bodyParts: [],
     colorTypes: [],
+    regions: [],
+    comunas: [],
   });
   
   const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    budgetMin: '',
-    budgetMax: '',
+    title: prefilledData?.title || '',
+    description: prefilledData?.description || (prefilledData?.tattooIdea || ''),
+    budgetMin: prefilledData?.budgetRange?.split('-')[0] || '',
+    budgetMax: prefilledData?.budgetRange?.split('-')[1] || '',
     styleId: '',
     sizeDescription: '',
     bodyPartId: '',
     colorTypeId: '',
+    regionId: '',
+    comunaId: '',
     deadline: '',
     referenceImage: null,
   });
@@ -43,16 +54,25 @@ const CreateOfferView = () => {
 
   const loadCatalogs = async () => {
     try {
-      const [stylesRes, bodyPartsRes, colorTypesRes] = await Promise.all([
+      const [stylesRes, bodyPartsRes, colorTypesRes, regionsRes] = await Promise.all([
         catalogService.getStyles(),
         catalogService.getBodyParts(),
-        catalogService.getColorTypes()
+        catalogService.getColorTypes(),
+        catalogService.getRegions()
       ]);
       
+      // Deduplicate data in case there are duplicates
+      const uniqueStyles = [...new Map((stylesRes.data || []).map(item => [item.id, item])).values()];
+      const uniqueBodyParts = [...new Map((bodyPartsRes.data || []).map(item => [item.id, item])).values()];
+      const uniqueColorTypes = [...new Map((colorTypesRes.data || []).map(item => [item.id, item])).values()];
+      const uniqueRegions = [...new Map((regionsRes.data || []).map(item => [item.id, item])).values()];
+      
       setCatalogs({
-        styles: stylesRes.data || [],
-        bodyParts: bodyPartsRes.data || [],
-        colorTypes: colorTypesRes.data || [],
+        styles: uniqueStyles,
+        bodyParts: uniqueBodyParts,
+        colorTypes: uniqueColorTypes,
+        regions: uniqueRegions,
+        comunas: [],
       });
     } catch (error) {
       console.error('Error loading catalogs:', error);
@@ -72,6 +92,44 @@ const CreateOfferView = () => {
     // Clear error for this field
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
+    }
+  };
+
+  const handleRegionChange = async (e) => {
+    const regionId = e.target.value;
+    
+    // Update form data
+    setFormData(prev => ({
+      ...prev,
+      regionId: regionId,
+      comunaId: '' // Reset comuna when region changes
+    }));
+    
+    // Clear errors
+    if (errors.regionId) {
+      setErrors(prev => ({ ...prev, regionId: '', comunaId: '' }));
+    }
+    
+    // Load comunas for selected region
+    if (regionId) {
+      try {
+        const comunasRes = await catalogService.getComunas(regionId);
+        const uniqueComunas = [...new Map((comunasRes.data || []).map(item => [item.id, item])).values()];
+        
+        setCatalogs(prev => ({
+          ...prev,
+          comunas: uniqueComunas
+        }));
+      } catch (error) {
+        console.error('Error loading comunas:', error);
+        toast.error('Error al cargar las comunas');
+      }
+    } else {
+      // Clear comunas if no region selected
+      setCatalogs(prev => ({
+        ...prev,
+        comunas: []
+      }));
     }
   };
 
@@ -177,6 +235,14 @@ const CreateOfferView = () => {
       newErrors.colorTypeId = 'Selecciona el tipo de color';
     }
     
+    if (!formData.regionId) {
+      newErrors.regionId = 'Selecciona una región';
+    }
+    
+    if (!formData.comunaId) {
+      newErrors.comunaId = 'Selecciona una comuna';
+    }
+    
     if (formData.deadline) {
       const deadlineDate = new Date(formData.deadline);
       const today = new Date();
@@ -193,16 +259,25 @@ const CreateOfferView = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    // Prevent double submission
+    if (loading || publishingStatus === 'publishing') {
+      return;
+    }
+    
     const validationErrors = validateForm();
+    
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
       // Scroll to first error
       window.scrollTo({ top: 0, behavior: 'smooth' });
+      toast.error('Por favor completa todos los campos requeridos');
       return;
     }
     
     try {
       setLoading(true);
+      setPublishingStatus('publishing');
+      setErrors({}); // Clear any previous errors
       
       // Prepare offer data
       const offerData = {
@@ -214,25 +289,40 @@ const CreateOfferView = () => {
         sizeDescription: formData.sizeDescription,
         budgetMin: parseInt(formData.budgetMin),
         budgetMax: parseInt(formData.budgetMax),
+        regionId: parseInt(formData.regionId),
+        comunaId: parseInt(formData.comunaId),
         deadline: formData.deadline || null
       };
       
-      // Create the offer first
+      // Create the offer
       const response = await offerService.create(offerData);
       const offerId = response.data.offer.id;
+      setCreatedOfferId(offerId); // Store the created offer ID
       
       // Upload reference image if provided
-      if (formData.referenceImage) {
-        const imageFormData = new FormData();
-        imageFormData.append('reference', formData.referenceImage);
-        await offerService.uploadReferences(offerId, [formData.referenceImage]);
+      if (formData.referenceImage && offerId) {
+        try {
+          await offerService.uploadReferences(offerId, [formData.referenceImage]);
+        } catch (imageError) {
+          console.warn('Image upload failed, but offer was created:', imageError);
+          // Don't fail the whole process if only image upload fails
+        }
       }
       
-      toast.success('Oferta creada exitosamente');
-      navigate('/feed');
+      // The animation will handle the completion and navigation
     } catch (error) {
       console.error('Error creating offer:', error);
-      if (error.response?.data?.errors) {
+      
+      // Reset publishing status on error
+      setPublishingStatus(null);
+      
+      // Handle different types of errors
+      if (error.name === 'AbortError' || error.message?.includes('message channel closed')) {
+        // Browser extension interference - show user-friendly message
+        setErrors({ 
+          submit: 'Hubo un problema temporal. Por favor, intenta nuevamente.' 
+        });
+      } else if (error.response?.data?.errors) {
         const apiErrors = {};
         error.response.data.errors.forEach(err => {
           if (err.path) {
@@ -240,21 +330,51 @@ const CreateOfferView = () => {
           }
         });
         setErrors(apiErrors);
+      } else if (error.response?.data?.error) {
+        setErrors({ submit: error.response.data.error });
       } else {
-        setErrors({ submit: error.response?.data?.error || 'Error al crear la oferta' });
+        setErrors({ 
+          submit: 'Error al crear la oferta. Por favor, verifica tu conexión e intenta nuevamente.' 
+        });
       }
+      
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
-      setLoading(false);
+      if (publishingStatus !== 'publishing') {
+        setLoading(false);
+      }
     }
   };
 
+  const handlePublishingComplete = () => {
+    // Use setTimeout to ensure state updates are processed
+    setTimeout(() => {
+      setPublishingStatus(null);
+      setLoading(false);
+      toast.success('¡Solicitud publicada exitosamente!', {
+        duration: 5000,
+        icon: '🎉'
+      });
+      // Navigate to my requests page to see the new offer
+      navigate('/my-requests');
+    }, 100);
+  };
+
   return (
+    <>
+      {publishingStatus === 'publishing' && (
+        <PublishingAnimation 
+          status={publishingStatus}
+          onComplete={handlePublishingComplete}
+        />
+      )}
+      
+      {publishingStatus !== 'publishing' && (
     <PageContainer
-      title="Crear Nueva Oferta"
-      subtitle="Describe el tatuaje que deseas y recibe propuestas de artistas"
+      title={fromQuickRequest ? "Completa tu solicitud" : "Crear Nueva Oferta"}
+      subtitle={fromQuickRequest ? "Finaliza los detalles de tu tatuaje ideal" : "Describe el tatuaje que deseas y recibe propuestas de artistas"}
       breadcrumbs={[
-        { label: 'Feed', href: '/feed' },
+        { label: 'Dashboard', href: '/dashboard' },
         { label: 'Crear Oferta' }
       ]}
       maxWidth="3xl"
@@ -278,7 +398,7 @@ const CreateOfferView = () => {
               
               <div>
                 <label className="block text-sm font-medium text-primary-200 mb-2">
-                  Descripción detallada
+                  Descripción detallada *
                 </label>
                 <textarea
                   name="description"
@@ -295,9 +415,14 @@ const CreateOfferView = () => {
                 {errors.description && (
                   <p className="mt-1 text-sm text-error-400">{errors.description}</p>
                 )}
-                <p className="mt-1 text-xs text-primary-500">
-                  {formData.description.length}/1000 caracteres
-                </p>
+                <div className="mt-1 flex items-center justify-between">
+                  <p className={`text-xs ${formData.description.length < 50 ? 'text-warning-400' : 'text-primary-500'}`}>
+                    {formData.description.length}/1000 caracteres {formData.description.length < 50 && '(mínimo 50)'}
+                  </p>
+                  {formData.description.length >= 50 && (
+                    <span className="text-xs text-success-400">✓ Longitud válida</span>
+                  )}
+                </div>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -419,6 +544,57 @@ const CreateOfferView = () => {
                 />
               </div>
               
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-primary-200 mb-2">
+                    Región *
+                  </label>
+                  <select
+                    name="regionId"
+                    value={formData.regionId}
+                    onChange={handleRegionChange}
+                    className={`w-full px-4 py-3 bg-primary-700 border ${
+                      errors.regionId ? 'border-error-500' : 'border-primary-600'
+                    } rounded-lg text-primary-100 focus:border-accent-500 focus:outline-none`}
+                    required
+                  >
+                    <option value="">Seleccionar región...</option>
+                    {catalogs.regions.map(region => (
+                      <option key={region.id} value={region.id}>{region.name}</option>
+                    ))}
+                  </select>
+                  {errors.regionId && (
+                    <p className="mt-1 text-sm text-error-400">{errors.regionId}</p>
+                  )}
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-primary-200 mb-2">
+                    Comuna *
+                  </label>
+                  <select
+                    name="comunaId"
+                    value={formData.comunaId}
+                    onChange={handleInputChange}
+                    className={`w-full px-4 py-3 bg-primary-700 border ${
+                      errors.comunaId ? 'border-error-500' : 'border-primary-600'
+                    } rounded-lg text-primary-100 focus:border-accent-500 focus:outline-none`}
+                    required
+                    disabled={!formData.regionId}
+                  >
+                    <option value="">
+                      {formData.regionId ? 'Seleccionar comuna...' : 'Primero selecciona una región'}
+                    </option>
+                    {catalogs.comunas.map(comuna => (
+                      <option key={comuna.id} value={comuna.id}>{comuna.name}</option>
+                    ))}
+                  </select>
+                  {errors.comunaId && (
+                    <p className="mt-1 text-sm text-error-400">{errors.comunaId}</p>
+                  )}
+                </div>
+              </div>
+              
               <div>
                 <Input
                   label="Fecha límite (opcional)"
@@ -513,7 +689,7 @@ const CreateOfferView = () => {
             <Button
               type="button"
               variant="ghost"
-              onClick={() => navigate('/feed')}
+              onClick={() => navigate('/dashboard')}
               disabled={loading}
             >
               Cancelar
@@ -530,6 +706,8 @@ const CreateOfferView = () => {
         </Stack>
       </form>
     </PageContainer>
+      )}
+    </>
   );
 };
 

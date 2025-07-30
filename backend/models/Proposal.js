@@ -27,12 +27,32 @@ class Proposal {
               ta.studio_name, ta.rating, ta.instagram_url, ta.years_experience, ta.whatsapp,
               up.first_name, up.last_name, up.profile_image, up.phone,
               u.email,
-              o.title as offer_title, o.description as offer_description
+              o.title as offer_title, o.description as offer_description,
+              c.id as client_id,
+              CASE 
+                WHEN p.status = 'accepted' THEN cup.first_name 
+                ELSE NULL 
+              END as client_first_name,
+              CASE 
+                WHEN p.status = 'accepted' THEN cup.last_name 
+                ELSE NULL 
+              END as client_last_name,
+              CASE 
+                WHEN p.status = 'accepted' THEN cu.email 
+                ELSE NULL 
+              END as client_email,
+              CASE 
+                WHEN p.status = 'accepted' THEN cup.phone 
+                ELSE NULL 
+              END as client_phone
        FROM proposals p
        JOIN tattoo_artists ta ON p.artist_id = ta.id
        JOIN users u ON ta.user_id = u.id
        LEFT JOIN user_profiles up ON u.id = up.user_id
        JOIN tattoo_offers o ON p.offer_id = o.id
+       JOIN clients c ON o.client_id = c.id
+       JOIN users cu ON c.user_id = cu.id
+       LEFT JOIN user_profiles cup ON cu.id = cup.user_id
        WHERE p.id = ?`,
       [id]
     );
@@ -47,6 +67,20 @@ class Proposal {
     );
     
     return rows[0];
+  }
+
+  static async findByArtistAndOffers(artistId, offerIds) {
+    if (!Array.isArray(offerIds) || offerIds.length === 0) {
+      return [];
+    }
+    
+    const placeholders = offerIds.map(() => '?').join(',');
+    const [rows] = await promisePool.execute(
+      `SELECT * FROM proposals WHERE artist_id = ? AND offer_id IN (${placeholders})`,
+      [artistId, ...offerIds]
+    );
+    
+    return rows;
   }
 
   static async update(proposalId, updateData, userId = null) {
@@ -157,7 +191,22 @@ class Proposal {
              o.title as offer_title, o.description as offer_description,
              o.budget_min, o.budget_max, o.deadline,
              bp.name as body_part_name, ts.name as style_name,
-             up.first_name as client_first_name, up.last_name as client_last_name
+             CASE 
+               WHEN p.status = 'accepted' THEN up.first_name 
+               ELSE NULL 
+             END as client_first_name,
+             CASE 
+               WHEN p.status = 'accepted' THEN up.last_name 
+               ELSE NULL 
+             END as client_last_name,
+             CASE 
+               WHEN p.status = 'accepted' THEN u.email 
+               ELSE NULL 
+             END as client_email,
+             CASE 
+               WHEN p.status = 'accepted' THEN up.phone 
+               ELSE NULL 
+             END as client_phone
       FROM proposals p
       JOIN tattoo_offers o ON p.offer_id = o.id
       JOIN clients c ON o.client_id = c.id

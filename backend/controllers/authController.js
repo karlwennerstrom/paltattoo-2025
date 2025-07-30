@@ -135,7 +135,13 @@ const login = async (req, res) => {
           planName: profile.subscription_plan_name,
           status: profile.subscription_status,
           price: profile.subscription_plan_price
-        } : null
+        } : {
+          // Default to Basic plan if no subscription found
+          planId: 'basic',
+          planName: 'basico',
+          status: 'active',
+          price: 0
+        }
       },
       token
     });
@@ -148,6 +154,14 @@ const login = async (req, res) => {
 const getProfile = async (req, res) => {
   try {
     const profile = await User.getProfile(req.user.id);
+    
+    // Debug logs
+    console.log('🔍 Profile Debug for user', req.user.id, ':', {
+      subscription_plan_id: profile.subscription_plan_id,
+      subscription_plan_name: profile.subscription_plan_name,
+      subscription_status: profile.subscription_status,
+      subscription_plan_price: profile.subscription_plan_price
+    });
     
     res.json({
       user: {
@@ -165,7 +179,13 @@ const getProfile = async (req, res) => {
           planName: profile.subscription_plan_name,
           status: profile.subscription_status,
           price: profile.subscription_plan_price
-        } : null
+        } : {
+          // Default to Basic plan if no subscription found
+          planId: 'basic',
+          planName: 'basico',
+          status: 'active',
+          price: 0
+        }
       }
     });
   } catch (error) {

@@ -128,3 +128,54 @@ Frontend requires: `REACT_APP_API_URL`, `REACT_APP_GOOGLE_CLIENT_ID`
 - Portfolio endpoints return empty arrays (implementation pending)
 - Some subscription features incomplete
 - Chat system not yet implemented
+
+## Plan de Desarrollo: Experiencia Tipo Uber
+
+### Objetivo Principal
+Transformar la experiencia de publicar una solicitud de algo que parece estático y pasivo, a algo que se siente dinámico y activo, donde el cliente siente que el sistema está trabajando para él en tiempo real, similar a la experiencia de pedir un servicio en Uber.
+
+### Componentes a Implementar
+
+#### 1. Experiencia de Publicación Inmediata
+Cuando el cliente publique una solicitud, debe sentirse como cuando pides un Uber. Al presionar 'Publicar', mostrar inmediatamente una animación o pantalla que indique que se está buscando tatuadores. No debe ser una simple confirmación, sino un proceso visual que dé la sensación de que algo está sucediendo en tiempo real.
+
+#### 2. Página de Seguimiento en Vivo
+Crear una vista donde el cliente pueda ver el 'progreso' de su solicitud. Similar a cuando esperas un Uber y ves el mapa. Debe mostrar cuántos tatuadores han visto la solicitud, si alguien está interesado, y las propuestas que van llegando. Todo debe actualizarse sin recargar la página.
+
+#### 3. Sistema de Notificaciones Activas
+Implementar notificaciones que hagan sentir al cliente que hay actividad. Por ejemplo: 'Un tatuador está revisando tu solicitud', '3 tatuadores han visto tu propuesta', 'Nueva propuesta recibida'. Estas deben aparecer de forma dinámica mientras el usuario está en la plataforma.
+
+#### 4. Feed Dinámico para Tatuadores
+Los tatuadores deben ver las nuevas solicitudes como un feed que se actualiza automáticamente, no como una lista estática. Deben poder indicar rápidamente si les interesa sin necesidad de escribir una propuesta completa inmediatamente.
+
+#### 5. Estados Visuales del Proceso
+La solicitud debe pasar por estados visuales claros que el cliente pueda ver: 'Publicando' → 'Buscando tatuadores' → 'Tatuadores revisando' → 'Recibiendo propuestas'. Cada estado debe tener su propia representación visual y animaciones.
+
+#### 6. Sensación de Actividad Constante
+Mostrar métricas que den la sensación de que hay movimiento: cantidad de tatuadores que vieron la solicitud, tiempo transcurrido, tatuadores en línea en el área. Aunque no sea 100% real-time, debe parecer que el sistema está activamente trabajando.
+
+#### 7. Respuesta Inmediata a Acciones
+Cada acción del usuario debe tener feedback inmediato. Si publican, ver la publicación procesándose. Si un tatuador muestra interés, el cliente lo ve al instante. No debe haber momentos donde el usuario se pregunte '¿funcionó?'
+
+#### 8. Dashboard con Información en Vivo
+El dashboard principal debe mostrar el estado actual de todas las solicitudes activas del cliente, con indicadores visuales de nueva actividad (puntos rojos, badges, etc). Debe sentirse vivo, no como una lista estática.
+
+#### 9. Flujo de Interacción Rápida
+Permitir que los tatuadores puedan expresar interés rápidamente (como un 'me interesa' o 'estoy revisando') antes de enviar una propuesta formal. Esto genera actividad inmediata que el cliente puede ver.
+
+#### 10. Experiencia Mobile-First
+Todo el flujo debe sentirse natural en móvil, con gestos, transiciones suaves y carga rápida. La experiencia debe ser tan fluida como usar la app de Uber en el teléfono.
+
+#### 11. Progreso Visual del Proceso
+Implementar indicadores visuales de progreso en cada etapa. Por ejemplo, una barra de progreso o círculos que se van completando conforme avanza el proceso de la solicitud.
+
+#### 12. Comunicación Proactiva
+El sistema debe comunicar proactivamente lo que está pasando. No esperar a que el usuario pregunte o recargue. Mensajes como 'Tu solicitud fue vista por 5 tatuadores en los últimos 10 minutos' generan confianza.
+
+### Tecnologías Recomendadas para Implementación
+- **WebSockets (Socket.io)**: Para actualizaciones en tiempo real
+- **Server-Sent Events**: Como alternativa ligera para notificaciones unidireccionales
+- **React Query o SWR**: Para polling optimizado y caché de datos
+- **Framer Motion**: Para animaciones fluidas y transiciones
+- **Push Notifications API**: Para notificaciones del navegador
+- **Redis**: Para caché y pub/sub de eventos en tiempo real

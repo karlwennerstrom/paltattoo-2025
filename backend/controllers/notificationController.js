@@ -6,6 +6,40 @@ const TattooRequest = require('../models/TattooRequest');
 const Proposal = require('../models/Proposal');
 
 const notificationController = {
+  async triggerNewOfferNotification(offerId, regionId, comunaId = null) {
+    try {
+      const offer = await TattooRequest.findById(offerId);
+      if (!offer) {
+        console.error('Offer not found for notification:', offerId);
+        return;
+      }
+
+      // Get artists in the region/comuna
+      const artists = await TattooArtist.findByRegion(regionId, comunaId);
+      
+      if (artists.length === 0) {
+        console.log('No artists found in region/comuna for offer notification');
+        return;
+      }
+
+      // Send email to each artist
+      const emailPromises = artists.map(artist => 
+        emailService.sendNewOfferNotification(artist, offer)
+      );
+
+      const results = await Promise.allSettled(emailPromises);
+      
+      const successful = results.filter(r => r.status === 'fulfilled' && r.value.success).length;
+      const failed = results.length - successful;
+      
+      console.log(`New offer notification sent: ${successful} successful, ${failed} failed`);
+      
+      return { successful, failed, total: results.length };
+    } catch (error) {
+      console.error('Error sending new offer notifications:', error);
+      throw error;
+    }
+  },
   async sendWelcomeEmail(req, res) {
     try {
       const { userId } = req.body;

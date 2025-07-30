@@ -11,7 +11,8 @@ const PlanChangeModal = ({
   currentPlan, 
   targetPlan, 
   onConfirm,
-  loading = false 
+  loading = false,
+  prorationInfo = null // Add proration info from backend
 }) => {
   const [agreed, setAgreed] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
@@ -24,16 +25,9 @@ const PlanChangeModal = ({
   const isFreeTarget = targetPlan.price === 0;
   const isFreeCurrent = currentPlan.price === 0;
 
-  // Calculate prorated amount for upgrades
-  const calculateProratedAmount = () => {
-    if (!isUpgrade) return 0;
-    
-    // Simplified calculation - in real implementation, consider billing cycle
-    const priceDifference = targetPlan.price - currentPlan.price;
-    return Math.round(priceDifference * 0.8); // Assuming 80% of month remaining
-  };
-
-  const proratedAmount = calculateProratedAmount();
+  // Use real proration info from backend if available
+  const proratedAmount = prorationInfo?.immediateCharge || 0;
+  const hasProrationInfo = !!prorationInfo;
 
   const getChangeType = () => {
     if (isSameTier) return 'same';
@@ -206,19 +200,53 @@ const PlanChangeModal = ({
           </div>
         </div>
 
-        {/* Upgrade Payment Info */}
-        {isUpgrade && proratedAmount > 0 && (
-          <div className="bg-success-900/20 border border-success-600/30 rounded-lg p-4 mb-6">
-            <div className="flex items-center space-x-3 mb-2">
-              <FiDollarSign className="w-5 h-5 text-success-400" />
-              <h3 className="font-medium text-success-400">Pago Prorrateado</h3>
+        {/* Proration Info */}
+        {prorationInfo && (isUpgrade || isDowngrade) && (
+          <div className={`border rounded-lg p-4 mb-6 ${
+            prorationInfo.isUpgrade 
+              ? 'bg-success-900/20 border-success-600/30' 
+              : 'bg-warning-900/20 border-warning-600/30'
+          }`}>
+            <div className="flex items-center space-x-3 mb-3">
+              <FiDollarSign className={`w-5 h-5 ${
+                prorationInfo.isUpgrade ? 'text-success-400' : 'text-warning-400'
+              }`} />
+              <h3 className={`font-medium ${
+                prorationInfo.isUpgrade ? 'text-success-400' : 'text-warning-400'
+              }`}>
+                {prorationInfo.isUpgrade ? 'Cargo Inmediato' : 'Crédito Aplicado'}
+              </h3>
             </div>
-            <p className="text-sm text-primary-300 mb-2">
-              Se cobrará la diferencia prorrateada por el tiempo restante del período actual.
+            
+            {/* Description */}
+            <p className="text-sm text-primary-300 mb-3">
+              {prorationInfo.description}
             </p>
-            <p className="text-lg font-semibold text-success-400">
-              Monto a pagar: ${proratedAmount.toLocaleString('es-CL')}
-            </p>
+            
+            {/* Amount */}
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm text-primary-400">
+                {prorationInfo.isUpgrade ? 'Monto a pagar ahora:' : 'Crédito aplicado:'}
+              </span>
+              <span className={`text-lg font-semibold ${
+                prorationInfo.isUpgrade ? 'text-success-400' : 'text-warning-400'
+              }`}>
+                ${Math.abs(proratedAmount).toLocaleString('es-CL')}
+              </span>
+            </div>
+            
+            {/* Next billing info */}
+            {prorationInfo.details && (
+              <div className="pt-3 border-t border-primary-700">
+                <div className="flex items-center space-x-2 mb-2">
+                  <FiCalendar className="w-4 h-4 text-primary-400" />
+                  <span className="text-sm text-primary-400">Próximo cobro:</span>
+                </div>
+                <p className="text-sm text-primary-300">
+                  ${prorationInfo.details.proration.nextBillingAmount.toLocaleString('es-CL')} el {new Date(prorationInfo.details.proration.nextBillingDate).toLocaleDateString('es-CL')}
+                </p>
+              </div>
+            )}
           </div>
         )}
 

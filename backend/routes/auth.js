@@ -11,6 +11,15 @@ router.post('/logout', authController.logout);
 router.get('/profile', authenticate, authController.getProfile);
 router.put('/profile', authenticate, uploadProfile.single('profileImage'), authController.updateProfile);
 
+// Debug endpoint to check token content
+router.get('/verify-token', authenticate, (req, res) => {
+  res.json({
+    userId: req.user.id,
+    userType: req.user.userType,
+    rawUser: req.user
+  });
+});
+
 // Google OAuth routes
 router.get('/google', authController.googleAuth);
 router.get('/google/callback', authController.googleCallback);

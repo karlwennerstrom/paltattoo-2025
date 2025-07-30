@@ -15,6 +15,8 @@ import AuthCallback from './pages/auth/AuthCallback';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
 // Client pages
+import ClientDashboard from './pages/ClientDashboard';
+import UserProfile from './pages/UserProfile';
 import FeedView from './pages/feed/FeedView';
 import CreateOfferView from './pages/feed/CreateOfferView';
 import MyRequestsPage from './pages/client/MyRequestsPage';
@@ -44,6 +46,7 @@ import ArtistsView from './pages/artists/ArtistsView';
 import ArtistProfileView from './pages/artists/ArtistProfileView';
 import SendProposalPage from './pages/proposals/SendProposalPage';
 import OfferDetailPage from './pages/offers/OfferDetailPage';
+import OfferTrackingPage from './pages/offers/OfferTrackingPage';
 
 // Shop pages
 import ShopsListPage from './pages/shops/ShopsListPage';
@@ -79,6 +82,7 @@ import SubscriptionPending from './pages/SubscriptionPending';
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
 import PageWrapper from './components/layout/PageWrapper';
+import RealtimeNotifications from './components/notifications/RealtimeNotifications';
 
 function App() {
   console.log('App component loaded');
@@ -94,12 +98,15 @@ function App() {
   }
 
   const isAdminRoute = location.pathname.startsWith('/admin');
-  const isArtistRoute = location.pathname.startsWith('/artist');
-  const isDashboardRoute = isAdminRoute || isArtistRoute;
+  const isArtistDashboardRoute = location.pathname.startsWith('/artist/') || location.pathname === '/artist';
+  // Only hide navbar on main dashboard page, not on other client pages
+  const isMainDashboardRoute = location.pathname === '/dashboard';
+  const isDashboardRoute = isAdminRoute || isArtistDashboardRoute || isMainDashboardRoute;
 
   return (
     <div className="App min-h-screen bg-primary-900">
       <Toaster position="top-right" />
+      {user && <RealtimeNotifications />}
       {!isDashboardRoute && <Navbar />}
       <main>
         <Routes>
@@ -114,6 +121,11 @@ function App() {
           <Route path="/artists" element={<PageWrapper><ArtistsView /></PageWrapper>} />
           <Route path="/artists/:id" element={<PageWrapper><ArtistProfileView /></PageWrapper>} />
           <Route path="/offers/:id" element={<PageWrapper><OfferDetailPage /></PageWrapper>} />
+          <Route path="/offers/:id/tracking" element={
+            <ProtectedRoute requiredRole="client">
+              <PageWrapper><OfferTrackingPage /></PageWrapper>
+            </ProtectedRoute>
+          } />
           <Route path="/shops" element={<PageWrapper><ShopsListPage /></PageWrapper>} />
           <Route path="/shops/:id" element={<PageWrapper><ShopDetailPage /></PageWrapper>} />
           
@@ -141,9 +153,19 @@ function App() {
           <Route path="/inspiration" element={<PageWrapper><InspirationGalleryPage /></PageWrapper>} />
 
           {/* Protected client routes */}
+          <Route path="/client/dashboard" element={
+            <ProtectedRoute requiredRole="client">
+              <PageWrapper><ClientDashboard /></PageWrapper>
+            </ProtectedRoute>
+          } />
           <Route path="/feed" element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRole="artist">
               <PageWrapper><FeedView /></PageWrapper>
+            </ProtectedRoute>
+          } />
+          <Route path="/offers/create" element={
+            <ProtectedRoute requiredRole="client">
+              <PageWrapper><CreateOfferView /></PageWrapper>
             </ProtectedRoute>
           } />
           <Route path="/create-offer" element={
@@ -164,6 +186,11 @@ function App() {
           <Route path="/my-appointments" element={
             <ProtectedRoute requiredRole="client">
               <PageWrapper><MyAppointmentsPage /></PageWrapper>
+            </ProtectedRoute>
+          } />
+          <Route path="/profile" element={
+            <ProtectedRoute requiredRole="client">
+              <PageWrapper><UserProfile /></PageWrapper>
             </ProtectedRoute>
           } />
 

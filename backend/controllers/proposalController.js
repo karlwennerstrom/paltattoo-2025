@@ -290,6 +290,39 @@ const proposalController = {
       console.error('Check existing proposal error:', error);
       res.status(500).json({ error: 'Error al verificar propuesta existente' });
     }
+  },
+
+  async checkExistingProposalsBatch(req, res) {
+    try {
+      const { offerIds } = req.body;
+      
+      if (!Array.isArray(offerIds) || offerIds.length === 0) {
+        return res.status(400).json({ error: 'Se requiere un array de IDs de ofertas' });
+      }
+      
+      const artist = await TattooArtist.findByUserId(req.user.id);
+      
+      if (!artist) {
+        return res.status(404).json({ error: 'Perfil de tatuador no encontrado' });
+      }
+      
+      const proposals = await Proposal.findByArtistAndOffers(artist.id, offerIds);
+      
+      // Create a map of offer ID to proposal status
+      const proposalMap = {};
+      offerIds.forEach(offerId => {
+        const proposal = proposals.find(p => p.offer_id == offerId);
+        proposalMap[offerId] = {
+          hasProposal: !!proposal,
+          proposal: proposal || null
+        };
+      });
+      
+      res.json(proposalMap);
+    } catch (error) {
+      console.error('Check existing proposals batch error:', error);
+      res.status(500).json({ error: 'Error al verificar propuestas existentes' });
+    }
   }
 };
 

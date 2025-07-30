@@ -4,12 +4,18 @@ const dotenv = require('dotenv');
 const path = require('path');
 const session = require('express-session');
 const passport = require('./config/passport');
+const http = require('http');
+const socketService = require('./services/socketService');
 
 dotenv.config();
 
 const app = express();
+const server = http.createServer(app);
 
-app.use(cors());
+app.use(cors({
+  origin: ["http://localhost:3000", "http://127.0.0.1:3000"],
+  credentials: true
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -44,6 +50,7 @@ const sponsoredShopsRoutes = require('./routes/sponsoredShops');
 const statsRoutes = require('./routes/stats');
 const subscriptionRoutes = require('./routes/subscriptions');
 const collectionRoutes = require('./routes/collections');
+const interestRoutes = require('./routes/interest');
 
 // Import middleware
 const { errorHandler, notFound } = require('./middleware/errorHandler');
@@ -88,6 +95,7 @@ app.use('/api/sponsored-shops', sponsoredShopsRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/collections', collectionRoutes);
+app.use('/api/interest', interestRoutes);
 
 // Error handling
 app.use(notFound);
@@ -95,7 +103,11 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
+// Initialize Socket.io
+socketService.initialize(server);
+
+server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
   console.log(`API documentation available at http://localhost:${PORT}`);
+  console.log(`Socket.io server initialized`);
 });

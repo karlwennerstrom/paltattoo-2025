@@ -18,6 +18,15 @@ const CompleteProfile = () => {
   });
 
   useEffect(() => {
+    // Get token from URL if present (for OAuth flow)
+    const urlParams = new URLSearchParams(location.search);
+    const token = urlParams.get('token');
+    
+    if (token) {
+      // Store the temporary token
+      localStorage.setItem('authToken', token);
+    }
+
     // If user already has a user type, redirect them
     if (user && user.userType) {
       if (user.userType === 'artist') {
@@ -37,7 +46,7 @@ const CompleteProfile = () => {
         email: user.email || ''
       }));
     }
-  }, [user, navigate]);
+  }, [user, navigate, location.search]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -72,6 +81,11 @@ const CompleteProfile = () => {
       });
 
       if (response.data) {
+        // Store the new token if provided
+        if (response.data.token) {
+          localStorage.setItem('authToken', response.data.token);
+        }
+        
         // Update user context with new data
         updateUser(response.data.user);
         

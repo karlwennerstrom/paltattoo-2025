@@ -581,6 +581,13 @@ class EmailService {
     return this.send(email, subject, html);
   }
 
+  async sendSubscriptionChanged(email, data) {
+    const subject = 'Plan de suscripción actualizado - PalTattoo';
+    const html = this.getSubscriptionChangedHtml(data);
+    
+    return this.send(email, subject, html);
+  }
+
   getSubscriptionCreatedHtml(data) {
     return `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -645,6 +652,41 @@ class EmailService {
         </div>
         <p>Tu próximo pago será el ${new Date(data.nextPaymentDate).toLocaleDateString('es-CL')}.</p>
         <p style="color: #666; font-size: 14px;">Gracias por tu pago.</p>
+      </div>
+    `;
+  }
+
+  getSubscriptionChangedHtml(data) {
+    const formattedDate = new Date(data.effectiveDate).toLocaleDateString('es-CL', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #6366f1;">¡Plan actualizado exitosamente! 🎉</h1>
+        <p>Hola ${data.userName},</p>
+        <p>Tu plan de suscripción ha sido actualizado exitosamente.</p>
+        <div style="background-color: #f0f9ff; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #0ea5e9;">
+          <h3 style="margin-top: 0; color: #0369a1;">Detalles del cambio:</h3>
+          <p><strong>Plan anterior:</strong> ${data.oldPlanName}</p>
+          <p><strong>Nuevo plan:</strong> <span style="color: #059669; font-weight: bold;">${data.newPlanName}</span></p>
+          <p><strong>Fecha de cambio:</strong> ${formattedDate}</p>
+        </div>
+        <div style="background-color: #f0fdf4; padding: 15px; border-radius: 8px; border: 1px solid #86efac; margin: 20px 0;">
+          <p style="margin: 0;"><strong>✨ ¡Disfruta de las nuevas funcionalidades!</strong> Ya tienes acceso a todas las características de tu nuevo plan.</p>
+        </div>
+        <p>
+          <a href="${process.env.FRONTEND_URL}/artist/payments" 
+             style="display: inline-block; padding: 12px 24px; background-color: #6366f1; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">
+            Ver mi suscripción
+          </a>
+        </p>
+        <p style="color: #666; font-size: 14px;">
+          Gracias por confiar en PalTattoo. Si tienes alguna pregunta, no dudes en contactarnos.
+        </p>
       </div>
     `;
   }
@@ -757,6 +799,59 @@ class EmailService {
         <p>Esta propuesta ya no está disponible para aceptación.</p>
         <p>Puedes revisar otras propuestas disponibles para esta oferta o esperar nuevas propuestas.</p>
         <a href="${process.env.FRONTEND_URL}/offers/${offer.id}" style="display: inline-block; margin-top: 15px; padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px;">Ver oferta</a>
+      </div>
+    `;
+  }
+
+  async sendNewOfferNotification(artist, offer) {
+    const artistName = artist.first_name || artist.email.split('@')[0];
+    const locationText = offer.comuna_name 
+      ? `${offer.comuna_name}, ${offer.region_name}`
+      : offer.region_name;
+    
+    const html = await this.loadTemplate('new-offer', {
+      artistName: artistName,
+      offerTitle: offer.title,
+      offerDescription: offer.description,
+      budgetRange: offer.budget_min && offer.budget_max 
+        ? `${this.formatCurrency(offer.budget_min)} - ${this.formatCurrency(offer.budget_max)}`
+        : 'Presupuesto a convenir',
+      location: locationText,
+      bodyPart: offer.body_part_name,
+      style: offer.style_name,
+      offerUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/artist-dashboard`
+    });
+    
+    return this.send(
+      artist.email,
+      `Nueva solicitud de tatuaje en ${locationText}`,
+      html || this.getDefaultNewOfferHtml(artist, offer, locationText)
+    );
+  }
+
+  getDefaultNewOfferHtml(artist, offer, locationText) {
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #333;">¡Nueva solicitud de tatuaje disponible!</h1>
+        <p>Hola ${artist.first_name || artist.email.split('@')[0]},</p>
+        <p>Hay una nueva solicitud de tatuaje en tu región que podría interesarte:</p>
+        
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <h2 style="color: #555; margin-top: 0;">"${offer.title}"</h2>
+          <p><strong>Descripción:</strong> ${offer.description}</p>
+          <p><strong>Ubicación:</strong> ${locationText}</p>
+          <p><strong>Parte del cuerpo:</strong> ${offer.body_part_name}</p>
+          <p><strong>Estilo:</strong> ${offer.style_name}</p>
+          <p><strong>Presupuesto:</strong> ${offer.budget_min && offer.budget_max 
+            ? `${this.formatCurrency(offer.budget_min)} - ${this.formatCurrency(offer.budget_max)}`
+            : 'A convenir'}</p>
+        </div>
+        
+        <p>Inicia sesión en tu dashboard para ver más detalles y enviar tu propuesta:</p>
+        <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/artist-dashboard" 
+           style="display: inline-block; padding: 12px 24px; background-color: #28a745; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">
+          Ver en Dashboard
+        </a>
       </div>
     `;
   }

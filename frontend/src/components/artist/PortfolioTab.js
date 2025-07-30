@@ -8,7 +8,7 @@ import UpgradePrompt from '../common/UpgradePrompt';
 import { getTattooImageUrl } from '../../utils/imageHelpers';
 import { portfolioService, collectionService, subscriptionsAPI } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
-import { getUserFeatures } from '../../utils/subscriptionHelpers';
+import { getUserFeatures, getUserPlanName } from '../../utils/subscriptionHelpers';
 import toast from 'react-hot-toast';
 import { 
   FiImage, 
@@ -29,6 +29,7 @@ import {
 const PortfolioTab = () => {
   const { user, refreshUserData } = useAuth();
   const userFeatures = getUserFeatures(user);
+  const userPlanName = getUserPlanName(user);
   
   // View states
   const [currentView, setCurrentView] = useState('collections'); // 'collections' | 'collection-detail'
@@ -581,10 +582,10 @@ const PortfolioTab = () => {
             <h1 className="text-2xl font-bold text-primary-100">Mi Portfolio</h1>
             <p className="text-primary-400">Organiza tu trabajo en colecciones temáticas</p>
             <p className="text-sm text-primary-500 mt-1">
-              {collections.length}/{getCurrentCollectionLimit()} colecciones utilizadas
-              {userSubscription?.plan?.name && (
+              {collections.length}/{getCurrentCollectionLimit() === Infinity ? '∞' : getCurrentCollectionLimit()} colecciones utilizadas
+              {userFeatures && (
                 <span className="ml-2 px-2 py-1 bg-accent-600 text-white text-xs rounded">
-                  Plan {userSubscription.plan.name}
+                  Plan {userPlanName === 'basic' ? 'Básico' : userPlanName.charAt(0).toUpperCase() + userPlanName.slice(1)}
                 </span>
               )}
             </p>

@@ -29,9 +29,35 @@ class TattooArtist {
     return rows[0];
   }
 
+  static async findByRegion(regionId, comunaId = null) {
+    let query = `
+      SELECT ta.*, u.email, up.first_name, up.last_name
+      FROM tattoo_artists ta
+      JOIN users u ON ta.user_id = u.id
+      LEFT JOIN user_profiles up ON u.id = up.user_id
+      LEFT JOIN comunas c ON ta.comuna_id = c.id
+      WHERE u.is_active = true AND c.region_id = ?
+    `;
+    
+    const params = [regionId];
+    
+    if (comunaId) {
+      query += ' AND ta.comuna_id = ?';
+      params.push(comunaId);
+    }
+    
+    const [rows] = await promisePool.execute(query, params);
+    return rows;
+  }
+
   static async findById(id) {
     const [rows] = await promisePool.execute(
-      `SELECT ta.*, u.email, up.*, c.name as comuna_name, c.region
+      `SELECT ta.id, ta.user_id, ta.studio_name, ta.comuna_id, ta.address, 
+              ta.years_experience, ta.min_price, ta.max_price, ta.instagram_url, 
+              ta.whatsapp, ta.is_verified, ta.rating, ta.total_reviews, 
+              ta.created_at, ta.updated_at,
+              u.email, up.first_name, up.last_name, up.phone, up.profile_image, up.bio,
+              c.name as comuna_name, c.region
        FROM tattoo_artists ta
        JOIN users u ON ta.user_id = u.id
        LEFT JOIN user_profiles up ON u.id = up.user_id
@@ -72,7 +98,12 @@ class TattooArtist {
 
   static async search(filters = {}) {
     let query = `
-      SELECT ta.*, u.email, up.*, c.name as comuna_name, c.region,
+      SELECT ta.id, ta.user_id, ta.studio_name, ta.comuna_id, ta.address, 
+             ta.years_experience, ta.min_price, ta.max_price, ta.instagram_url, 
+             ta.whatsapp, ta.is_verified, ta.rating, ta.total_reviews, 
+             ta.created_at, ta.updated_at,
+             u.email, up.first_name, up.last_name, up.phone, up.profile_image, up.bio,
+             c.name as comuna_name, c.region,
              GROUP_CONCAT(DISTINCT ts.name) as styles
       FROM tattoo_artists ta
       JOIN users u ON ta.user_id = u.id
@@ -117,8 +148,18 @@ class TattooArtist {
     
     query += ' GROUP BY ta.id ORDER BY ta.rating DESC, ta.created_at DESC';
     
-    // Always add a limit to prevent huge result sets - use hardcoded to avoid parameter issues
-    query += ' LIMIT 50';
+    // Use filters for pagination instead of hardcoded limit
+    if (filters.limit) {
+      const limit = Math.min(parseInt(filters.limit), 100); // Cap at 100
+      query += ` LIMIT ${limit}`;
+      
+      if (filters.offset) {
+        const offset = parseInt(filters.offset);
+        query += ` OFFSET ${offset}`;
+      }
+    } else {
+      query += ' LIMIT 50'; // Default fallback
+    }
     
     const [rows] = await promisePool.execute(query, values);
     

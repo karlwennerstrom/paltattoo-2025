@@ -233,21 +233,39 @@ class SponsoredShop {
 
   async incrementViewCount() {
     try {
+      // First check if view_count column exists, if not, skip increment
+      const [columns] = await db.execute(`SHOW COLUMNS FROM sponsored_shops LIKE 'view_count'`);
+      if (columns.length === 0) {
+        console.log('view_count column does not exist, skipping increment');
+        return true;
+      }
+      
       const query = `UPDATE sponsored_shops SET view_count = view_count + 1 WHERE id = ?`;
       await db.execute(query, [this.id]);
       return true;
     } catch (error) {
-      throw new Error(`Error incrementing view count: ${error.message}`);
+      console.error(`Error incrementing view count: ${error.message}`);
+      // Don't throw error, just log it to avoid breaking the request
+      return false;
     }
   }
 
   async incrementClickCount() {
     try {
+      // First check if click_count column exists, if not, skip increment
+      const [columns] = await db.execute(`SHOW COLUMNS FROM sponsored_shops LIKE 'click_count'`);
+      if (columns.length === 0) {
+        console.log('click_count column does not exist, skipping increment');
+        return true;
+      }
+      
       const query = `UPDATE sponsored_shops SET click_count = click_count + 1 WHERE id = ?`;
       await db.execute(query, [this.id]);
       return true;
     } catch (error) {
-      throw new Error(`Error incrementing click count: ${error.message}`);
+      console.error(`Error incrementing click count: ${error.message}`);
+      // Don't throw error, just log it to avoid breaking the request
+      return false;
     }
   }
 

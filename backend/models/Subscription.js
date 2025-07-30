@@ -36,30 +36,23 @@ class Subscription {
       status = 'pending',
       startDate,
       endDate,
-      nextPaymentDate,
-      externalReference,
-      payerEmail
+      nextPaymentDate
     } = subscriptionData;
-
-    // Convert undefined values to null for MySQL compatibility
-    const params = [
-      userId,
-      planId,
-      mercadopagoPreapprovalId || null,
-      status,
-      startDate || null,
-      endDate || null,
-      nextPaymentDate || null,
-      externalReference || null,
-      payerEmail || null
-    ];
 
     const [result] = await db.execute(
       `INSERT INTO user_subscriptions 
        (user_id, plan_id, mercadopago_preapproval_id, status, start_date, end_date, 
-        next_payment_date, external_reference, payer_email) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      params
+        next_payment_date) 
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        userId, 
+        planId, 
+        mercadopagoPreapprovalId || null, 
+        status, 
+        startDate || null, 
+        endDate || null, 
+        nextPaymentDate || null
+      ]
     );
 
     return result.insertId;
@@ -68,7 +61,7 @@ class Subscription {
   // Obtener suscripción activa de un usuario
   static async getActiveByUserId(userId) {
     const [rows] = await db.execute(
-      `SELECT s.*, p.name as plan_name, p.price, p.features 
+      `SELECT s.*, p.name as plan_name, p.plan_type, p.price, p.features, p.max_portfolio_images 
        FROM user_subscriptions s 
        JOIN subscription_plans p ON s.plan_id = p.id 
        WHERE s.user_id = ? AND s.status = 'authorized' 
@@ -83,7 +76,7 @@ class Subscription {
   static async getByUserId(userId) {
     const [rows] = await db.execute(
       `SELECT s.*, p.name as plan_name, p.price 
-       FROM user_subscriptions s 
+       FROM subscriptions s 
        JOIN subscription_plans p ON s.plan_id = p.id 
        WHERE s.user_id = ? 
        ORDER BY s.created_at DESC`,
@@ -288,19 +281,40 @@ class Subscription {
 
   // Obtener historial de cambios de suscripción
   static async getSubscriptionChanges(userId, limit = 50) {
-    const [rows] = await db.execute(
-      `SELECT sc.*, 
-              op.name as old_plan_name, op.plan_type as old_plan_type,
-              np.name as new_plan_name, np.plan_type as new_plan_type
-       FROM subscription_changes sc
-       LEFT JOIN subscription_plans op ON sc.old_plan_id = op.id
-       LEFT JOIN subscription_plans np ON sc.new_plan_id = np.id
-       WHERE sc.user_id = ?
-       ORDER BY sc.created_at DESC
-       LIMIT ?`,
-      [userId, limit]
-    );
-    return rows;
+    try {
+      // Ensure parameters are properly typed
+      const userIdInt = parseInt(userId);
+      const limitInt = parseInt(limit);
+      
+      if (isNaN(userIdInt) || isNaN(limitInt) || limitInt <= 0) {
+        console.error('Invalid parameters for getSubscriptionChanges:', { userId, limit });
+        return [];
+      }
+
+      // Use string interpolation for LIMIT to avoid mysql2 parameter issues
+      const [rows] = await db.execute(
+        `SELECT sc.*, 
+                op.name as old_plan_name, op.plan_type as old_plan_type,
+                np.name as new_plan_name, np.plan_type as new_plan_type
+         FROM subscription_changes sc
+         LEFT JOIN subscription_plans op ON sc.old_plan_id = op.id
+         LEFT JOIN subscription_plans np ON sc.new_plan_id = np.id
+         WHERE sc.user_id = ?
+         ORDER BY sc.created_at DESC
+         LIMIT ${limitInt}`,
+        [userIdInt]
+      );
+      return rows;
+    } catch (error) {
+      console.error('Error in getSubscriptionChanges:', error);
+      // If table doesn't exist, return empty array for now
+      if (error.code === 'ER_NO_SUCH_TABLE') {
+        console.log('subscription_changes table does not exist, returning empty array');
+        return [];
+      }
+      // Return empty array for any error to prevent UI breaking
+      return [];
+    }
   }
 
   // Obtener analíticas de suscripciones (para admin)

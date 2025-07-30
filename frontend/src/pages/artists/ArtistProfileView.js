@@ -28,57 +28,47 @@ const ArtistProfileView = () => {
           portfolioService.getAll(id)
         ]);
         
+        const rawArtist = artistResponse.data;
+        const portfolioImages = portfolioResponse.data || [];
+        
+        // Transform API data to match frontend expectations
         artistData = {
-          ...artistResponse.data,
-          portfolioImages: portfolioResponse.data || []
+          id: rawArtist.id,
+          name: `${rawArtist.first_name || ''} ${rawArtist.last_name || ''}`.trim(),
+          profileImage: rawArtist.profile_image,
+          location: `${rawArtist.comuna_name}, ${rawArtist.region}` || 'Sin ubicación',
+          specialties: rawArtist.styles ? rawArtist.styles.map(style => style.name) : [],
+          rating: parseFloat(rawArtist.rating) || 0,
+          reviewsCount: rawArtist.total_reviews || 0,
+          experienceYears: rawArtist.years_experience || 0,
+          completedWorks: portfolioImages.length,
+          priceRange: {
+            min: Math.floor(parseFloat(rawArtist.min_price) / 1000) || 50,
+            max: Math.floor(parseFloat(rawArtist.max_price) / 1000) || 200
+          },
+          bio: rawArtist.bio || 'Artista tatuador profesional',
+          portfolioImages: portfolioImages,
+          collections: rawArtist.collections || {},
+          subscription: rawArtist.subscription || null,
+          isOnline: true,
+          verified: rawArtist.is_verified === 1,
+          acceptingWork: true,
+          isPromoted: false,
+          isFavorited: false,
+          isFollowing: false,
+          email: rawArtist.email,
+          phone: rawArtist.phone,
+          instagram: rawArtist.instagram_url,
+          studio: {
+            name: rawArtist.studio_name || 'Estudio de Tatuajes',
+            address: rawArtist.address || 'Dirección del estudio',
+            hours: 'Lun-Vie: 10:00-19:00, Sáb: 10:00-16:00'
+          },
+          nextAvailableDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
         };
       } catch (apiError) {
-        console.log('API not available, using mock data:', apiError.message);
-        // Fallback to mock data if API is not available
-        artistData = {
-        id: parseInt(id),
-        name: 'Carlos Mendoza',
-        profileImage: null,
-        location: 'Santiago Centro, Chile',
-        specialties: ['Realista', 'Black & Grey', 'Retratos', 'Neo-tradicional'],
-        rating: 4.8,
-        reviewsCount: 127,
-        experienceYears: 8,
-        completedWorks: 450,
-        priceRange: {
-          min: 80,
-          max: 350
-        },
-        bio: 'Artista tatuador especializado en realismo y retratos con más de 8 años de experiencia. Mi pasión es crear tatuajes únicos que cuenten la historia de cada persona. Trabajo con técnicas avanzadas de sombreado y detalle para lograr resultados excepcionales.',
-        portfolioImages: Array.from({ length: 20 }, (_, i) => `/placeholder-tattoo-${i + 1}.jpg`),
-        isOnline: true,
-        verified: true,
-        acceptingWork: true,
-        isPromoted: Math.random() > 0.5,
-        isFavorited: Math.random() > 0.7,
-        isFollowing: Math.random() > 0.6,
-        email: 'carlos.mendoza@email.com',
-        phone: '+56 9 1234 5678',
-        instagram: 'carlos_tattoo_art',
-        studio: {
-          name: 'Ink Masters Studio',
-          address: 'Providencia 1234, Santiago Centro',
-          hours: 'Lun-Vie: 10:00-19:00, Sáb: 10:00-16:00'
-        },
-        nextAvailableDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-        certifications: [
-          {
-            name: 'Certificación en Bioseguridad',
-            issuer: 'Instituto Nacional de Salud',
-            year: 2023
-          },
-          {
-            name: 'Curso Avanzado de Realismo',
-            issuer: 'Academia Internacional de Tatuaje',
-            year: 2022
-          }
-        ]
-        };
+        console.error('Error loading artist data:', apiError.message);
+        throw apiError; // Re-throw to be handled by outer catch
       }
       
       setArtist(artistData);

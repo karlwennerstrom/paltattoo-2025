@@ -7,11 +7,7 @@
  * @returns {boolean} - True if user can access calendar
  */
 export const hasCalendarAccess = (user) => {
-  if (!user || !user.subscription) {
-    return false; // Basic/free plan or no subscription
-  }
-  
-  const planName = user.subscription.planName?.toLowerCase();
+  const planName = getUserPlanName(user);
   return planName === 'premium' || planName === 'pro';
 };
 
@@ -21,14 +17,28 @@ export const hasCalendarAccess = (user) => {
  * @returns {string} - Plan name (basic, premium, pro)
  */
 export const getUserPlanName = (user) => {
-  if (!user || !user.subscription) {
+  if (!user) {
     return 'basic';
   }
   
-  const planName = user.subscription.planName?.toLowerCase() || 'basic';
+  // Check multiple possible locations for subscription data
+  const subscription = user.subscription || user.subscriptionData || null;
+  
+  if (!subscription) {
+    return 'basic';
+  }
+  
+  // Try multiple possible field names for the plan name
+  const planName = (
+    subscription.planName || 
+    subscription.plan_name || 
+    subscription.plan || 
+    subscription.name ||
+    'basic'
+  ).toLowerCase();
   
   // Handle different plan name formats
-  if (planName.includes('básico') || planName.includes('basico') || planName.includes('gratis')) {
+  if (planName.includes('básico') || planName.includes('basico') || planName.includes('gratis') || planName === 'basic' || planName === '') {
     return 'basic';
   }
   if (planName.includes('premium')) {
@@ -37,8 +47,8 @@ export const getUserPlanName = (user) => {
   if (planName.includes('pro')) {
     return 'pro';
   }
-  
-  return planName;
+  // Default to basic if no match
+  return 'basic';
 };
 
 /**

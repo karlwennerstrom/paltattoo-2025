@@ -28,6 +28,12 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Filter out browser extension errors
+    if (error.message && error.message.includes('message channel closed')) {
+      console.warn('Browser extension interference in API call');
+      return Promise.reject(error);
+    }
+    
     const message = error.response?.data?.message || error.message || 'Error desconocido';
     
     // Handle specific error status codes
@@ -42,7 +48,8 @@ api.interceptors.response.use(
       toast.error('Recurso no encontrado.');
     } else if (error.response?.status >= 500) {
       toast.error('Error del servidor. Intenta más tarde.');
-    } else {
+    } else if (!error.message?.includes('message channel closed')) {
+      // Only show toast for non-extension errors
       toast.error(message);
     }
     
@@ -104,13 +111,24 @@ export const offerService = {
     });
     return api.get(`/offers?${params}`);
   },
+  getOffers: (filters = {}) => {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value) params.append(key, value);
+    });
+    return api.get(`/offers?${params}`);
+  },
+  getMyOffers: () => api.get('/offers/my'),
   getById: (id) => api.get(`/offers/${id}`),
   create: (data) => api.post('/offers', data),
   update: (id, data) => api.put(`/offers/${id}`, data),
   delete: (id) => api.delete(`/offers/${id}`),
   uploadReferences: (id, files) => {
     const formData = new FormData();
-    files.forEach((file) => formData.append('references', file));
+    // Backend expects 'reference' in singular
+    if (files.length > 0) {
+      formData.append('reference', files[0]);
+    }
     return api.post(`/offers/${id}/references`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
@@ -139,7 +157,6 @@ export const profileService = {
     });
   },
   deleteAvatar: () => api.delete('/profile/image'),
-  getMyOffers: () => api.get('/offers/my'),
   getMyProposals: () => api.get('/proposals/my'),
   getFavorites: () => api.get('/profile/favorites'),
   addFavorite: (type, id) => api.post('/profile/favorites', { type, id }),
@@ -155,7 +172,14 @@ export const profileService = {
 
 // Portfolio services
 export const portfolioService = {
-  getAll: (artistId) => api.get(`/portfolio/${artistId || 'my'}`),
+  getAll: async (artistId) => {
+    const response = await api.get(`/portfolio/${artistId || 'my'}`);
+    // Backend returns { items: [...], total, artist }, but we want just the items
+    return {
+      ...response,
+      data: response.data.items || response.data
+    };
+  },
   getById: (id) => api.get(`/portfolio/${id}`),
   create: (data) => {
     const formData = new FormData();
@@ -230,6 +254,10 @@ export const paymentService = {
   // Get subscription changes
   getSubscriptionChanges: (limit = 50) => 
     api.get(`/payments/subscription/changes?limit=${limit}`),
+    
+  // Get proration preview for plan change
+  getProrationPreview: (planId) => 
+    api.get(`/payments/subscription/proration-preview?planId=${planId}`),
   
   // Legacy methods for compatibility
   getMySubscription: () => api.get('/payments/subscription/active'),
@@ -259,6 +287,7 @@ export const statsService = {
   getGeneral: () => api.get('/stats/general'),
   getArtistStats: () => api.get('/stats/artist'),
   getClientStats: () => api.get('/stats/client'),
+  getClientDashboardStats: () => api.get('/stats/client-dashboard'),
   getOfferStats: () => api.get('/stats/offers'),
   getRevenue: (period = 'month') => api.get(`/stats/revenue?period=${period}`),
 };
@@ -357,6 +386,9 @@ export const proposalService = {
   
   // Check if artist has already sent a proposal for an offer
   checkExisting: (offerId) => api.get(`/proposals/check/${offerId}`),
+  
+  // Check if artist has already sent proposals for multiple offers (batch)
+  checkExistingBatch: (offerIds) => api.post('/proposals/check-batch', { offerIds }),
 };
 
 // Search services

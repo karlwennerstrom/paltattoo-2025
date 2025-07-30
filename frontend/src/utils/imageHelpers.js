@@ -52,7 +52,36 @@ export const getTattooImageUrl = (imagePath, index = null) => {
     }
     return '/placeholder-tattoo.jpg';
   }
-  return getImageUrl(imagePath);
+  
+  // Return as-is if it's already a full URL
+  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+    return imagePath;
+  }
+  
+  // Return as-is if it's an absolute path starting with /uploads
+  if (imagePath.startsWith('/uploads/')) {
+    return API_BASE_URL.replace('/api', '') + imagePath;
+  }
+  
+  // For portfolio images, prepend the correct portfolio directory
+  return `${API_BASE_URL.replace('/api', '')}/uploads/portfolio/${imagePath}`;
+};
+
+export const getReferenceImageUrl = (imagePath) => {
+  if (!imagePath) return '/placeholder-tattoo.jpg';
+  
+  // Return as-is if it's already a full URL
+  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+    return imagePath;
+  }
+  
+  // Return as-is if it's an absolute path starting with /uploads
+  if (imagePath.startsWith('/uploads/')) {
+    return API_BASE_URL.replace('/api', '') + imagePath;
+  }
+  
+  // For reference images, prepend the correct references directory
+  return `${API_BASE_URL.replace('/api', '')}/uploads/references/${imagePath}`;
 };
 
 export const getRandomPlaceholderTattoo = () => {

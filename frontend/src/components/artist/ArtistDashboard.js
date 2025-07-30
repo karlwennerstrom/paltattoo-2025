@@ -1,20 +1,41 @@
 import React, { useState, useEffect } from 'react';
 import { twMerge } from 'tailwind-merge';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { PageLayout, Section, Grid, Card, Stack } from '../common/Layout';
 import { FiUser, FiImage, FiMail, FiCalendar, FiCreditCard, FiBarChart2, FiEye, FiHeart, FiMessageCircle, FiDollarSign, FiTrendingUp, FiCheckCircle, FiClock, FiX, FiSettings, FiCamera, FiMapPin, FiPhone, FiGlobe, FiInstagram, FiTwitter, FiFacebook, FiStar, FiMenu, FiFolder } from 'react-icons/fi';
 import { artistService, paymentService, profileService, statsService } from '../../services/api';
+import { useSocket } from '../../contexts/SocketContext';
+import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import ProposalsTab from './ProposalsTab';
 import PublicOffersTab from './PublicOffersTab';
+import DynamicArtistFeed from '../feed/DynamicArtistFeed';
 import PortfolioTab from './PortfolioTab';
 import ProfileTab from './ProfileTab';
 import CalendarTab from './CalendarTabNew';
 import PaymentsTab from './PaymentsTab';
 import ArtistAnalytics from './pages/ArtistAnalytics';
 import SubscriptionBadge from '../common/SubscriptionBadge';
+import { getProfileImageUrl } from '../../utils/imageHelpers';
 
 const ArtistDashboard = () => {
-  const [activeTab, setActiveTab] = useState('overview');
+  const { socket } = useSocket();
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  
+  // Extract tab from URL path, default to 'overview'
+  const getTabFromPath = () => {
+    const path = location.pathname;
+    if (path === '/artist' || path === '/artist/') {
+      return 'overview';
+    }
+    // Extract tab from paths like /artist/payments, /artist/portfolio, etc.
+    const pathParts = path.split('/');
+    return pathParts[2] || 'overview';
+  };
+  
+  const [activeTab, setActiveTab] = useState(getTabFromPath());
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({});
   const [subscription, setSubscription] = useState(null);
@@ -22,19 +43,38 @@ const ArtistDashboard = () => {
   const [plans, setPlans] = useState([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  // Function to handle tab changes and update URL
+  const handleTabChange = (tabName) => {
+    setActiveTab(tabName);
+    // Update URL to reflect the current tab
+    if (tabName === 'overview') {
+      navigate('/artist', { replace: true });
+    } else {
+      navigate(`/artist/${tabName}`, { replace: true });
+    }
+  };
+
+  // Update active tab when URL changes (browser back/forward)
+  useEffect(() => {
+    const newTab = getTabFromPath();
+    if (newTab !== activeTab) {
+      setActiveTab(newTab);
+    }
+  }, [location.pathname]);
+
   useEffect(() => {
     loadInitialData();
     
     // Listen for tab switch events from child components
     const handleSwitchTab = (event) => {
       if (event.detail?.tab) {
-        setActiveTab(event.detail.tab);
+        handleTabChange(event.detail.tab);
       }
     };
 
     // Listen for proposals navigation events
     const handleNavigateToProposals = (event) => {
-      setActiveTab('proposals');
+      handleTabChange('proposals');
       // Optionally, pass the proposal ID to highlight it
       if (event.detail?.proposalId) {
         // Store proposal ID for highlighting in proposals tab
@@ -103,6 +143,7 @@ const ArtistDashboard = () => {
 
   const OverviewTab = () => (
     <div className="space-y-6">
+      
       <Grid cols={3} className="mb-6">
         <Card className="text-center">
           <FiEye className="mx-auto mb-2 text-accent-500" size={24} />
@@ -147,13 +188,13 @@ const ArtistDashboard = () => {
                 </p>
                 <div className="flex space-x-2">
                   <button 
-                    onClick={() => setActiveTab('calendar')}
+                    onClick={() => handleTabChange('calendar')}
                     className="flex-1 px-3 py-2 bg-accent-600 text-white text-xs rounded hover:bg-accent-700 transition-colors"
                   >
                     Ver Detalles
                   </button>
                   <button 
-                    onClick={() => setActiveTab('calendar')}
+                    onClick={() => handleTabChange('calendar')}
                     className="px-3 py-2 bg-primary-600 text-primary-100 text-xs rounded hover:bg-primary-500 transition-colors"
                   >
                     Ver Todas
@@ -165,7 +206,7 @@ const ArtistDashboard = () => {
                 <FiCalendar className="mx-auto mb-2 text-primary-400" size={24} />
                 <p className="text-primary-300 mb-3">No tienes citas próximas</p>
                 <button 
-                  onClick={() => setActiveTab('calendar')}
+                  onClick={() => handleTabChange('calendar')}
                   className="px-4 py-2 bg-accent-600 text-white text-sm rounded hover:bg-accent-700 transition-colors"
                 >
                   Programar Cita
@@ -311,21 +352,39 @@ const ArtistDashboard = () => {
         sidebarOpen ? 'translate-x-0' : '-translate-x-full'
       )}>
         <div className="flex items-center justify-between h-16 px-6 border-b border-border">
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-accent-500 rounded-full flex items-center justify-center overflow-hidden">
-              {profile?.avatar ? (
-                <img 
-                  src={profile.avatar} 
-                  alt="Avatar" 
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <FiUser className="text-white" size={16} />
-              )}
+          <div className="flex items-center space-x-3 min-w-0 flex-1">
+            <div className="w-8 h-8 bg-accent-500 rounded-full flex items-center justify-center overflow-hidden flex-shrink-0">
+              {(() => {
+                const profileImage = profile?.user?.profile_image || profile?.profile_image || user?.profile_image || user?.profileImage;
+                console.log('🖼️ Profile image data:', {
+                  profileUserImage: profile?.user?.profile_image,
+                  profileImage: profile?.profile_image,
+                  userProfileImage: user?.profile_image,
+                  userProfileImageAlt: user?.profileImage,
+                  finalImage: profileImage,
+                  imageUrl: profileImage ? getProfileImageUrl(profileImage) : null
+                });
+                
+                return profileImage ? (
+                  <img 
+                    src={getProfileImageUrl(profileImage)} 
+                    alt="Avatar" 
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      console.error('❌ Failed to load profile image:', e.target.src);
+                      e.target.style.display = 'none';
+                      e.target.nextSibling.style.display = 'block';
+                    }}
+                  />
+                ) : (
+                  <FiUser className="text-white" size={16} />
+                );
+              })()}
+              <FiUser className="text-white" size={16} style={{display: 'none'}} />
             </div>
-            <div>
-              <h2 className="font-semibold text-white text-sm">{profile?.user?.email || 'artista@email.com'}</h2>
-              <div className="flex items-center space-x-2">
+            <div className="min-w-0 flex-1">
+              <h2 className="font-semibold text-white text-sm truncate">{profile?.user?.email || 'artista@email.com'}</h2>
+              <div className="flex items-center space-x-2 min-w-0">
                 <SubscriptionBadge subscriptionType={subscription?.plan?.plan_type} size="xs" />
                 {subscription?.status === 'active' && (
                   <span className="text-xs text-success-400">Activo</span>
@@ -348,7 +407,7 @@ const ArtistDashboard = () => {
                 key={tab.id}
                 tab={tab}
                 active={activeTab === tab.id}
-                onClick={setActiveTab}
+                onClick={handleTabChange}
                 isMobile={true}
               />
             ))}
@@ -416,7 +475,7 @@ const ArtistDashboard = () => {
               {activeTab === 'overview' && <OverviewTab />}
               {activeTab === 'profile' && <ProfileTab />}
               {activeTab === 'portfolio' && <PortfolioTab />}
-              {activeTab === 'offers' && <PublicOffersTab />}
+              {activeTab === 'offers' && <DynamicArtistFeed />}
               {activeTab === 'proposals' && <ProposalsTab />}
               {activeTab === 'calendar' && <CalendarTab />}
               {activeTab === 'payments' && <PaymentsTab />}

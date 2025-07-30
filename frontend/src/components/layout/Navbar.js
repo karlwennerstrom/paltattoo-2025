@@ -86,13 +86,16 @@ const Navbar = () => {
           {/* Desktop Navigation */}
           <div className="hidden md:block">
             <div className="ml-10 flex items-baseline space-x-4">
-              {!isAdmin && !isArtist && <NavLink to="/">Inicio</NavLink>}
+              {!isAuthenticated && <NavLink to="/">Inicio</NavLink>}
               <NavLink to="/artists">Tatuadores</NavLink>
-              <NavLink to="/feed">Feed</NavLink>
+              {isAuthenticated && isArtist && (
+                <NavLink to="/feed">Feed</NavLink>
+              )}
               <NavLink to="/shops">Tiendas</NavLink>
               
               {isAuthenticated && isClient && (
                 <>
+                  <NavLink to="/dashboard">Solicitar Tatuaje</NavLink>
                   <NavLink to="/my-requests">Mis Solicitudes</NavLink>
                   <NavLink to="/my-appointments">Mis Citas</NavLink>
                   <NavLink to="/favorites">Favoritos</NavLink>
@@ -221,7 +224,7 @@ const Navbar = () => {
       {isMobileMenuOpen && (
         <div className="md:hidden">
           <div className="px-4 pt-4 pb-6 space-y-2 bg-black/95 backdrop-blur-xl border-t border-white/10">
-            {!isAdmin && !isArtist && (
+            {!isAuthenticated && (
               <NavLink to="/" onClick={() => setIsMobileMenuOpen(false)}>
                 Inicio
               </NavLink>
@@ -229,15 +232,20 @@ const Navbar = () => {
             <NavLink to="/artists" onClick={() => setIsMobileMenuOpen(false)}>
               Tatuadores
             </NavLink>
-            <NavLink to="/feed" onClick={() => setIsMobileMenuOpen(false)}>
-              Feed
-            </NavLink>
+            {isAuthenticated && isArtist && (
+              <NavLink to="/feed" onClick={() => setIsMobileMenuOpen(false)}>
+                Feed
+              </NavLink>
+            )}
             <NavLink to="/shops" onClick={() => setIsMobileMenuOpen(false)}>
               Tiendas
             </NavLink>
             
             {isAuthenticated && isClient && (
               <>
+                <NavLink to="/dashboard" onClick={() => setIsMobileMenuOpen(false)}>
+                  Solicitar Tatuaje
+                </NavLink>
                 <NavLink to="/my-requests" onClick={() => setIsMobileMenuOpen(false)}>
                   Mis Solicitudes
                 </NavLink>

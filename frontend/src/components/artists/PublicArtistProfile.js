@@ -18,9 +18,9 @@ const PublicArtistProfile = ({ artist, className = '' }) => {
   };
 
   const tabs = [
-    { id: 'portfolio', label: 'Portfolio', count: artist?.portfolioImages?.length || 12 },
+    { id: 'portfolio', label: 'Portfolio', count: artist?.portfolioImages?.length || 0 },
     { id: 'about', label: 'Sobre mí', count: null },
-    { id: 'reviews', label: 'Reseñas', count: artist?.reviewsCount || 0 },
+    ...(artist?.reviewsCount > 0 ? [{ id: 'reviews', label: 'Reseñas', count: artist?.reviewsCount }] : []),
     { id: 'contact', label: 'Contacto', count: null },
   ];
 
@@ -69,6 +69,7 @@ const PublicArtistProfile = ({ artist, className = '' }) => {
         return (
           <PortfolioGallery
             images={artist?.portfolioImages}
+            collections={artist?.collections}
             artist={artist}
           />
         );
@@ -99,23 +100,6 @@ const PublicArtistProfile = ({ artist, className = '' }) => {
               </Grid>
             </Card>
 
-            {artist?.certifications && (
-              <Card title="Certificaciones">
-                <div className="space-y-3">
-                  {artist.certifications.map((cert, index) => (
-                    <div key={index} className="flex items-center space-x-3 p-3 bg-primary-800 rounded-lg">
-                      <svg className="h-6 w-6 text-accent-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
-                      </svg>
-                      <div>
-                        <p className="text-primary-100 font-medium">{cert.name}</p>
-                        <p className="text-primary-400 text-sm">{cert.issuer} - {cert.year}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            )}
           </div>
         );
 
@@ -125,41 +109,21 @@ const PublicArtistProfile = ({ artist, className = '' }) => {
             <Card>
               <div className="text-center mb-6">
                 <div className="flex justify-center mb-2">
-                  {getRatingStars(artist?.rating || 5)}
+                  {getRatingStars(artist?.rating || 0)}
                 </div>
-                <p className="text-2xl font-bold text-primary-100">{artist?.rating || 5.0}</p>
+                <p className="text-2xl font-bold text-primary-100">{artist?.rating || 0}</p>
                 <p className="text-primary-400">{artist?.reviewsCount || 0} reseñas</p>
               </div>
 
-              {/* Mock reviews */}
-              <div className="space-y-4">
-                {Array.from({ length: 5 }, (_, i) => (
-                  <div key={i} className="border-b border-primary-700 pb-4 last:border-b-0">
-                    <div className="flex items-start space-x-3">
-                      <div className="h-10 w-10 bg-primary-600 rounded-full flex items-center justify-center">
-                        <span className="text-sm font-medium text-primary-200">
-                          {`U${i + 1}`}
-                        </span>
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between mb-1">
-                          <p className="font-medium text-primary-100">Usuario {i + 1}</p>
-                          <div className="flex items-center space-x-1">
-                            {getRatingStars(5 - i * 0.2)}
-                          </div>
-                        </div>
-                        <p className="text-primary-300 text-sm">
-                          Excelente trabajo, muy profesional y atento a los detalles. 
-                          El resultado superó mis expectativas.
-                        </p>
-                        <p className="text-primary-500 text-xs mt-2">
-                          Hace {i + 1} mes{i > 0 ? 's' : ''}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              {artist?.reviewsCount > 0 ? (
+                <div className="text-center text-primary-400">
+                  <p>Las reseñas aparecerán aquí cuando los clientes dejen comentarios.</p>
+                </div>
+              ) : (
+                <div className="text-center text-primary-400">
+                  <p>Aún no hay reseñas para este artista.</p>
+                </div>
+              )}
             </Card>
           </div>
         );
@@ -184,7 +148,7 @@ const PublicArtistProfile = ({ artist, className = '' }) => {
               alt={artist?.name}
               className="h-24 w-24 rounded-full object-cover border-4 border-primary-600"
             />
-            {artist?.isOnline && (
+            {artist?.verified && (
               <div className="absolute bottom-0 right-0 h-6 w-6 bg-success-500 border-2 border-primary-700 rounded-full"></div>
             )}
             {artist?.verified && (

@@ -5,6 +5,7 @@ import { getProfileImageUrl, getTattooImageUrl } from '../../utils/imageHelpers'
 
 const FavoritesPage = () => {
   const [activeTab, setActiveTab] = useState('artists');
+  const [isComingSoon] = useState(true); // Temporary flag for development
 
   // Mock favorites data
   const favoriteArtists = [
@@ -136,6 +137,21 @@ const FavoritesPage = () => {
             </button>
           ))}
         </div>
+
+        {/* Development Notice */}
+        {isComingSoon && (
+          <Card className="border-yellow-600 bg-yellow-600/10">
+            <div className="flex items-center space-x-3">
+              <svg className="h-6 w-6 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div>
+                <p className="text-yellow-400 font-medium">Funcionalidad en desarrollo</p>
+                <p className="text-yellow-300 text-sm">La función de favoritos se está implementando. Próximamente podrás guardar tus artistas y trabajos favoritos.</p>
+              </div>
+            </div>
+          </Card>
+        )}
 
         {/* Artists Tab */}
         {activeTab === 'artists' && (

@@ -1,0 +1,20 @@
+# Comandos para exportar la base de datos tattoo_connect
+
+## Opción 1: Exportación completa (recomendado para Railway)
+mysqldump -u root -p --single-transaction --routines --triggers tattoo_connect > tattoo_connect_export.sql
+
+## Opción 2: Solo estructura (para desarrollo)
+mysqldump -u root -p --no-data --single-transaction --routines --triggers tattoo_connect > tattoo_connect_structure.sql
+
+## Opción 3: Solo datos
+mysqldump -u root -p --no-create-info --single-transaction tattoo_connect > tattoo_connect_data.sql
+
+## Opción 4: Con compresión (para archivos grandes)
+mysqldump -u root -p --single-transaction --routines --triggers tattoo_connect | gzip > tattoo_connect_export.sql.gz
+
+## Para verificar el contenido del export:
+head -20 tattoo_connect_export.sql
+tail -20 tattoo_connect_export.sql
+
+## Para ver el tamaño del archivo:
+ls -lh tattoo_connect_export.sql

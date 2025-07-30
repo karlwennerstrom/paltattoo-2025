@@ -3,7 +3,12 @@ const path = require('path');
 const fs = require('fs');
 
 const createStorage = (folder) => {
-  const uploadPath = path.join(__dirname, '..', 'uploads', folder);
+  // Use Railway Volume path if available, fallback to local uploads
+  const baseUploadPath = process.env.RAILWAY_VOLUME_MOUNT_PATH 
+    ? path.join(process.env.RAILWAY_VOLUME_MOUNT_PATH, 'uploads')
+    : path.join(__dirname, '..', 'uploads');
+  
+  const uploadPath = path.join(baseUploadPath, folder);
   
   if (!fs.existsSync(uploadPath)) {
     fs.mkdirSync(uploadPath, { recursive: true });

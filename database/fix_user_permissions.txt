@@ -1,0 +1,26 @@
+# Comandos para arreglar permisos del usuario tattoconnect
+
+## Opción 1: Ejecutar como root para arreglar permisos
+mysql -u root -p -e "
+ALTER USER 'tattoconnect'@'localhost' IDENTIFIED BY 'Dracula241988';
+GRANT ALL PRIVILEGES ON tattoo_connect.* TO 'tattoconnect'@'localhost';
+GRANT LOCK TABLES ON tattoo_connect.* TO 'tattoconnect'@'localhost';
+GRANT PROCESS ON *.* TO 'tattoconnect'@'localhost';
+FLUSH PRIVILEGES;
+"
+
+## Opción 2: Si el usuario no existe, crearlo
+mysql -u root -p -e "
+DROP USER IF EXISTS 'tattoconnect'@'localhost';
+CREATE USER 'tattoconnect'@'localhost' IDENTIFIED BY 'Dracula241988';
+GRANT ALL PRIVILEGES ON tattoo_connect.* TO 'tattoconnect'@'localhost';
+GRANT LOCK TABLES ON tattoo_connect.* TO 'tattoconnect'@'localhost';
+GRANT PROCESS ON *.* TO 'tattoconnect'@'localhost';
+FLUSH PRIVILEGES;
+"
+
+## Después de arreglar permisos, exportar:
+mysqldump -u tattoconnect -pDracula241988 --single-transaction --routines --triggers tattoo_connect > tattoo_connect_export.sql
+
+## Alternativa más simple (como root):
+mysqldump -u root -p --single-transaction --routines --triggers tattoo_connect > tattoo_connect_export.sql

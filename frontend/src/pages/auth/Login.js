@@ -72,9 +72,6 @@ const Login = () => {
           <p className="mt-2 text-primary-300">
             Bienvenido de vuelta
           </p>
-          <p className="mt-2 text-xs text-primary-500">
-            Prueba: test@test.com (cliente) / artist@test.com (artista) - password123
-          </p>
         </div>
         
         <div className="bg-black/60 backdrop-blur-xl p-8 rounded-xl shadow-2xl border border-white/10 hover:border-accent-500/20 transition-all duration-300">

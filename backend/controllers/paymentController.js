@@ -212,12 +212,13 @@ const paymentController = {
       // Create preapproval using the plan
       const externalReference = `user_${userId}_plan_${planId}_${Date.now()}`;
       
+      // Try creating preapproval without card_token_id first
       const preApprovalData = {
-        preapproval_plan_id: plan.mercadopago_plan_id,
         reason: `Suscripción ${plan.name} - PalTattoo`,
         external_reference: externalReference,
         payer_email: req.user.email,
         back_urls: config.backUrls,
+        status: "authorized", // Required according to MercadoPago docs
         auto_recurring: {
           frequency: 1,
           frequency_type: 'months',
@@ -225,11 +226,32 @@ const paymentController = {
           transaction_amount: parseFloat(plan.price),
           currency_id: 'CLP'
         }
-        // Note: Omitting status and card_token_id to let user authorize via init_point
       };
 
+      // Only add preapproval_plan_id if we have it
+      if (plan.mercadopago_plan_id) {
+        preApprovalData.preapproval_plan_id = plan.mercadopago_plan_id;
+      }
+
       console.log('Creating MercadoPago preapproval with data:', preApprovalData);
-      const preApproval = await preApprovalClient.create({ body: preApprovalData });
+      
+      try {
+        const preApproval = await preApprovalClient.create({ body: preApprovalData });
+        console.log('MercadoPago preapproval created successfully:', preApproval.id);
+      } catch (mpError) {
+        console.error('MercadoPago preapproval creation failed:', mpError);
+        
+        // If card_token_id is required, log detailed error and suggest alternative
+        if (mpError.message && mpError.message.includes('card_token_id')) {
+          console.error('MercadoPago requires card_token_id. This might be a sandbox vs production difference.');
+          console.error('Full error details:', JSON.stringify(mpError, null, 2));
+          
+          // For now, throw a more descriptive error
+          throw new Error(`MercadoPago configuration issue: ${mpError.message}. Check if using correct API environment.`);
+        }
+        
+        throw mpError;
+      }
 
       // Guardar suscripción en la base de datos
       const subscriptionId = await Subscription.create({

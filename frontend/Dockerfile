@@ -23,16 +23,34 @@ RUN npm run build
 # Production stage
 FROM node:18-alpine
 
-# Install serve
-RUN npm install -g serve@14.2.1
-
 WORKDIR /app
+
+# Install express for serving
+RUN npm install express
 
 # Copy build files
 COPY --from=build /app/build ./build
 
-# Railway asigna el puerto dinámicamente
+# Create simple server file
+RUN cat > server.js << 'EOF'
+const express = require('express');
+const path = require('path');
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Serve static files from build directory
+app.use(express.static(path.join(__dirname, 'build')));
+
+// Handle React Router - serve index.html for all non-API routes
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'build', 'index.html'));
+});
+
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on http://0.0.0.0:${PORT}`);
+});
+EOF
+
 EXPOSE $PORT
 
-# Use correct serve syntax for Railway
-CMD ["sh", "-c", "serve -s build -H 0.0.0.0 -p ${PORT:-3000}"]
+CMD ["node", "server.js"]

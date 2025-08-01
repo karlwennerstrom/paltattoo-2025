@@ -95,6 +95,7 @@ temp/
 # Misc
 *.tgz
 *.tar.gz
+*.txt
 
 # Lock files (optional - remove if you want to commit them)
 # package-lock.json

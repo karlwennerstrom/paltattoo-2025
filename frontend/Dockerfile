@@ -31,8 +31,8 @@ WORKDIR /app
 # Copy build files
 COPY --from=build /app/build ./build
 
-# Expose port
-EXPOSE 8080
+# Railway asigna el puerto dinámicamente
+EXPOSE $PORT
 
-# Start the application
-CMD ["serve", "-s", "build", "-p", "8080"]
+# Use Railway's PORT environment variable
+CMD ["sh", "-c", "serve -s build -p ${PORT:-3000}"]

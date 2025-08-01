@@ -1,107 +1,76 @@
 # Dependencies
 node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+/backend/node_modules/
+/frontend/node_modules/
 
-# Environment Variables
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+# Build Outputs
+/build/
+/dist/
+/frontend/build/
+.next/
+.nuxt/
+.parcel-cache/
+
+# Cache
+.cache/
 
 # Logs
 logs/
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
 # Runtime data
-pids
+pids/
 *.pid
 *.seed
 *.pid.lock
 
-# Coverage directory used by tools like istanbul
-coverage/
-.nyc_output
+# Environment Variables
+.env
+.env.*
+!.env.example
 
-# Build outputs
-build/
-dist/
+# Uploads - Ignora todo dentro de la carpeta uploads
+uploads/
+# PERO, no ignores el archivo .gitkeep para mantener la carpeta en el repo
+!uploads/**/.gitkeep
 
 # Database
 *.sql
+# Excepciones para archivos de base de datos que sí quieres versionar
 !database/setup.sql
 !database/seed_data.sql
 
-# Uploads
-uploads/
-!uploads/.gitkeep
+# Testing
+coverage/
+.nyc_output/
 
-# IDE and Editor files
+# IDE and Editor Config
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# OS generated files
+# OS Generated Files
 .DS_Store
-.DS_Store?
 ._*
 .Spotlight-V100
 .Trashes
 ehthumbs.db
 Thumbs.db
 
-# Temporary files
+# Temporary files & archives
 tmp/
 temp/
-
-# Docker
-
+*.tgz
+*.tar.gz
+*.backup
+*.bak
 
 # SSL certificates
 *.pem
 *.key
 *.crt
-
-# Backup files
-*.backup
-*.bak
-
-# Cache
-.cache/
-.parcel-cache/
-
-# Next.js (if used later)
-.next/
-
-# Nuxt.js (if used later)
-.nuxt/
-
-# Gatsby (if used later)
-.cache/
-
-# React
-/frontend/build/
-
-# Testing
-/coverage
-
-# Production
-/build
-
-# Misc
-*.tgz
-*.tar.gz
-*.txt
-
-# Lock files (optional - remove if you want to commit them)
-# package-lock.json
-# yarn.locknode_modules/
-.cache/
-node_modules/
-.cache/
-backend/node_modules/
-frontend/node_modules/

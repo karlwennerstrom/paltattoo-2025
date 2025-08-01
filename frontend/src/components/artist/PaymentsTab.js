@@ -538,8 +538,7 @@ const PaymentsTab = () => {
           // Close modal and stop loading
           setPlanChangeModal(prev => ({ ...prev, loading: false, isOpen: false }));
           
-          // Refresh data
-          await loadData();
+          // Data is already refreshed with refreshUserData(), no need for additional loading
           
           return; // Exit function as we're done
         } catch (freeError) {

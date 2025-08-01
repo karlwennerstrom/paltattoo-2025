@@ -34,5 +34,5 @@ COPY --from=build /app/build ./build
 # Railway asigna el puerto dinámicamente
 EXPOSE $PORT
 
-# Use Railway's PORT environment variable
-CMD ["sh", "-c", "serve -s build -p ${PORT:-3000}"]
+# Use Railway's PORT and bind to all interfaces (0.0.0.0)
+CMD ["sh", "-c", "serve -s build -l 0.0.0.0:${PORT:-3000}"]

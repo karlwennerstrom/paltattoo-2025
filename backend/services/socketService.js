@@ -19,7 +19,7 @@ class SocketService {
     console.log('Initializing Socket.io server...');
     this.io = socketIO(server, {
       cors: {
-        origin: ["http://localhost:3000", "http://127.0.0.1:3000"],
+        origin: ["http://localhost:3000", "http://127.0.0.1:3000","https://paltattoo-2025.vercel.app"],
         methods: ["GET", "POST"],
         credentials: true
       },

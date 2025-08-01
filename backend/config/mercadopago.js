@@ -1,19 +1,18 @@
-const { MercadoPagoConfig, PreApproval, PreApprovalPlan } = require('mercadopago');
+const { MercadoPagoConfig, Preference, Payment } = require('mercadopago');
 
 // Configuración de MercadoPago
 const client = new MercadoPagoConfig({ 
-  accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN,
+  accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN || 'TEST-2420278478851432-010220-f91dd4f673b51cc5c8cf80e03b2becd8-183050733',
   options: {
-    timeout: 5000,
-    idempotencyKey: 'abc' // Para evitar duplicados
+    timeout: 5000
   }
 });
 
-// Cliente para planes de suscripción
-const preApprovalPlanClient = new PreApprovalPlan(client);
+// Cliente para preferencias de pago
+const preference = new Preference(client);
 
-// Cliente para suscripciones
-const preApprovalClient = new PreApproval(client);
+// Cliente para pagos
+const payment = new Payment(client);
 
 // Función para obtener URL válida para MercadoPago
 const getValidUrl = (url) => {
@@ -34,19 +33,20 @@ const config = {
   notificationUrl: process.env.BACKEND_URL?.includes('localhost') 
     ? 'https://webhook.site/#!/unique-id' // URL de prueba para webhooks
     : `${process.env.BACKEND_URL}/api/payments/webhook`,
-  backUrls: {
-    success: getValidUrl(`${process.env.FRONTEND_URL}/subscription/success`),
-    failure: getValidUrl(`${process.env.FRONTEND_URL}/subscription/failure`),
-    pending: getValidUrl(`${process.env.FRONTEND_URL}/subscription/pending`)
-  },
+  successUrl: `${process.env.FRONTEND_URL || 'https://paltattoo-2025.vercel.app'}/dashboard?payment=success`,
+  failureUrl: `${process.env.FRONTEND_URL || 'https://paltattoo-2025.vercel.app'}/dashboard?payment=failure`,
+  pendingUrl: `${process.env.FRONTEND_URL || 'https://paltattoo-2025.vercel.app'}/dashboard?payment=pending`,
   autoReturn: 'approved',
   statementDescriptor: 'PALTATTOO',
-  externalReference: 'paltattoo_subscription'
+  externalReference: 'paltattoo_subscription',
+  excludedPaymentMethods: [],
+  excludedPaymentTypes: [],
+  installments: 1 // Solo pagos en una cuota
 };
 
 module.exports = {
   client,
-  preApprovalClient,
-  preApprovalPlanClient,
+  preference,
+  payment,
   config
 };

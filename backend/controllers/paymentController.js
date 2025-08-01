@@ -300,27 +300,70 @@ const paymentController = {
   // Webhook de MercadoPago
   webhook: async (req, res) => {
     try {
-      const { type, data } = req.body;
+      const { type, data, action } = req.body;
+      console.log('MercadoPago webhook received:', { type, action, data });
 
-      console.log('Webhook received:', { type, data });
+      // Importar payment client
+      const { payment } = require('../config/mercadopago');
 
-      switch (type) {
-        case 'preapproval':
-          await handlePreapprovalNotification(data.id);
-          break;
-        
-        case 'authorized_payment':
-          await handlePaymentNotification(data.id);
-          break;
+      // MercadoPago envía diferentes tipos de notificaciones
+      if (type === 'payment' && data?.id) {
+        try {
+          // Obtener información del pago
+          const paymentInfo = await payment.get({ id: data.id });
+          console.log('Payment info:', {
+            id: paymentInfo.id,
+            status: paymentInfo.status,
+            external_reference: paymentInfo.external_reference,
+            payer_email: paymentInfo.payer?.email
+          });
 
-        default:
-          console.log('Unhandled webhook type:', type);
+          // Extraer información del external_reference
+          const [userId, planId, subscriptionId] = paymentInfo.external_reference 
+            ? paymentInfo.external_reference.split('_')
+            : [null, null, null];
+
+          if (paymentInfo.status === 'approved' && userId && subscriptionId) {
+            // Activar la suscripción
+            await Subscription.updateStatus(subscriptionId, 'authorized');
+            
+            // Registrar el pago
+            await Subscription.createPaymentRecord({
+              subscriptionId,
+              mercadoPagoPaymentId: paymentInfo.id,
+              amount: paymentInfo.transaction_amount,
+              status: 'approved',
+              paymentDate: new Date()
+            });
+
+            console.log(`Subscription ${subscriptionId} activated for user ${userId}`);
+
+            // Enviar notificación por email
+            try {
+              const user = await User.findById(userId);
+              const plan = await SubscriptionPlan.findById(planId);
+              
+              await emailService.sendPaymentReceived(user.email, {
+                userName: user.first_name || user.email,
+                planName: plan.name,
+                amount: paymentInfo.transaction_amount,
+                paymentDate: new Date()
+              });
+            } catch (emailError) {
+              console.error('Error sending payment email:', emailError);
+            }
+          }
+        } catch (paymentError) {
+          console.error('Error processing payment webhook:', paymentError);
+        }
       }
 
+      // Siempre responder 200 para que MercadoPago no reintente
       res.status(200).send('OK');
     } catch (error) {
       console.error('Webhook error:', error);
-      res.status(500).json({ error: 'Error processing webhook' });
+      // Responder 200 para evitar reintentos
+      res.status(200).send('OK');
     }
   },
 
@@ -533,6 +576,95 @@ const paymentController = {
     }
   },
 
+  // Crear preferencia de pago con MercadoPago
+  createPaymentPreference: async (req, res) => {
+    try {
+      const { planId, subscriptionId } = req.body;
+      const userId = req.user.id;
+
+      if (!planId) {
+        return res.status(400).json({ error: 'Plan ID es requerido' });
+      }
+
+      // Obtener información del usuario y plan
+      const [user, plan] = await Promise.all([
+        User.findById(userId),
+        SubscriptionPlan.findById(planId)
+      ]);
+
+      if (!user || !plan) {
+        return res.status(404).json({ error: 'Usuario o plan no encontrado' });
+      }
+
+      // Importar preference desde el config
+      const { preference, config } = require('../config/mercadopago');
+
+      // Crear preferencia de pago
+      const preferenceData = {
+        items: [{
+          id: `plan_${plan.id}`,
+          title: `Suscripción ${plan.name} - PalTattoo`,
+          description: `Plan ${plan.name} mensual para artistas`,
+          picture_url: 'https://paltattoo-2025.vercel.app/logo192.png',
+          category_id: 'services',
+          quantity: 1,
+          currency_id: 'CLP',
+          unit_price: parseFloat(plan.price)
+        }],
+        payer: {
+          name: user.first_name || '',
+          surname: user.last_name || '',
+          email: user.email,
+          identification: {
+            type: 'RUT',
+            number: user.rut || ''
+          }
+        },
+        back_urls: {
+          success: `${config.successUrl}&subscriptionId=${subscriptionId}`,
+          failure: config.failureUrl,
+          pending: config.pendingUrl
+        },
+        auto_return: 'approved',
+        payment_methods: {
+          excluded_payment_methods: [],
+          excluded_payment_types: [],
+          installments: 1
+        },
+        notification_url: config.notificationUrl,
+        statement_descriptor: 'PALTATTOO',
+        external_reference: `${userId}_${planId}_${subscriptionId}_${Date.now()}`
+      };
+
+      console.log('Creating MercadoPago preference:', preferenceData);
+
+      const response = await preference.create({ body: preferenceData });
+
+      console.log('MercadoPago preference created:', response.id);
+
+      // Actualizar la suscripción con el ID de preferencia
+      if (subscriptionId) {
+        await Subscription.updatePreferenceId(subscriptionId, response.id);
+      }
+
+      res.json({
+        success: true,
+        preferenceId: response.id,
+        initPoint: process.env.NODE_ENV === 'production' 
+          ? response.init_point 
+          : response.sandbox_init_point,
+        sandboxInitPoint: response.sandbox_init_point,
+        publicKey: process.env.MERCADOPAGO_PUBLIC_KEY || 'TEST-d7f1cd01-74cf-4b2f-b6f0-e86c9a98fb2d'
+      });
+    } catch (error) {
+      console.error('Error creating payment preference:', error);
+      res.status(500).json({ 
+        error: 'Error al crear preferencia de pago',
+        details: error.message 
+      });
+    }
+  },
+
   // Send subscription change email notification
   sendSubscriptionChangeEmail: async (req, res) => {
     try {
@@ -602,9 +734,11 @@ const paymentController = {
     // Get current active subscription
     const activeSubscription = await Subscription.getActiveByUserId(userId);
     if (!activeSubscription) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'No active subscription found' 
+      // If no active subscription, return empty proration (new subscription)
+      return res.json({ 
+        success: true, 
+        proration: null,
+        message: 'No active subscription - will create new subscription' 
       });
     }
 

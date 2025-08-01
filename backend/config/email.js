@@ -8,7 +8,7 @@ const transporter = {
   sendMail: async (options) => {
     try {
       const result = await resend.emails.send({
-        from: options.from || 'PalTattoo <noreply@misterwolf.cl>',
+        from: options.from || 'PalTattoo <noreply@resend.dev>',
         to: options.to,
         subject: options.subject,
         html: options.html || options.text,

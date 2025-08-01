@@ -50,6 +50,14 @@ router.post('/subscribe', authenticate, async (req, res) => {
       const success = await Subscription.changePlan(existingSubscription.id, planId);
       
       if (success) {
+        // Get plan details for activation check
+        const newPlan = await Subscription.getPlanById(planId);
+        
+        // In development mode or for free plans, activate immediately
+        if (process.env.NODE_ENV === 'development' || newPlan.price === 0) {
+          await Subscription.updateStatus(existingSubscription.id, 'authorized');
+        }
+        
         // Get updated subscription
         const updatedSubscription = await Subscription.getById(existingSubscription.id);
         
@@ -77,6 +85,11 @@ router.post('/subscribe', authenticate, async (req, res) => {
       mercadopagoPreapprovalId: null, // Would be set by MercadoPago
       status: 'pending'
     });
+    
+    // In development mode or for free plans, activate immediately
+    if (process.env.NODE_ENV === 'development' || plan.price === 0) {
+      await Subscription.updateStatus(subscriptionId, 'authorized');
+    }
     
     const subscriptions = await Subscription.getByUserId(req.user.id);
     const subscription = subscriptions.find(s => s.id === subscriptionId);
@@ -135,6 +148,11 @@ router.put('/:subscriptionId/change-plan', authenticate, async (req, res) => {
     const success = await Subscription.changePlan(subscriptionId, planId);
     
     if (success) {
+      // In development mode or for free plans, activate immediately
+      if (process.env.NODE_ENV === 'development' || newPlan.price === 0) {
+        await Subscription.updateStatus(subscriptionId, 'authorized');
+      }
+      
       // Get updated subscription
       const updatedSubscription = await Subscription.getById(subscriptionId);
       

@@ -476,19 +476,43 @@ const PaymentsTab = () => {
     setPlanChangeModal(prev => ({ ...prev, loading: true }));
     
     try {
-      // For plan changes (not new subscriptions), we need different API call
-      let response;
+      // Create subscription first
+      let subscriptionResponse;
       if (currentSubscription && currentSubscription.id && typeof currentSubscription.id === 'number') {
-        // Change existing subscription (has real database ID)
+        // Change existing subscription
         console.log('🔄 Changing existing subscription:', currentSubscription.id, 'to plan:', targetPlan.id);
-        response = await subscriptionsAPI.changePlan(currentSubscription.id, targetPlan.id);
+        subscriptionResponse = await subscriptionsAPI.changePlan(currentSubscription.id, targetPlan.id);
       } else {
-        // New subscription (coming from basic/free plan or no subscription)
+        // New subscription
         console.log('➕ Creating new subscription for plan:', targetPlan.id);
-        response = await subscriptionsAPI.subscribe(targetPlan.id);
+        subscriptionResponse = await subscriptionsAPI.subscribe(targetPlan.id);
+      }
+
+      // If plan has a price, redirect to MercadoPago
+      if (targetPlan.price > 0) {
+        try {
+          // Create payment preference
+          const preferenceResponse = await paymentService.createPaymentPreference(
+            targetPlan.id,
+            subscriptionResponse.data.subscription?.id || subscriptionResponse.data.subscriptionId
+          );
+
+          console.log('MercadoPago preference created:', preferenceResponse.data);
+
+          // Redirect to MercadoPago
+          if (preferenceResponse.data.initPoint) {
+            window.location.href = preferenceResponse.data.initPoint;
+            return; // Exit function as we're redirecting
+          }
+        } catch (paymentError) {
+          console.error('Error creating payment preference:', paymentError);
+          toast.error('Error al procesar el pago. Por favor intenta nuevamente.');
+          setPlanChangeModal(prev => ({ ...prev, loading: false }));
+          return;
+        }
       }
       
-      // Send confirmation email for subscription change
+      // For free plans or if payment is not required, just send email
       try {
         await paymentService.sendSubscriptionChangeEmail({
           oldPlan: currentSubscription?.plan_name || currentSubscription?.plan || 'Básico',
@@ -497,7 +521,6 @@ const PaymentsTab = () => {
         });
       } catch (emailError) {
         console.warn('Email notification failed:', emailError);
-        // Don't block the subscription change if email fails
       }
 
       toast.success('Plan actualizado exitosamente. Se ha enviado un correo de confirmación.');

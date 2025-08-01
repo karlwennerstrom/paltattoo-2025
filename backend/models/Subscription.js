@@ -134,6 +134,29 @@ class Subscription {
       endDate: new Date().toISOString().split('T')[0]
     });
   }
+  
+  // Actualizar preference ID de MercadoPago
+  static async updatePreferenceId(subscriptionId, preferenceId) {
+    const [result] = await db.execute(
+      'UPDATE user_subscriptions SET mercadopago_preference_id = ? WHERE id = ?',
+      [preferenceId, subscriptionId]
+    );
+    return result.affectedRows > 0;
+  }
+  
+  // Crear registro de pago
+  static async createPaymentRecord(paymentData) {
+    const { subscriptionId, mercadoPagoPaymentId, amount, status, paymentDate } = paymentData;
+    
+    const [result] = await db.execute(
+      `INSERT INTO subscription_payments 
+       (subscription_id, mercadopago_payment_id, amount, status, payment_date, created_at) 
+       VALUES (?, ?, ?, ?, ?, NOW())`,
+      [subscriptionId, mercadoPagoPaymentId, amount, status, paymentDate]
+    );
+    
+    return result.insertId;
+  }
 
   // Verificar si un usuario puede usar una característica según su plan
   static async checkFeatureAccess(userId, featureName) {

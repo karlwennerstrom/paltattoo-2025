@@ -5,7 +5,7 @@ const fs = require('fs').promises;
 
 class EmailService {
   constructor() {
-    this.from = process.env.EMAIL_FROM || 'PalTattoo <noreply@misterwolf.cl>';
+    this.from = process.env.EMAIL_FROM || 'PalTattoo <noreply@resend.dev>';
   }
 
   async loadTemplate(templateName, variables = {}) {

@@ -239,6 +239,8 @@ export const paymentService = {
   getActiveSubscription: () => api.get('/payments/subscription/active'),
   getSubscriptionHistory: () => api.get('/payments/subscription/history'),
   createSubscription: (data) => api.post('/payments/subscription', data),
+  createPaymentPreference: (planId, subscriptionId) =>
+    api.post('/payments/subscription/preference', { planId, subscriptionId }),
   cancelSubscription: (subscriptionId) => api.delete(`/payments/subscription/${subscriptionId}`),
   
   // Card tokenization

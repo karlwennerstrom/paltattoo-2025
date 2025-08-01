@@ -115,96 +115,98 @@ class TattooRequest {
     return result.affectedRows > 0;
   }
 
-  static async search(filters = {}) {
-    let query = `
-      SELECT o.*, 
-             up.first_name as client_first_name, 
-             up.last_name as client_last_name,
-             up.profile_image as client_avatar,
-             bp.name as body_part_name, 
-             ts.name as style_name,
-             ct.name as color_type_name,
-             co.name as comuna_name,
-             co.region,
-             COALESCE(pc.proposal_count, 0) as proposal_count
-      FROM tattoo_offers o
-      JOIN clients c ON o.client_id = c.id
-      JOIN users u ON c.user_id = u.id
-      LEFT JOIN user_profiles up ON u.id = up.user_id
-      LEFT JOIN comunas co ON o.comuna_id = co.id
-      JOIN body_parts bp ON o.body_part_id = bp.id
-      JOIN tattoo_styles ts ON o.style_id = ts.id
-      JOIN color_types ct ON o.color_type_id = ct.id
-      LEFT JOIN (
-        SELECT offer_id, COUNT(*) as proposal_count 
-        FROM proposals 
-        GROUP BY offer_id
-      ) pc ON o.id = pc.offer_id
-      WHERE u.is_active = true
-    `;
-    
-    const conditions = [];
-    const values = [];
-    
-    if (filters.status) {
-      conditions.push('o.status = ?');
-      values.push(filters.status);
-    }
-    
-    if (filters.styleId) {
-      conditions.push('o.style_id = ?');
-      values.push(filters.styleId);
-    }
-    
-    if (filters.bodyPartId) {
-      conditions.push('o.body_part_id = ?');
-      values.push(filters.bodyPartId);
-    }
-    
-    if (filters.colorTypeId) {
-      conditions.push('o.color_type_id = ?');
-      values.push(filters.colorTypeId);
-    }
-    
-    if (filters.minBudget) {
-      conditions.push('o.budget_max >= ?');
-      values.push(filters.minBudget);
-    }
-    
-    if (filters.maxBudget) {
-      conditions.push('o.budget_min <= ?');
-      values.push(filters.maxBudget);
-    }
-    
-    if (filters.regionId) {
-      conditions.push('o.region_id = ?');
-      values.push(filters.regionId);
-    }
-    
-    if (filters.comunaId) {
-      conditions.push('o.comuna_id = ?');
-      values.push(filters.comunaId);
-    }
-    
-    if (conditions.length > 0) {
-      query += ' AND ' + conditions.join(' AND ');
-    }
-    
-    query += ' ORDER BY o.created_at DESC';
-    
-    if (filters.limit) {
-      const limit = parseInt(filters.limit);
-      query += ` LIMIT ${limit}`;
-    }
-    
-    if (filters.offset) {
-      const offset = parseInt(filters.offset);
-      query += ` OFFSET ${offset}`;
-    }
-    
-    const [rows] = await promisePool.execute(query, values);
-    return rows;
+  // Corrección para el método search en TattooRequest.js
+
+static async search(filters = {}) {
+  let query = `
+    SELECT o.*, 
+           up.first_name as client_first_name, 
+           up.last_name as client_last_name,
+           up.profile_image as client_avatar,
+           bp.name as body_part_name, 
+           ts.name as style_name,
+           ct.name as color_type_name,
+           co.name as comuna_name,
+           co.region,
+           COALESCE(pc.proposal_count, 0) as proposal_count
+    FROM tattoo_offers o
+    JOIN clients c ON o.client_id = c.id
+    JOIN users u ON c.user_id = u.id
+    LEFT JOIN user_profiles up ON u.id = up.user_id
+    LEFT JOIN comunas co ON c.comuna_id = co.id
+    JOIN body_parts bp ON o.body_part_id = bp.id
+    JOIN tattoo_styles ts ON o.style_id = ts.id
+    JOIN color_types ct ON o.color_type_id = ct.id
+    LEFT JOIN (
+      SELECT offer_id, COUNT(*) as proposal_count 
+      FROM proposals 
+      GROUP BY offer_id
+    ) pc ON o.id = pc.offer_id
+    WHERE u.is_active = true
+  `;
+  
+  const conditions = [];
+  const values = [];
+  
+  if (filters.status) {
+    conditions.push('o.status = ?');
+    values.push(filters.status);
   }
+  
+  if (filters.styleId) {
+    conditions.push('o.style_id = ?');
+    values.push(filters.styleId);
+  }
+  
+  if (filters.bodyPartId) {
+    conditions.push('o.body_part_id = ?');
+    values.push(filters.bodyPartId);
+  }
+  
+  if (filters.colorTypeId) {
+    conditions.push('o.color_type_id = ?');
+    values.push(filters.colorTypeId);
+  }
+  
+  if (filters.minBudget) {
+    conditions.push('o.budget_max >= ?');
+    values.push(filters.minBudget);
+  }
+  
+  if (filters.maxBudget) {
+    conditions.push('o.budget_min <= ?');
+    values.push(filters.maxBudget);
+  }
+  
+  if (filters.regionId) {
+    conditions.push('co.region = ?');
+    values.push(filters.regionId);
+  }
+  
+  if (filters.comunaId) {
+    conditions.push('c.comuna_id = ?');
+    values.push(filters.comunaId);
+  }
+  
+  if (conditions.length > 0) {
+    query += ' AND ' + conditions.join(' AND ');
+  }
+  
+  query += ' ORDER BY o.created_at DESC';
+  
+  if (filters.limit) {
+    const limit = parseInt(filters.limit);
+    query += ` LIMIT ${limit}`;
+  }
+  
+  if (filters.offset) {
+    const offset = parseInt(filters.offset);
+    query += ` OFFSET ${offset}`;
+  }
+  
+  const [rows] = await promisePool.execute(query, values);
+  return rows;
+}
 
   static async addReference(offerId, imageUrl, description = null) {
     const [result] = await promisePool.execute(

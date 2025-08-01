@@ -239,7 +239,7 @@ const paymentController = {
       const subscriptionId = await Subscription.create({
         userId,
         planId,
-        mercadopagoPreapprovalId: null, // Will be updated after creating preference
+        mercadopagoPreapprovalId: 'temp_' + Date.now(), // Temporary value, will be updated with preference ID
         status: 'pending', // Will be activated when payment is completed
         externalReference: externalReference,
         payerEmail: req.user.email
@@ -287,8 +287,10 @@ const paymentController = {
         paymentPreference = await preference.create({ body: preferenceData });
         console.log('MercadoPago preference created successfully:', paymentPreference.id);
         
-        // Update subscription with preference ID
-        await Subscription.updatePreferenceId(subscriptionId, paymentPreference.id);
+        // Update subscription with preference ID using existing column
+        await Subscription.updateStatus(subscriptionId, 'pending', {
+          mercadopagoPreapprovalId: paymentPreference.id
+        });
         
       } catch (prefError) {
         console.error('MercadoPago preference creation failed:', prefError);

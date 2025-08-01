@@ -479,9 +479,15 @@ const PaymentsTab = () => {
       // Create subscription first
       let subscriptionResponse;
       if (currentSubscription && currentSubscription.id && typeof currentSubscription.id === 'number') {
-        // Change existing subscription
-        console.log('🔄 Changing existing subscription:', currentSubscription.id, 'to plan:', targetPlan.id);
-        subscriptionResponse = await subscriptionsAPI.changePlan(currentSubscription.id, targetPlan.id);
+        // For plan changes that require payment, use the payment endpoint that generates MercadoPago URLs
+        if (targetPlan.price > 0) {
+          console.log('💳 Creating payment for plan upgrade:', targetPlan.id);
+          subscriptionResponse = await paymentService.createSubscription({ planId: targetPlan.id });
+        } else {
+          // For downgrades to free plans, use the subscription change endpoint
+          console.log('🔄 Changing to free plan:', currentSubscription.id, 'to plan:', targetPlan.id);
+          subscriptionResponse = await subscriptionsAPI.changePlan(currentSubscription.id, targetPlan.id);
+        }
       } else {
         // New subscription
         console.log('➕ Creating new subscription for plan:', targetPlan.id);

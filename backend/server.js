@@ -30,9 +30,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Serve uploads from Railway Volume or local path
-const uploadsPath = process.env.RAILWAY_VOLUME_MOUNT_PATH 
-  ? path.join(process.env.RAILWAY_VOLUME_MOUNT_PATH, 'uploads')
-  : path.join(__dirname, 'uploads');
+const { getRailwayUploadPath } = require('./utils/railwayStorage');
+const uploadsPath = getRailwayUploadPath();
 app.use('/uploads', express.static(uploadsPath));
 
 // Session configuration for Passport

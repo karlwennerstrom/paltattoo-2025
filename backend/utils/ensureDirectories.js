@@ -1,27 +1,27 @@
 // backend/utils/ensureDirectories.js
 const fs = require('fs');
 const path = require('path');
+const { getRailwayUploadPath } = require('./railwayStorage');
 
 const ensureDirectories = () => {
-  // Determine base uploads path
-  const baseUploadsPath = process.env.RAILWAY_VOLUME_MOUNT_PATH 
-    ? path.join(process.env.RAILWAY_VOLUME_MOUNT_PATH, 'uploads')
-    : path.join(__dirname, '..', 'uploads');
+  // Get the base uploads path (handles Railway volumes)
+  const baseUploadsPath = getRailwayUploadPath();
 
-  // List of required directories
-  const requiredDirs = [
-    baseUploadsPath,
-    path.join(baseUploadsPath, 'profiles'),
-    path.join(baseUploadsPath, 'portfolio'),
-    path.join(baseUploadsPath, 'references'),
-    path.join(baseUploadsPath, 'shops'),
-    path.join(baseUploadsPath, 'shops', 'logos'),
-    path.join(baseUploadsPath, 'shops', 'covers')
+  // List of required subdirectories
+  const requiredSubdirs = [
+    'profiles',
+    'portfolio',
+    'references',
+    'shops',
+    'shops/logos',
+    'shops/covers'
   ];
 
   console.log('🗂️  Ensuring upload directories exist...');
+  console.log(`📁 Base upload path: ${baseUploadsPath}`);
   
-  requiredDirs.forEach(dir => {
+  requiredSubdirs.forEach(subdir => {
+    const dir = path.join(baseUploadsPath, subdir);
     try {
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
@@ -30,7 +30,7 @@ const ensureDirectories = () => {
         console.log(`✓ Directory exists: ${dir}`);
       }
     } catch (error) {
-      console.error(`❌ Error creating directory ${dir}:`, error);
+      console.error(`❌ Error creating directory ${dir}:`, error.message);
     }
   });
   

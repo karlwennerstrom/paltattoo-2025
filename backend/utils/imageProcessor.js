@@ -32,6 +32,15 @@ const ImageProcessor = {
   // Portfolio image processing
   processPortfolioImage: async (inputPath, outputPath, artistId, index = 0) => {
     try {
+      // Ensure output directory exists
+      try {
+        await fs.mkdir(outputPath, { recursive: true });
+      } catch (err) {
+        if (err.code !== 'EEXIST') {
+          throw err;
+        }
+      }
+
       const filename = `portfolio-${artistId}-${Date.now()}-${index}.jpg`;
       const fullOutputPath = path.join(outputPath, filename);
       

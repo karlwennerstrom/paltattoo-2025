@@ -7,6 +7,7 @@ const { body, param } = require('express-validator');
 const { handleValidationErrors } = require('../middleware/validation');
 const path = require('path');
 const fs = require('fs').promises;
+const { getRailwayUploadPath } = require('../utils/railwayStorage');
 
 const createPortfolioValidation = [
   body('title').optional().isLength({ max: 255 }).withMessage('El título no puede exceder 255 caracteres'),
@@ -234,7 +235,7 @@ const deletePortfolioItem = async (req, res) => {
     }
     
     // Delete files from storage
-    const uploadsPath = path.join(__dirname, '..', 'uploads', 'portfolio');
+    const uploadsPath = path.join(getRailwayUploadPath(), 'portfolio');
     
     try {
       if (portfolioItem.image_url) {
@@ -276,7 +277,7 @@ const uploadPortfolioMedia = async (req, res) => {
     
     const { itemId, title, description, styleId, category, isFeatured, collectionId } = req.body;
     
-    const uploadsPath = path.join(__dirname, '..', 'uploads', 'portfolio');
+    const uploadsPath = path.join(getRailwayUploadPath(), 'portfolio');
     const isVideo = req.file.mimetype.startsWith('video/');
     
     let mediaData = {

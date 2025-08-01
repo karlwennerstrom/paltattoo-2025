@@ -1,22 +1,27 @@
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { getRailwayUploadPath } = require('../utils/railwayStorage');
 
 const createStorage = (folder) => {
-  // Use Railway Volume path if available, fallback to local uploads
-  const baseUploadPath = process.env.RAILWAY_VOLUME_MOUNT_PATH 
-    ? path.join(process.env.RAILWAY_VOLUME_MOUNT_PATH, 'uploads')
-    : path.join(__dirname, '..', 'uploads');
-  
-  const uploadPath = path.join(baseUploadPath, folder);
-  
-  if (!fs.existsSync(uploadPath)) {
-    fs.mkdirSync(uploadPath, { recursive: true });
-  }
-
   return multer.diskStorage({
     destination: function (req, file, cb) {
-      cb(null, uploadPath);
+      try {
+        // Get the base upload path (handles Railway volumes)
+        const baseUploadPath = getRailwayUploadPath();
+        const uploadPath = path.join(baseUploadPath, folder);
+        
+        // Ensure directory exists before saving the file
+        if (!fs.existsSync(uploadPath)) {
+          fs.mkdirSync(uploadPath, { recursive: true });
+          console.log(`Created upload directory: ${uploadPath}`);
+        }
+        
+        cb(null, uploadPath);
+      } catch (error) {
+        console.error(`Failed to setup upload directory for ${folder}:`, error);
+        cb(error);
+      }
     },
     filename: function (req, file, cb) {
       const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);

@@ -287,10 +287,23 @@ const paymentController = {
         paymentPreference = await preference.create({ body: preferenceData });
         console.log('MercadoPago preference created successfully:', paymentPreference.id);
         
-        // Update subscription with preference ID using existing column
+        // Update subscription with preference ID and external reference using existing column
         await Subscription.updateStatus(subscriptionId, 'pending', {
           mercadopagoPreapprovalId: paymentPreference.id
         });
+        
+        // Also create a mapping for the external reference to find the subscription later
+        const connection = await require('../config/database').getConnection();
+        try {
+          await connection.execute(
+            'UPDATE user_subscriptions SET external_reference = ? WHERE id = ?',
+            [externalReference, subscriptionId]
+          );
+        } catch (updateError) {
+          console.log('Could not update external reference (column may not exist):', updateError.message);
+        } finally {
+          connection.release();
+        }
         
       } catch (prefError) {
         console.error('MercadoPago preference creation failed:', prefError);
@@ -373,28 +386,75 @@ const paymentController = {
 
   // Webhook de MercadoPago
   webhook: async (req, res) => {
+    const startTime = Date.now();
+    
     try {
       const { type, data, action } = req.body;
-      console.log('MercadoPago webhook received:', { type, action, data });
+      const headers = req.headers;
+      
+      console.log('=== MercadoPago Webhook Received ===');
+      console.log('Timestamp:', new Date().toISOString());
+      console.log('Headers:', {
+        'user-agent': headers['user-agent'],
+        'x-request-id': headers['x-request-id'],
+        'x-signature': headers['x-signature']
+      });
+      console.log('Body:', { type, action, data });
+      console.log('Full request body:', JSON.stringify(req.body, null, 2));
 
-      // Handle different notification types
-      if (type === 'payment' && data?.id) {
-        // Handle regular payment notifications
-        await this.handlePaymentNotification(data.id);
-      } else if (type === 'preapproval' && data?.id) {
-        // Handle subscription preapproval notifications
-        await this.handlePreapprovalNotification(data.id);
-      } else if (type === 'authorized_payment' && data?.id) {
-        // Handle authorized payment notifications for subscriptions
-        await this.handleAuthorizedPaymentNotification(data.id);
+      // Validate required fields
+      if (!type || !data?.id) {
+        console.error('Invalid webhook payload: missing type or data.id');
+        return res.status(200).send('OK'); // Still return 200 to avoid retries
       }
 
+      // Handle different notification types
+      let processed = false;
+      
+      if (type === 'payment' && data?.id) {
+        console.log('Processing payment notification for ID:', data.id);
+        await paymentController.handlePaymentNotification(data.id);
+        processed = true;
+      } else if (type === 'preapproval' && data?.id) {
+        console.log('Processing preapproval notification for ID:', data.id);
+        await paymentController.handlePreapprovalNotification(data.id);
+        processed = true;
+      } else if (type === 'authorized_payment' && data?.id) {
+        console.log('Processing authorized payment notification for ID:', data.id);
+        await paymentController.handleAuthorizedPaymentNotification(data.id);
+        processed = true;
+      } else {
+        console.log('Unhandled webhook type:', type);
+      }
+
+      const processingTime = Date.now() - startTime;
+      console.log(`Webhook processed in ${processingTime}ms, processed: ${processed}`);
+      console.log('=== End Webhook Processing ===\n');
+
       // Always respond 200 so MercadoPago doesn't retry
-      res.status(200).send('OK');
+      res.status(200).json({ 
+        status: 'received', 
+        processed,
+        processingTime: `${processingTime}ms`,
+        timestamp: new Date().toISOString()
+      });
+      
     } catch (error) {
-      console.error('Webhook error:', error);
-      // Respond 200 to avoid retries
-      res.status(200).send('OK');
+      const processingTime = Date.now() - startTime;
+      console.error('=== Webhook Error ===');
+      console.error('Error:', error.message);
+      console.error('Stack:', error.stack);
+      console.error(`Processing time: ${processingTime}ms`);
+      console.error('Request body:', JSON.stringify(req.body, null, 2));
+      console.error('=== End Webhook Error ===\n');
+      
+      // Still respond 200 to avoid retries from MercadoPago
+      res.status(200).json({ 
+        status: 'error', 
+        error: error.message,
+        processingTime: `${processingTime}ms`,
+        timestamp: new Date().toISOString()
+      });
     }
   },
 
@@ -407,48 +467,130 @@ const paymentController = {
       console.log('Processing payment notification:', {
         id: paymentInfo.id,
         status: paymentInfo.status,
-        external_reference: paymentInfo.external_reference
+        external_reference: paymentInfo.external_reference,
+        transaction_amount: paymentInfo.transaction_amount,
+        payment_method_id: paymentInfo.payment_method_id
       });
 
-      // Extract info from external_reference
-      const refParts = paymentInfo.external_reference?.split('_') || [];
-      if (refParts.length >= 3) {
-        const [userIdStr, planIdStr, subscriptionIdStr] = refParts;
-        const userId = parseInt(userIdStr);
-        const planId = parseInt(planIdStr);
-        const subscriptionId = parseInt(subscriptionIdStr);
+      if (!paymentInfo.external_reference) {
+        console.error('Payment notification missing external_reference');
+        return;
+      }
 
-        if (paymentInfo.status === 'approved') {
-          // Activate subscription
-          await Subscription.updateStatus(subscriptionId, 'authorized');
+      // Extract info from external_reference format: user_{userId}_plan_{planId}_{timestamp}
+      const refParts = paymentInfo.external_reference.split('_');
+      console.log('External reference parts:', refParts);
+      
+      if (refParts.length >= 5 && refParts[0] === 'user' && refParts[2] === 'plan') {
+        const userId = parseInt(refParts[1]);
+        const planId = parseInt(refParts[3]);
+        
+        console.log('Extracted from external reference:', { userId, planId });
+
+        if (isNaN(userId) || isNaN(planId)) {
+          console.error('Invalid userId or planId from external reference:', { userId, planId });
+          return;
+        }
+
+        // Try multiple methods to find the subscription
+        let subscription = null;
+        
+        // Method 1: Find by external reference in mercadopago_preapproval_id field
+        subscription = await Subscription.getByPreapprovalId(paymentInfo.external_reference);
+        
+        if (!subscription && paymentInfo.preference_id) {
+          // Method 2: Find by preference ID
+          console.log('Trying to find subscription by preference ID:', paymentInfo.preference_id);
+          subscription = await Subscription.getByPreapprovalId(paymentInfo.preference_id);
+        }
+        
+        if (!subscription) {
+          // Method 3: Find by user and plan with pending status
+          console.log('Trying to find pending subscription by user and plan:', { userId, planId });
+          const db = require('../config/database');
+          const [rows] = await db.execute(
+            `SELECT s.*, p.name as plan_name, p.price, u.email as user_email 
+             FROM user_subscriptions s 
+             JOIN subscription_plans p ON s.plan_id = p.id 
+             JOIN users u ON s.user_id = u.id 
+             WHERE s.user_id = ? AND s.plan_id = ? AND s.status = 'pending' 
+             ORDER BY s.created_at DESC LIMIT 1`,
+            [userId, planId]
+          );
+          subscription = rows[0];
+        }
+        
+        if (!subscription) {
+          console.error('Subscription not found with any method. External reference:', paymentInfo.external_reference, 'Preference ID:', paymentInfo.preference_id);
+          return;
+        }
+
+        await paymentController.processPaymentApproval(paymentInfo, subscription, userId, planId);
+      } else {
+        console.error('Invalid external_reference format:', paymentInfo.external_reference);
+      }
+    } catch (error) {
+      console.error('Error processing payment notification:', error);
+    }
+  },
+
+  // Process payment approval
+  processPaymentApproval: async (paymentInfo, subscription, userId, planId) => {
+    try {
+      if (paymentInfo.status === 'approved') {
+        console.log('Processing approved payment for subscription:', subscription.id);
+        
+        // Activate subscription
+        await Subscription.updateStatus(subscription.id, 'authorized', {
+          startDate: new Date().toISOString().split('T')[0],
+          nextPaymentDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+        });
+        
+        console.log('Subscription activated:', subscription.id);
+        
+        // Record payment
+        await Subscription.createPaymentRecord({
+          subscriptionId: subscription.id,
+          mercadopagoPaymentId: paymentInfo.id,
+          amount: paymentInfo.transaction_amount,
+          status: 'approved',
+          paymentType: 'subscription',
+          paymentMethod: paymentInfo.payment_method_id,
+          statusDetail: paymentInfo.status_detail,
+          transactionDate: new Date()
+        });
+        
+        console.log('Payment recorded for subscription:', subscription.id);
+
+        // Send email notification
+        try {
+          const user = await User.findById(userId);
+          const plan = await SubscriptionPlan.findById(planId);
           
-          // Record payment
-          await Subscription.createPaymentRecord({
-            subscriptionId,
-            mercadoPagoPaymentId: paymentInfo.id,
-            amount: paymentInfo.transaction_amount,
-            status: 'approved',
-            paymentDate: new Date()
-          });
-
-          // Send email notification
-          try {
-            const user = await User.findById(userId);
-            const plan = await SubscriptionPlan.findById(planId);
-            
+          if (user && plan) {
             await emailService.sendPaymentReceived(user.email, {
               userName: user.first_name || user.email,
               planName: plan.name,
               amount: paymentInfo.transaction_amount,
               paymentDate: new Date()
             });
-          } catch (emailError) {
-            console.error('Error sending payment email:', emailError);
+            
+            await emailService.sendSubscriptionActivated(user.email, {
+              userName: user.first_name || user.email,
+              planName: plan.name,
+              isChange: false
+            });
+            
+            console.log('Emails sent for subscription activation');
           }
+        } catch (emailError) {
+          console.error('Error sending payment emails:', emailError);
         }
+      } else {
+        console.log('Payment not approved, status:', paymentInfo.status);
       }
     } catch (error) {
-      console.error('Error processing payment notification:', error);
+      console.error('Error processing payment approval:', error);
     }
   },
 
@@ -507,7 +649,7 @@ const paymentController = {
   handleAuthorizedPaymentNotification: async (paymentId) => {
     try {
       // This handles recurring payments from authorized subscriptions
-      await this.handlePaymentNotification(paymentId);
+      await paymentController.handlePaymentNotification(paymentId);
     } catch (error) {
       console.error('Error processing authorized payment notification:', error);
     }

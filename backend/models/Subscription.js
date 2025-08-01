@@ -76,7 +76,7 @@ class Subscription {
   static async getByUserId(userId) {
     const [rows] = await db.execute(
       `SELECT s.*, p.name as plan_name, p.price 
-       FROM subscriptions s 
+       FROM user_subscriptions s 
        JOIN subscription_plans p ON s.plan_id = p.id 
        WHERE s.user_id = ? 
        ORDER BY s.created_at DESC`,

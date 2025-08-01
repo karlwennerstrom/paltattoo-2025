@@ -36,9 +36,10 @@ const getValidUrl = (url) => {
 const config = {
   appId: process.env.MERCADOPAGO_APP_ID || '5698143216134280',
   userId: process.env.MERCADOPAGO_USER_ID || '183050733',
-  notificationUrl: process.env.BACKEND_URL?.includes('localhost') 
-    ? 'https://webhook.site/#!/unique-id' // URL de prueba para webhooks
-    : `${process.env.BACKEND_URL}/api/payments/webhook`,
+  notificationUrl: process.env.MERCADOPAGO_WEBHOOK_URL || 
+    (process.env.BACKEND_URL?.includes('localhost') 
+      ? 'https://webhook.site/#!/unique-id' // URL de prueba para webhooks en desarrollo
+      : `${process.env.BACKEND_URL || 'https://paltattoo-backend.onrender.com'}/api/payments/webhook`),
   // URLs para suscripciones (preaprobaciones)
   backUrls: {
     success: `${process.env.FRONTEND_URL || 'https://paltattoo-2025.vercel.app'}/subscription/success`,

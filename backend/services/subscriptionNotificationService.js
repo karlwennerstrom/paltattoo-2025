@@ -1,18 +1,11 @@
-const nodemailer = require('nodemailer');
+const transporter = require('../config/email');
 const fs = require('fs').promises;
 const path = require('path');
 
 class SubscriptionNotificationService {
   constructor() {
-    this.transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'localhost',
-      port: process.env.SMTP_PORT || 587,
-      secure: process.env.SMTP_SECURE === 'true',
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS
-      }
-    });
+    // Use the unified email service (Resend) instead of direct nodemailer
+    this.transporter = transporter;
   }
 
   async sendSubscriptionChangeNotification(user, changeData) {
@@ -33,7 +26,7 @@ class SubscriptionNotificationService {
         .replace(/{{CURRENT_DATE}}/g, new Date().toLocaleDateString('es-CL'));
 
       const mailOptions = {
-        from: process.env.SMTP_FROM || 'noreply@paltattoo.com',
+        from: process.env.EMAIL_FROM || 'PalTattoo <noreply@resend.dev>',
         to: user.email,
         subject: subject,
         html: htmlContent
@@ -62,7 +55,7 @@ class SubscriptionNotificationService {
         .replace(/{{PLAN_PRICE}}/g, this.formatCurrency(subscription.plan.price));
 
       const mailOptions = {
-        from: process.env.SMTP_FROM || 'noreply@paltattoo.com',
+        from: process.env.EMAIL_FROM || 'PalTattoo <noreply@resend.dev>',
         to: user.email,
         subject: subject,
         html: htmlContent
@@ -92,7 +85,7 @@ class SubscriptionNotificationService {
         .replace(/{{PAYMENT_ID}}/g, payment.mercadopago_payment_id);
 
       const mailOptions = {
-        from: process.env.SMTP_FROM || 'noreply@paltattoo.com',
+        from: process.env.EMAIL_FROM || 'PalTattoo <noreply@resend.dev>',
         to: user.email,
         subject: subject,
         html: htmlContent

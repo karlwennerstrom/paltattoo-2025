@@ -235,6 +235,16 @@ const paymentController = {
 
       console.log('Creating MercadoPago preapproval with data:', preApprovalData);
       
+      // First, create subscription in database to get ID
+      const subscriptionId = await Subscription.create({
+        userId,
+        planId,
+        mercadopagoPreapprovalId: null, // Will be updated after creating preference
+        status: 'pending', // Will be activated when payment is completed
+        externalReference: externalReference,
+        payerEmail: req.user.email
+      });
+
       // Since MercadoPago PreApprovals require card_token_id, we'll use Preferences instead
       // This creates a payment preference that the user can complete, then we manually manage the subscription
       console.log('Creating MercadoPago preference (not preapproval) due to card_token_id requirement');
@@ -256,7 +266,11 @@ const paymentController = {
           surname: req.user.last_name || '',
           email: req.user.email
         },
-        back_urls: config.backUrls,
+        back_urls: {
+          success: `${process.env.FRONTEND_URL || 'https://paltattoo-2025.vercel.app'}/subscription/success?subscription_id=${subscriptionId}`,
+          failure: `${process.env.FRONTEND_URL || 'https://paltattoo-2025.vercel.app'}/subscription/failure`,
+          pending: `${process.env.FRONTEND_URL || 'https://paltattoo-2025.vercel.app'}/subscription/pending`
+        },
         auto_return: 'approved',
         payment_methods: {
           excluded_payment_methods: [],
@@ -265,32 +279,21 @@ const paymentController = {
         },
         notification_url: config.notificationUrl,
         statement_descriptor: 'PALTATTOO',
-        external_reference: externalReference,
-        metadata: {
-          user_id: userId,
-          plan_id: planId,
-          subscription_type: 'monthly'
-        }
+        external_reference: externalReference
       };
 
       let paymentPreference;
       try {
         paymentPreference = await preference.create({ body: preferenceData });
         console.log('MercadoPago preference created successfully:', paymentPreference.id);
+        
+        // Update subscription with preference ID
+        await Subscription.updatePreferenceId(subscriptionId, paymentPreference.id);
+        
       } catch (prefError) {
         console.error('MercadoPago preference creation failed:', prefError);
         throw new Error(`Error creating payment preference: ${prefError.message}`);
       }
-
-      // Guardar suscripción en la base de datos
-      const subscriptionId = await Subscription.create({
-        userId,
-        planId,
-        mercadopagoPreapprovalId: paymentPreference.id, // Using preference ID instead of preapproval
-        status: 'pending', // Will be activated when payment is completed
-        externalReference: externalReference,
-        payerEmail: req.user.email
-      });
 
       // Enviar email de confirmación
       await emailService.sendSubscriptionCreated(req.user.email, {

@@ -235,8 +235,9 @@ const paymentController = {
 
       console.log('Creating MercadoPago preapproval with data:', preApprovalData);
       
+      let preApproval;
       try {
-        const preApproval = await preApprovalClient.create({ body: preApprovalData });
+        preApproval = await preApprovalClient.create({ body: preApprovalData });
         console.log('MercadoPago preapproval created successfully:', preApproval.id);
       } catch (mpError) {
         console.error('MercadoPago preapproval creation failed:', mpError);
@@ -313,7 +314,26 @@ const paymentController = {
       });
     } catch (error) {
       console.error('Error creating subscription:', error);
-      res.status(500).json({ error: 'Error al crear la suscripción' });
+      console.error('Error stack:', error.stack);
+      console.error('Error details:', JSON.stringify(error, null, 2));
+      
+      // More specific error handling
+      if (error.message && error.message.includes('MercadoPago')) {
+        res.status(500).json({ 
+          error: 'Error de configuración con MercadoPago',
+          details: error.message 
+        });
+      } else if (error.message && error.message.includes('database')) {
+        res.status(500).json({ 
+          error: 'Error de base de datos',
+          details: 'Error al guardar la suscripción' 
+        });
+      } else {
+        res.status(500).json({ 
+          error: 'Error al crear la suscripción',
+          details: error.message 
+        });
+      }
     }
   },
 

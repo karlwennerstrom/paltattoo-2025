@@ -84,7 +84,6 @@ docker-compose.yml
 
 # Gatsby (if used later)
 .cache/
-public/
 
 # React
 /frontend/build/

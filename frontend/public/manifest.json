@@ -1,0 +1,20 @@
+{
+  "short_name": "PalTattoo",
+  "name": "PalTattoo - Conecta con los mejores tatuadores",
+  "icons": [
+    {
+      "src": "paltattoo-icono.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "paltattoo-icono.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#2563eb",
+  "background_color": "#ffffff"
+}

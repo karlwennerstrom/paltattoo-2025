@@ -491,21 +491,19 @@ const PaymentsTab = () => {
       // If plan has a price, redirect to MercadoPago
       if (targetPlan.price > 0) {
         try {
-          // Create payment preference
-          const preferenceResponse = await paymentService.createPaymentPreference(
-            targetPlan.id,
-            subscriptionResponse.data.subscription?.id || subscriptionResponse.data.subscriptionId
-          );
+          // Use the subscription response directly - it already contains the init_point
+          console.log('MercadoPago subscription created:', subscriptionResponse.data);
 
-          console.log('MercadoPago preference created:', preferenceResponse.data);
-
-          // Redirect to MercadoPago
-          if (preferenceResponse.data.initPoint) {
-            window.location.href = preferenceResponse.data.initPoint;
+          // Redirect to MercadoPago using the subscription init_point
+          if (subscriptionResponse.data.data?.initPoint) {
+            window.location.href = subscriptionResponse.data.data.initPoint;
+            return; // Exit function as we're redirecting
+          } else if (subscriptionResponse.data.initPoint) {
+            window.location.href = subscriptionResponse.data.initPoint;
             return; // Exit function as we're redirecting
           }
         } catch (paymentError) {
-          console.error('Error creating payment preference:', paymentError);
+          console.error('Error processing subscription payment:', paymentError);
           toast.error('Error al procesar el pago. Por favor intenta nuevamente.');
           setPlanChangeModal(prev => ({ ...prev, loading: false }));
           return;

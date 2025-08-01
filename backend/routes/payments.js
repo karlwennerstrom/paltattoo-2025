@@ -32,7 +32,6 @@ router.post('/subscription/send-change-email', paymentController.sendSubscriptio
 
 // Rutas para artistas solamente
 router.post('/subscription', authorizeArtist, paymentController.createSubscription);
-router.post('/subscription/preference', authorizeArtist, paymentController.createPaymentPreference);
 router.delete('/subscription/:subscriptionId', authorizeArtist, paymentController.cancelSubscription);
 router.get('/subscription/:subscriptionId/payments', authorizeArtist, paymentController.getSubscriptionPaymentHistory);
 

@@ -21,14 +21,18 @@ ENV CI=false
 RUN npm run build
 
 # Production stage
-FROM nginx:alpine
+FROM node:18-alpine
 
-# Copy build files to nginx
-COPY --from=build /app/build /usr/share/nginx/html
+# Install serve
+RUN npm install -g serve@14.2.1
 
-# Copy nginx config for React routing
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+WORKDIR /app
 
-EXPOSE 80
+# Copy build files
+COPY --from=build /app/build ./build
 
-CMD ["nginx", "-g", "daemon off;"]
+# Expose port
+EXPOSE 8080
+
+# Start the application
+CMD ["serve", "-s", "build", "-p", "8080"]

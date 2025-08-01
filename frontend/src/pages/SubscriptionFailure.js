@@ -44,7 +44,7 @@ const SubscriptionFailure = () => {
             <Button
               variant="ghost"
               fullWidth
-              onClick={() => navigate('/artist/dashboard')}
+              onClick={() => navigate('/artist')}
             >
               Volver al Dashboard
             </Button>

@@ -48,7 +48,7 @@ const SubscriptionPending = () => {
             <Button
               variant="ghost"
               fullWidth
-              onClick={() => navigate('/artist/dashboard')}
+              onClick={() => navigate('/artist')}
             >
               Ir al Dashboard
             </Button>

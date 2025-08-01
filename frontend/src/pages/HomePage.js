@@ -14,7 +14,7 @@ const HomePage = () => {
     if (isAdmin) {
       navigate('/admin/dashboard', { replace: true });
     } else if (isArtist) {
-      navigate('/artist/dashboard', { replace: true });
+      navigate('/artist', { replace: true });
     } else if (isClient) {
       navigate('/client/dashboard', { replace: true });
     }
@@ -113,7 +113,7 @@ const HomePage = () => {
     if (user) {
       // Redirect based on user type
       if (user.user_type === 'artist') {
-        navigate('/artist/dashboard');
+        navigate('/artist');
       } else {
         navigate('/client/dashboard');
       }

@@ -27,7 +27,7 @@ const ArtistDashboard = () => {
   // Extract tab from URL path, default to 'overview'
   const getTabFromPath = () => {
     const path = location.pathname;
-    if (path === '/artist' || path === '/artist/') {
+    if (path === '/artist' || path === '/artist/' || path === '/artist/dashboard') {
       return 'overview';
     }
     // Extract tab from paths like /artist/payments, /artist/portfolio, etc.
@@ -48,6 +48,7 @@ const ArtistDashboard = () => {
     setActiveTab(tabName);
     // Update URL to reflect the current tab
     if (tabName === 'overview') {
+      // Always navigate to /artist for overview, not /artist/dashboard
       navigate('/artist', { replace: true });
     } else {
       navigate(`/artist/${tabName}`, { replace: true });
@@ -60,10 +61,38 @@ const ArtistDashboard = () => {
     if (newTab !== activeTab) {
       setActiveTab(newTab);
     }
-  }, [location.pathname]);
+    
+    // Redirect /artist/dashboard to /artist to avoid confusion
+    if (location.pathname === '/artist/dashboard') {
+      navigate('/artist', { replace: true });
+    }
+  }, [location.pathname, navigate]);
 
   useEffect(() => {
     loadInitialData();
+    
+    // Handle payment return parameters
+    const urlParams = new URLSearchParams(location.search);
+    const paymentStatus = urlParams.get('payment');
+    
+    if (paymentStatus) {
+      switch (paymentStatus) {
+        case 'success':
+          toast.success('¡Pago exitoso! Tu suscripción ha sido activada.');
+          // Redirect to subscription tab to show the new plan
+          handleTabChange('subscription');
+          break;
+        case 'failure':
+          toast.error('El pago no pudo ser procesado. Por favor intenta nuevamente.');
+          break;
+        case 'pending':
+          toast.info('Tu pago está siendo procesado. Te notificaremos cuando se complete.');
+          break;
+      }
+      
+      // Clean URL parameters
+      navigate(location.pathname, { replace: true });
+    }
     
     // Listen for tab switch events from child components
     const handleSwitchTab = (event) => {

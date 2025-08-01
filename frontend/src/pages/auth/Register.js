@@ -60,7 +60,7 @@ const Register = () => {
         toast.success('¡Cuenta creada exitosamente!');
         // Redirect based on user type
         if (result.user.userType === 'artist') {
-          navigate('/artist/dashboard');
+          navigate('/artist');
         } else {
           navigate('/feed');
         }

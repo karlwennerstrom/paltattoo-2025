@@ -26,7 +26,7 @@ const ArtistSidebar = () => {
     {
       section: 'PRINCIPAL',
       items: [
-        { path: '/artist/dashboard', label: 'Dashboard', icon: FiHome },
+        { path: '/artist', label: 'Dashboard', icon: FiHome },
         { path: '/artist/portfolio', label: 'Portafolio', icon: FiImage },
         { path: '/artist/proposals', label: 'Propuestas', icon: FiMail },
         ...(userHasCalendarAccess ? [{ 
@@ -60,7 +60,7 @@ const ArtistSidebar = () => {
     <div className="w-64 bg-black border-r border-gray-800 h-screen flex flex-col">
       {/* Logo/Header */}
       <div className="px-6 py-5 border-b border-gray-800">
-        <Link to="/artist/dashboard" className="flex items-center space-x-3">
+        <Link to="/artist" className="flex items-center space-x-3">
           <div className="w-10 h-10 bg-gradient-to-br from-accent-500 to-accent-600 rounded-xl flex items-center justify-center shadow-lg">
             <span className="text-white font-bold text-lg">P</span>
           </div>

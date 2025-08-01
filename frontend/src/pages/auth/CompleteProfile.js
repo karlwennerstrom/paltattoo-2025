@@ -30,7 +30,7 @@ const CompleteProfile = () => {
     // If user already has a user type, redirect them
     if (user && user.userType) {
       if (user.userType === 'artist') {
-        navigate('/artist/dashboard');
+        navigate('/artist');
       } else {
         navigate('/feed');
       }
@@ -93,7 +93,7 @@ const CompleteProfile = () => {
         
         // Redirect based on user type
         if (formData.userType === 'artist') {
-          navigate('/artist/dashboard');
+          navigate('/artist');
         } else {
           navigate('/feed');
         }

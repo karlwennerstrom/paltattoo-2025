@@ -33,7 +33,7 @@ const Login = () => {
         toast.success('¡Bienvenido de vuelta!');
         // Redirect based on user type
         if (result.user.userType === 'artist') {
-          navigate('/artist/dashboard');
+          navigate('/artist');
         } else {
           navigate('/feed');
         }

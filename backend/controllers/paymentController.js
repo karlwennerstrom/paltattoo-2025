@@ -206,6 +206,7 @@ const paymentController = {
         
         await SubscriptionPlan.updateMercadoPagoId(planId, mpPlan.id);
         plan.mercadopago_plan_id = mpPlan.id;
+        console.log('Created MercadoPago plan:', mpPlan.id);
       }
 
       // Create preapproval using the plan
@@ -216,21 +217,9 @@ const paymentController = {
         reason: `Suscripción ${plan.name} - PalTattoo`,
         external_reference: externalReference,
         payer_email: req.user.email,
-        back_url: config.backUrls.success,
-        auto_recurring: {
-          frequency: 1,
-          frequency_type: 'months',
-          start_date: new Date().toISOString(),
-          transaction_amount: parseFloat(plan.price),
-          currency_id: 'CLP'
-        },
-        status: cardToken ? 'authorized' : 'pending'
+        back_urls: config.backUrls,
+        status: 'pending' // Always start as pending, will be authorized after payment
       };
-
-      // Add card token if provided
-      if (cardToken) {
-        preApprovalData.card_token_id = cardToken;
-      }
 
       console.log('Creating MercadoPago preapproval with data:', preApprovalData);
       const preApproval = await preApprovalClient.create({ body: preApprovalData });
@@ -288,7 +277,9 @@ const paymentController = {
           preApprovalId: preApproval.id,
           status: preApproval.status,
           planChange: !!activeSubscription,
-          message: activeSubscription ? 'Plan cambiado exitosamente' : 'Suscripción creada exitosamente'
+          message: activeSubscription ? 'Plan cambiado exitosamente' : 'Suscripción creada exitosamente',
+          // Important: This is a subscription authorization flow, not a payment
+          isSubscription: true
         }
       });
     } catch (error) {
@@ -303,67 +294,139 @@ const paymentController = {
       const { type, data, action } = req.body;
       console.log('MercadoPago webhook received:', { type, action, data });
 
-      // Importar payment client
-      const { payment } = require('../config/mercadopago');
-
-      // MercadoPago envía diferentes tipos de notificaciones
+      // Handle different notification types
       if (type === 'payment' && data?.id) {
-        try {
-          // Obtener información del pago
-          const paymentInfo = await payment.get({ id: data.id });
-          console.log('Payment info:', {
-            id: paymentInfo.id,
-            status: paymentInfo.status,
-            external_reference: paymentInfo.external_reference,
-            payer_email: paymentInfo.payer?.email
-          });
-
-          // Extraer información del external_reference
-          const [userId, planId, subscriptionId] = paymentInfo.external_reference 
-            ? paymentInfo.external_reference.split('_')
-            : [null, null, null];
-
-          if (paymentInfo.status === 'approved' && userId && subscriptionId) {
-            // Activar la suscripción
-            await Subscription.updateStatus(subscriptionId, 'authorized');
-            
-            // Registrar el pago
-            await Subscription.createPaymentRecord({
-              subscriptionId,
-              mercadoPagoPaymentId: paymentInfo.id,
-              amount: paymentInfo.transaction_amount,
-              status: 'approved',
-              paymentDate: new Date()
-            });
-
-            console.log(`Subscription ${subscriptionId} activated for user ${userId}`);
-
-            // Enviar notificación por email
-            try {
-              const user = await User.findById(userId);
-              const plan = await SubscriptionPlan.findById(planId);
-              
-              await emailService.sendPaymentReceived(user.email, {
-                userName: user.first_name || user.email,
-                planName: plan.name,
-                amount: paymentInfo.transaction_amount,
-                paymentDate: new Date()
-              });
-            } catch (emailError) {
-              console.error('Error sending payment email:', emailError);
-            }
-          }
-        } catch (paymentError) {
-          console.error('Error processing payment webhook:', paymentError);
-        }
+        // Handle regular payment notifications
+        await this.handlePaymentNotification(data.id);
+      } else if (type === 'preapproval' && data?.id) {
+        // Handle subscription preapproval notifications
+        await this.handlePreapprovalNotification(data.id);
+      } else if (type === 'authorized_payment' && data?.id) {
+        // Handle authorized payment notifications for subscriptions
+        await this.handleAuthorizedPaymentNotification(data.id);
       }
 
-      // Siempre responder 200 para que MercadoPago no reintente
+      // Always respond 200 so MercadoPago doesn't retry
       res.status(200).send('OK');
     } catch (error) {
       console.error('Webhook error:', error);
-      // Responder 200 para evitar reintentos
+      // Respond 200 to avoid retries
       res.status(200).send('OK');
+    }
+  },
+
+  // Handle payment notifications
+  handlePaymentNotification: async (paymentId) => {
+    try {
+      const { payment } = require('../config/mercadopago');
+      const paymentInfo = await payment.get({ id: paymentId });
+      
+      console.log('Processing payment notification:', {
+        id: paymentInfo.id,
+        status: paymentInfo.status,
+        external_reference: paymentInfo.external_reference
+      });
+
+      // Extract info from external_reference
+      const refParts = paymentInfo.external_reference?.split('_') || [];
+      if (refParts.length >= 3) {
+        const [userIdStr, planIdStr, subscriptionIdStr] = refParts;
+        const userId = parseInt(userIdStr);
+        const planId = parseInt(planIdStr);
+        const subscriptionId = parseInt(subscriptionIdStr);
+
+        if (paymentInfo.status === 'approved') {
+          // Activate subscription
+          await Subscription.updateStatus(subscriptionId, 'authorized');
+          
+          // Record payment
+          await Subscription.createPaymentRecord({
+            subscriptionId,
+            mercadoPagoPaymentId: paymentInfo.id,
+            amount: paymentInfo.transaction_amount,
+            status: 'approved',
+            paymentDate: new Date()
+          });
+
+          // Send email notification
+          try {
+            const user = await User.findById(userId);
+            const plan = await SubscriptionPlan.findById(planId);
+            
+            await emailService.sendPaymentReceived(user.email, {
+              userName: user.first_name || user.email,
+              planName: plan.name,
+              amount: paymentInfo.transaction_amount,
+              paymentDate: new Date()
+            });
+          } catch (emailError) {
+            console.error('Error sending payment email:', emailError);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error processing payment notification:', error);
+    }
+  },
+
+  // Handle preapproval notifications
+  handlePreapprovalNotification: async (preapprovalId) => {
+    try {
+      const { preApprovalClient } = require('../config/mercadopago');
+      const preApproval = await preApprovalClient.get({ id: preapprovalId });
+      
+      console.log('Processing preapproval notification:', {
+        id: preApproval.id,
+        status: preApproval.status,
+        external_reference: preApproval.external_reference
+      });
+
+      // Find subscription by preapproval ID
+      const subscription = await Subscription.getByPreapprovalId(preapprovalId);
+      
+      if (subscription) {
+        // Update subscription status based on preapproval status
+        const statusMap = {
+          'authorized': 'authorized',
+          'paused': 'paused',
+          'cancelled': 'cancelled',
+          'pending': 'pending'
+        };
+
+        const newStatus = statusMap[preApproval.status] || 'pending';
+        
+        await Subscription.updateStatus(subscription.id, newStatus, {
+          startDate: preApproval.date_created ? new Date(preApproval.date_created).toISOString().split('T')[0] : null,
+          nextPaymentDate: preApproval.next_payment_date ? new Date(preApproval.next_payment_date).toISOString().split('T')[0] : null
+        });
+
+        // Send activation email if authorized
+        if (newStatus === 'authorized') {
+          try {
+            const user = await User.findById(subscription.user_id);
+            const plan = await SubscriptionPlan.findById(subscription.plan_id);
+            
+            await emailService.sendSubscriptionActivated(user.email, {
+              userName: user.first_name || user.email,
+              planName: plan.name
+            });
+          } catch (emailError) {
+            console.error('Error sending activation email:', emailError);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error processing preapproval notification:', error);
+    }
+  },
+
+  // Handle authorized payment notifications (recurring payments)
+  handleAuthorizedPaymentNotification: async (paymentId) => {
+    try {
+      // This handles recurring payments from authorized subscriptions
+      await this.handlePaymentNotification(paymentId);
+    } catch (error) {
+      console.error('Error processing authorized payment notification:', error);
     }
   },
 

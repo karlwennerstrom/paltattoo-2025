@@ -57,7 +57,7 @@ const AuthCallback = () => {
             
             // Redirect based on user type
             if (userData.user.userType === 'artist') {
-              navigate('/artist/dashboard');
+              navigate('/artist');
             } else if (userData.user.userType === 'admin') {
               navigate('/admin/dashboard');
             } else {

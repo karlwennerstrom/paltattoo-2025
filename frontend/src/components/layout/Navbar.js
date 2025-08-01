@@ -66,7 +66,7 @@ const Navbar = () => {
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <div className="flex-shrink-0">
-            <Link to={isAdmin ? "/admin/dashboard" : isArtist ? "/artist/dashboard" : "/"} className="flex items-center space-x-3 group">
+            <Link to={isAdmin ? "/admin/dashboard" : isArtist ? "/artist" : "/"} className="flex items-center space-x-3 group">
               <div className="relative">
                 <img 
                   src="/paltattoo-icono.png" 

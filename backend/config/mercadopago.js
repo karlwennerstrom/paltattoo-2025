@@ -1,4 +1,4 @@
-const { MercadoPagoConfig, Preference, Payment } = require('mercadopago');
+const { MercadoPagoConfig, Preference, Payment, PreApproval, PreApprovalPlan } = require('mercadopago');
 
 // Configuración de MercadoPago
 const client = new MercadoPagoConfig({ 
@@ -8,11 +8,17 @@ const client = new MercadoPagoConfig({
   }
 });
 
-// Cliente para preferencias de pago
+// Cliente para preferencias de pago (pagos únicos)
 const preference = new Preference(client);
 
 // Cliente para pagos
 const payment = new Payment(client);
+
+// Cliente para suscripciones (preaprobaciones)
+const preApprovalClient = new PreApproval(client);
+
+// Cliente para planes de suscripción
+const preApprovalPlanClient = new PreApprovalPlan(client);
 
 // Función para obtener URL válida para MercadoPago
 const getValidUrl = (url) => {
@@ -33,9 +39,16 @@ const config = {
   notificationUrl: process.env.BACKEND_URL?.includes('localhost') 
     ? 'https://webhook.site/#!/unique-id' // URL de prueba para webhooks
     : `${process.env.BACKEND_URL}/api/payments/webhook`,
-  successUrl: `${process.env.FRONTEND_URL || 'https://paltattoo-2025.vercel.app'}/dashboard?payment=success`,
-  failureUrl: `${process.env.FRONTEND_URL || 'https://paltattoo-2025.vercel.app'}/dashboard?payment=failure`,
-  pendingUrl: `${process.env.FRONTEND_URL || 'https://paltattoo-2025.vercel.app'}/dashboard?payment=pending`,
+  // URLs para suscripciones (preaprobaciones)
+  backUrls: {
+    success: `${process.env.FRONTEND_URL || 'https://paltattoo-2025.vercel.app'}/subscription/success`,
+    failure: `${process.env.FRONTEND_URL || 'https://paltattoo-2025.vercel.app'}/subscription/failure`,
+    pending: `${process.env.FRONTEND_URL || 'https://paltattoo-2025.vercel.app'}/subscription/pending`
+  },
+  // URLs para pagos únicos (preferencias)
+  successUrl: `${process.env.FRONTEND_URL || 'https://paltattoo-2025.vercel.app'}/artist?payment=success`,
+  failureUrl: `${process.env.FRONTEND_URL || 'https://paltattoo-2025.vercel.app'}/artist?payment=failure`,
+  pendingUrl: `${process.env.FRONTEND_URL || 'https://paltattoo-2025.vercel.app'}/artist?payment=pending`,
   autoReturn: 'approved',
   statementDescriptor: 'PALTATTOO',
   externalReference: 'paltattoo_subscription',
@@ -48,5 +61,7 @@ module.exports = {
   client,
   preference,
   payment,
+  preApprovalClient,
+  preApprovalPlanClient,
   config
 };

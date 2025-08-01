@@ -218,7 +218,14 @@ const paymentController = {
         external_reference: externalReference,
         payer_email: req.user.email,
         back_urls: config.backUrls,
-        status: 'pending' // Always start as pending, will be authorized after payment
+        auto_recurring: {
+          frequency: 1,
+          frequency_type: 'months',
+          start_date: new Date().toISOString(),
+          transaction_amount: parseFloat(plan.price),
+          currency_id: 'CLP'
+        }
+        // Note: Omitting status and card_token_id to let user authorize via init_point
       };
 
       console.log('Creating MercadoPago preapproval with data:', preApprovalData);

@@ -6,16 +6,21 @@ const session = require('express-session');
 const passport = require('./config/passport');
 const http = require('http');
 const socketService = require('./services/socketService');
+const ensureDirectories = require('./utils/ensureDirectories');
+
 
 dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
 
+ensureDirectories();
+
+
 // Configure CORS for development and production
 const allowedOrigins = process.env.NODE_ENV === 'production' 
   ? [process.env.FRONTEND_URL] 
-  : ["http://localhost:3000", "http://127.0.0.1:3000"];
+  : ["http://localhost:3000", "http://127.0.0.1:3000", "https://paltattoo-2025.vercel.app"];
 
 app.use(cors({
   origin: allowedOrigins,
@@ -120,4 +125,6 @@ server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
   console.log(`API documentation available at http://localhost:${PORT}`);
   console.log(`Socket.io server initialized`);
+  console.log(`Uploads directory: ${uploadsPath}`);
+
 });

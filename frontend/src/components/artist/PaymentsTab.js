@@ -489,9 +489,14 @@ const PaymentsTab = () => {
           subscriptionResponse = await subscriptionsAPI.changePlan(currentSubscription.id, targetPlan.id);
         }
       } else {
-        // New subscription
-        console.log('➕ Creating new subscription for plan:', targetPlan.id);
-        subscriptionResponse = await subscriptionsAPI.subscribe(targetPlan.id);
+        // New subscription - always use payment endpoint for paid plans to ensure MercadoPago integration
+        if (targetPlan.price > 0) {
+          console.log('💳 Creating new PAID subscription for plan:', targetPlan.id);
+          subscriptionResponse = await paymentService.createSubscription({ planId: targetPlan.id });
+        } else {
+          console.log('➕ Creating new FREE subscription for plan:', targetPlan.id);
+          subscriptionResponse = await subscriptionsAPI.subscribe(targetPlan.id);
+        }
       }
 
       // If plan has a price, redirect to MercadoPago

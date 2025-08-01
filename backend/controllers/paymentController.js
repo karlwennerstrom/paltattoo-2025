@@ -235,31 +235,59 @@ const paymentController = {
 
       console.log('Creating MercadoPago preapproval with data:', preApprovalData);
       
-      let preApproval;
-      try {
-        preApproval = await preApprovalClient.create({ body: preApprovalData });
-        console.log('MercadoPago preapproval created successfully:', preApproval.id);
-      } catch (mpError) {
-        console.error('MercadoPago preapproval creation failed:', mpError);
-        
-        // If card_token_id is required, log detailed error and suggest alternative
-        if (mpError.message && mpError.message.includes('card_token_id')) {
-          console.error('MercadoPago requires card_token_id. This might be a sandbox vs production difference.');
-          console.error('Full error details:', JSON.stringify(mpError, null, 2));
-          
-          // For now, throw a more descriptive error
-          throw new Error(`MercadoPago configuration issue: ${mpError.message}. Check if using correct API environment.`);
+      // Since MercadoPago PreApprovals require card_token_id, we'll use Preferences instead
+      // This creates a payment preference that the user can complete, then we manually manage the subscription
+      console.log('Creating MercadoPago preference (not preapproval) due to card_token_id requirement');
+      
+      const { preference } = require('../config/mercadopago');
+      
+      const preferenceData = {
+        items: [{
+          id: `plan_${plan.id}`,
+          title: `Suscripción ${plan.name} - PalTattoo`,
+          description: `Plan ${plan.name} mensual para artistas`,
+          category_id: 'services',
+          quantity: 1,
+          currency_id: 'CLP',
+          unit_price: parseFloat(plan.price)
+        }],
+        payer: {
+          name: req.user.first_name || '',
+          surname: req.user.last_name || '',
+          email: req.user.email
+        },
+        back_urls: config.backUrls,
+        auto_return: 'approved',
+        payment_methods: {
+          excluded_payment_methods: [],
+          excluded_payment_types: [],
+          installments: 1
+        },
+        notification_url: config.notificationUrl,
+        statement_descriptor: 'PALTATTOO',
+        external_reference: externalReference,
+        metadata: {
+          user_id: userId,
+          plan_id: planId,
+          subscription_type: 'monthly'
         }
-        
-        throw mpError;
+      };
+
+      let paymentPreference;
+      try {
+        paymentPreference = await preference.create({ body: preferenceData });
+        console.log('MercadoPago preference created successfully:', paymentPreference.id);
+      } catch (prefError) {
+        console.error('MercadoPago preference creation failed:', prefError);
+        throw new Error(`Error creating payment preference: ${prefError.message}`);
       }
 
       // Guardar suscripción en la base de datos
       const subscriptionId = await Subscription.create({
         userId,
         planId,
-        mercadopagoPreapprovalId: preApproval.id,
-        status: preApproval.status || 'pending',
+        mercadopagoPreapprovalId: paymentPreference.id, // Using preference ID instead of preapproval
+        status: 'pending', // Will be activated when payment is completed
         externalReference: externalReference,
         payerEmail: req.user.email
       });
@@ -303,13 +331,14 @@ const paymentController = {
         success: true,
         data: {
           subscriptionId,
-          initPoint: preApproval.init_point,
-          preApprovalId: preApproval.id,
-          status: preApproval.status,
+          initPoint: paymentPreference.init_point,
+          preferenceId: paymentPreference.id,
+          status: 'pending',
           planChange: !!activeSubscription,
           message: activeSubscription ? 'Plan cambiado exitosamente' : 'Suscripción creada exitosamente',
-          // Important: This is a subscription authorization flow, not a payment
-          isSubscription: true
+          // Note: Using payment preference instead of preapproval due to card_token_id requirement
+          isSubscription: true,
+          paymentType: 'preference'
         }
       });
     } catch (error) {

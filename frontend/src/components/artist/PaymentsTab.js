@@ -501,10 +501,50 @@ const PaymentsTab = () => {
           } else if (subscriptionResponse.data.initPoint) {
             window.location.href = subscriptionResponse.data.initPoint;
             return; // Exit function as we're redirecting
+          } else {
+            // If no init_point, something went wrong
+            console.error('No init_point received for paid plan');
+            toast.error('Error al generar el enlace de pago. Por favor intenta nuevamente.');
+            setPlanChangeModal(prev => ({ ...prev, loading: false }));
+            return;
           }
         } catch (paymentError) {
           console.error('Error processing subscription payment:', paymentError);
           toast.error('Error al procesar el pago. Por favor intenta nuevamente.');
+          setPlanChangeModal(prev => ({ ...prev, loading: false }));
+          return;
+        }
+      } else {
+        // Free plan - handle success immediately
+        console.log('Free plan selected - processing success immediately');
+        try {
+          // Show success message
+          toast.success(`Plan cambiado exitosamente a ${targetPlan.name}`);
+          
+          // Refresh user data to get updated subscription info
+          await refreshUserData();
+          
+          // Add to history
+          const historyEntry = {
+            id: Date.now(),
+            date: new Date().toISOString(),
+            fromPlan: currentSubscription?.plan_name || currentSubscription?.plan || 'Básico',
+            toPlan: targetPlan?.name,
+            action: 'downgrade',
+            reason: 'Cambio a plan gratuito'
+          };
+          setSubscriptionHistory(prev => [historyEntry, ...prev]);
+          
+          // Close modal and stop loading
+          setPlanChangeModal(prev => ({ ...prev, loading: false, isOpen: false }));
+          
+          // Refresh data
+          await loadData();
+          
+          return; // Exit function as we're done
+        } catch (freeError) {
+          console.error('Error processing free plan change:', freeError);
+          toast.error('Error al cambiar al plan gratuito. Por favor intenta nuevamente.');
           setPlanChangeModal(prev => ({ ...prev, loading: false }));
           return;
         }

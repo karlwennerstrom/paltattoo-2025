@@ -5,7 +5,20 @@ const fs = require('fs').promises;
 
 class EmailService {
   constructor() {
+    // Use verified domain in production, fallback to resend.dev for development
     this.from = process.env.EMAIL_FROM || 'PalTattoo <noreply@resend.dev>';
+    
+    // Validate email format
+    if (this.from && !this.isValidEmailFormat(this.from)) {
+      console.warn(`Invalid EMAIL_FROM format: ${this.from}. Using fallback.`);
+      this.from = 'PalTattoo <noreply@resend.dev>';
+    }
+  }
+
+  isValidEmailFormat(email) {
+    // Check if email follows "Name <email@domain.com>" or "email@domain.com" format
+    const emailRegex = /^(?:[^<]+\s+<[^@]+@[^>]+>|[^@]+@[^.]+\..+)$/;
+    return emailRegex.test(email);
   }
 
   async loadTemplate(templateName, variables = {}) {

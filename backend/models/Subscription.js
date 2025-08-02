@@ -97,6 +97,19 @@ class Subscription {
     );
     return rows[0];
   }
+  
+  // Obtener suscripción por external reference
+  static async getByExternalReference(externalReference) {
+    const [rows] = await db.execute(
+      `SELECT s.*, p.name as plan_name, p.price, u.email as user_email 
+       FROM user_subscriptions s 
+       JOIN subscription_plans p ON s.plan_id = p.id 
+       JOIN users u ON s.user_id = u.id 
+       WHERE s.external_reference = ?`,
+      [externalReference]
+    );
+    return rows[0];
+  }
 
   // Actualizar estado de suscripción
   static async updateStatus(subscriptionId, status, additionalData = {}) {

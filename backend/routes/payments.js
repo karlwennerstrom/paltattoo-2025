@@ -9,6 +9,61 @@ router.get('/plans', paymentController.getPlans);
 // Webhook de MercadoPago (sin autenticación)
 router.post('/webhook', paymentController.webhook);
 
+// Test webhook endpoint (for debugging)
+router.get('/webhook/test', (req, res) => {
+  const hasSecret = !!process.env.MERCADOPAGO_WEBHOOK_SECRET;
+  const secretPreview = process.env.MERCADOPAGO_WEBHOOK_SECRET ? 
+    process.env.MERCADOPAGO_WEBHOOK_SECRET.substring(0, 8) + '...' : 
+    'NOT_SET';
+    
+  res.json({ 
+    status: 'ok', 
+    message: 'Webhook endpoint is accessible',
+    timestamp: new Date().toISOString(),
+    env: process.env.NODE_ENV,
+    url: `${req.protocol}://${req.get('host')}${req.originalUrl}`,
+    webhookConfig: {
+      hasSecret,
+      secretPreview,
+      signatureValidation: hasSecret && process.env.NODE_ENV === 'production' ? 'enabled' : 'disabled'
+    }
+  });
+});
+
+// Manual payment processing endpoint (temporary for debugging)
+router.post('/webhook/manual/:paymentId', authenticate, async (req, res) => {
+  try {
+    if (req.user.user_type !== 'admin' && req.user.id !== 14) {
+      return res.status(403).json({ error: 'Not authorized' });
+    }
+    
+    const { paymentId } = req.params;
+    console.log('Manual webhook processing for payment:', paymentId);
+    
+    // Simulate webhook data
+    const simulatedBody = {
+      type: 'payment',
+      action: 'payment.created',
+      data: { id: paymentId }
+    };
+    
+    // Call the webhook handler directly
+    await paymentController.webhook(
+      { 
+        body: simulatedBody, 
+        headers: { 
+          'user-agent': 'Manual-Processing',
+          'x-request-id': 'manual-' + Date.now()
+        }
+      }, 
+      res
+    );
+  } catch (error) {
+    console.error('Manual webhook error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Rutas protegidas - requieren autenticación
 router.use(authenticate);
 

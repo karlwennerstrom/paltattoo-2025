@@ -389,18 +389,94 @@ const paymentController = {
     const startTime = Date.now();
     
     try {
-      const { type, data, action } = req.body;
+      // Parse body if it's a raw buffer
+      let body = req.body;
+      let rawBody = req.body;
+      
+      if (Buffer.isBuffer(req.body)) {
+        rawBody = req.body.toString();
+        try {
+          body = JSON.parse(rawBody);
+        } catch (parseError) {
+          console.error('Failed to parse webhook body:', parseError);
+          return res.status(400).json({ error: 'Invalid JSON' });
+        }
+      } else {
+        // If body is already parsed, we need to stringify it for signature validation
+        rawBody = JSON.stringify(body);
+      }
+      
+      const { type, data, action } = body;
       const headers = req.headers;
+      
+      // Validate webhook signature
+      const webhookSecret = process.env.MERCADOPAGO_WEBHOOK_SECRET;
+      if (webhookSecret && process.env.NODE_ENV === 'production') {
+        const xSignature = headers['x-signature'];
+        const xRequestId = headers['x-request-id'];
+        
+        if (!xSignature || !xRequestId) {
+          console.error('Missing webhook signature headers');
+          return res.status(401).json({ error: 'Missing signature' });
+        }
+        
+        // Extract ts and v1 from x-signature header
+        const parts = xSignature.split(',');
+        let ts = '';
+        let hash = '';
+        
+        for (const part of parts) {
+          const [key, value] = part.split('=');
+          if (key === 'ts') {
+            ts = value;
+          } else if (key === 'v1') {
+            hash = value;
+          }
+        }
+        
+        if (!ts || !hash) {
+          console.error('Invalid signature format');
+          return res.status(401).json({ error: 'Invalid signature format' });
+        }
+        
+        // Create the signed payload
+        const crypto = require('crypto');
+        const manifest = `id:${data.id};request-id:${xRequestId};ts:${ts};`;
+        
+        // Generate the signature
+        const hmac = crypto.createHmac('sha256', webhookSecret);
+        hmac.update(manifest);
+        const calculatedHash = hmac.digest('hex');
+        
+        // Compare signatures
+        if (calculatedHash !== hash) {
+          console.error('Webhook signature validation failed', {
+            expected: hash,
+            calculated: calculatedHash,
+            manifest
+          });
+          return res.status(401).json({ error: 'Invalid signature' });
+        }
+        
+        console.log('✅ Webhook signature validated successfully');
+      } else {
+        console.log('⚠️ Webhook signature validation skipped (development mode or no secret)');
+      }
       
       console.log('=== MercadoPago Webhook Received ===');
       console.log('Timestamp:', new Date().toISOString());
       console.log('Headers:', {
         'user-agent': headers['user-agent'],
         'x-request-id': headers['x-request-id'],
-        'x-signature': headers['x-signature']
+        'x-signature': headers['x-signature'],
+        'x-request-id-query': headers['x-request-id-query']
       });
       console.log('Body:', { type, action, data });
-      console.log('Full request body:', JSON.stringify(req.body, null, 2));
+      console.log('Full request body:', JSON.stringify(body, null, 2));
+      
+      // Log webhook URL for debugging
+      console.log('Webhook URL configured:', process.env.MERCADOPAGO_WEBHOOK_URL || 'Using default');
+      console.log('Is production:', process.env.NODE_ENV === 'production');
 
       // Validate required fields
       if (!type || !data?.id) {
@@ -445,7 +521,7 @@ const paymentController = {
       console.error('Error:', error.message);
       console.error('Stack:', error.stack);
       console.error(`Processing time: ${processingTime}ms`);
-      console.error('Request body:', JSON.stringify(req.body, null, 2));
+      console.error('Request body:', JSON.stringify(body, null, 2));
       console.error('=== End Webhook Error ===\n');
       
       // Still respond 200 to avoid retries from MercadoPago
@@ -495,13 +571,19 @@ const paymentController = {
         // Try multiple methods to find the subscription
         let subscription = null;
         
-        // Method 1: Find by external reference in mercadopago_preapproval_id field
-        subscription = await Subscription.getByPreapprovalId(paymentInfo.external_reference);
+        // Method 1: Find by external reference
+        subscription = await Subscription.getByExternalReference(paymentInfo.external_reference);
         
         if (!subscription && paymentInfo.preference_id) {
-          // Method 2: Find by preference ID
+          // Method 2: Find by preference ID in mercadopago_preapproval_id field
           console.log('Trying to find subscription by preference ID:', paymentInfo.preference_id);
           subscription = await Subscription.getByPreapprovalId(paymentInfo.preference_id);
+        }
+        
+        if (!subscription) {
+          // Method 3: Find by external reference in mercadopago_preapproval_id field (legacy)
+          console.log('Trying to find subscription by external reference in preapproval field:', paymentInfo.external_reference);
+          subscription = await Subscription.getByPreapprovalId(paymentInfo.external_reference);
         }
         
         if (!subscription) {

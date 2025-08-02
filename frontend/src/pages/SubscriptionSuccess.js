@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { FiCheckCircle, FiLoader } from 'react-icons/fi';
 import Button from '../components/common/Button';
@@ -11,8 +11,13 @@ const SubscriptionSuccess = () => {
   const [searchParams] = useSearchParams();
   const { isAuthenticated, user, refreshUserData } = useAuth();
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const hasRunRef = useRef(false);
   
   useEffect(() => {
+    // Prevent multiple executions
+    if (hasRunRef.current) return;
+    hasRunRef.current = true;
+    
     const refreshUserSubscription = async () => {
       if (!isAuthenticated) return;
       
@@ -33,15 +38,31 @@ const SubscriptionSuccess = () => {
             const updatedUser = await refreshUserData();
             
             // Check if we have subscription data or if user data includes subscription info
-            const hasActiveSubscription = updatedUser?.subscription?.status === 'authorized' || 
-                                        updatedUser?.subscription?.planName ||
-                                        updatedUser?.plan_name || 
-                                        updatedUser?.currentPlan;
+            // Note: Skip "basico" plan as it's the default/free plan
+            const currentPlan = updatedUser?.subscription?.planName || 
+                              updatedUser?.subscription?.planType ||
+                              updatedUser?.plan_name || 
+                              updatedUser?.currentPlan;
+                              
+            const hasActiveSubscription = (updatedUser?.subscription?.status === 'authorized' && 
+                                         currentPlan && 
+                                         currentPlan.toLowerCase() !== 'basico' &&
+                                         currentPlan.toLowerCase() !== 'basic');
             
             if (hasActiveSubscription) {
-              console.log('Subscription found in user data:', hasActiveSubscription);
+              console.log('Active paid subscription found:', {
+                plan: currentPlan,
+                status: updatedUser?.subscription?.status,
+                subscription: updatedUser?.subscription
+              });
               toast.success('¡Tu suscripción ha sido activada!');
               return true; // Subscription found and activated
+            } else {
+              console.log('No active paid subscription yet:', {
+                currentPlan,
+                status: updatedUser?.subscription?.status,
+                hasSubscription: !!updatedUser?.subscription
+              });
             }
             
             // If no subscription found and we haven't reached max attempts, try again
@@ -104,7 +125,7 @@ const SubscriptionSuccess = () => {
       console.log('Development mode: Subscription already created and activated');
       toast.success('¡Tu suscripción ha sido activada! (Modo desarrollo)');
     }
-  }, [searchParams, isAuthenticated, refreshUserData]);
+  }, []); // Remove dependencies to prevent infinite loop
 
   return (
     <div className="min-h-screen bg-primary-900 flex items-center justify-center p-6">
@@ -140,7 +161,7 @@ const SubscriptionSuccess = () => {
                   variant="primary"
                   fullWidth
                   disabled={isRefreshing}
-                  onClick={() => navigate('/artist/subscription')}
+                  onClick={() => navigate('/artist/payments')}
                 >
                   {isRefreshing ? 'Actualizando...' : 'Ver Mi Suscripción'}
                 </Button>

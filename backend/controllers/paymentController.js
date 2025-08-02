@@ -689,7 +689,9 @@ const paymentController = {
       console.log('Processing preapproval notification:', {
         id: preApproval.id,
         status: preApproval.status,
-        external_reference: preApproval.external_reference
+        external_reference: preApproval.external_reference,
+        payer_email: preApproval.payer_email,
+        date_created: preApproval.date_created
       });
 
       // Parse external_reference to get plan info
@@ -706,7 +708,25 @@ const paymentController = {
       }
 
       // Find subscription by preapproval ID
-      const subscription = await Subscription.getByPreapprovalId(preapprovalId);
+      let subscription = await Subscription.getByPreapprovalId(preapprovalId);
+      
+      // If not found by preapproval ID, try to find by external reference
+      if (!subscription && preApproval.external_reference) {
+        console.log('Subscription not found by preapproval ID, trying external reference:', preApproval.external_reference);
+        subscription = await Subscription.getByExternalReference(preApproval.external_reference);
+      }
+      
+      console.log('Subscription lookup result:', {
+        preapprovalId,
+        external_reference: preApproval.external_reference,
+        found: !!subscription,
+        subscription: subscription ? {
+          id: subscription.id,
+          user_id: subscription.user_id,
+          plan_id: subscription.plan_id,
+          status: subscription.status
+        } : null
+      });
       
       if (subscription) {
         console.log('Found subscription:', {
@@ -729,7 +749,16 @@ const paymentController = {
         // If we have a new plan ID and status is authorized, update the plan too
         if (newPlanId && newStatus === 'authorized' && newPlanId !== subscription.plan_id) {
           console.log(`Updating subscription ${subscription.id} from plan ${subscription.plan_id} to plan ${newPlanId}`);
-          await Subscription.updatePlan(subscription.id, newPlanId);
+          const planUpdateResult = await Subscription.updatePlan(subscription.id, newPlanId);
+          console.log('Plan update result:', planUpdateResult);
+        } else {
+          console.log('Plan update skipped:', {
+            hasNewPlanId: !!newPlanId,
+            isAuthorized: newStatus === 'authorized',
+            isDifferentPlan: newPlanId !== subscription.plan_id,
+            currentPlan: subscription.plan_id,
+            newPlan: newPlanId
+          });
         }
         
         await Subscription.updateStatus(subscription.id, newStatus, {

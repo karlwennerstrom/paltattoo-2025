@@ -441,7 +441,19 @@ const paymentController = {
         
         // Create the signed payload
         const crypto = require('crypto');
-        const manifest = `id:${data.id};request-id:${xRequestId};ts:${ts};`;
+        // Use the ID from data, or from body if data.id is undefined, or from body.id
+        const webhookId = data?.id || body?.data?.id || body?.id || '';
+        const manifest = `id:${webhookId};request-id:${xRequestId};ts:${ts};`;
+        
+        console.log('Signature validation details:', {
+          dataId: data?.id,
+          bodyDataId: body?.data?.id,
+          bodyId: body?.id,
+          selectedId: webhookId,
+          manifest,
+          xRequestId,
+          ts
+        });
         
         // Generate the signature
         const hmac = crypto.createHmac('sha256', webhookSecret);
@@ -473,6 +485,14 @@ const paymentController = {
       });
       console.log('Body:', { type, action, data });
       console.log('Full request body:', JSON.stringify(body, null, 2));
+      console.log('Data structure analysis:', {
+        type,
+        action,
+        hasData: !!data,
+        dataId: data?.id,
+        bodyId: body?.id,
+        dataKeys: data ? Object.keys(data) : null
+      });
       
       // Log webhook URL for debugging
       console.log('Webhook URL configured:', process.env.MERCADOPAGO_WEBHOOK_URL || 'Using default');
@@ -480,7 +500,11 @@ const paymentController = {
 
       // Validate required fields
       if (!type || !data?.id) {
-        console.error('Invalid webhook payload: missing type or data.id');
+        console.error('Invalid webhook payload: missing type or data.id', {
+          type,
+          data,
+          hasDataId: !!data?.id
+        });
         return res.status(200).send('OK'); // Still return 200 to avoid retries
       }
 

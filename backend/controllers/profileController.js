@@ -2,6 +2,7 @@ const User = require('../models/User');
 const TattooArtist = require('../models/TattooArtist');
 const Client = require('../models/Client');
 const Portfolio = require('../models/Portfolio');
+const Subscription = require('../models/Subscription');
 const sharp = require('sharp');
 const path = require('path');
 const fs = require('fs').promises;
@@ -18,6 +19,22 @@ const getProfile = async (req, res) => {
     
     let additionalData = {};
     
+    // Get subscription data for all users (especially important for artists)
+    const subscription = await Subscription.getActiveByUserId(req.user.id);
+    if (subscription) {
+      additionalData.subscription = {
+        id: subscription.id,
+        planName: subscription.plan_name,
+        planType: subscription.plan_type,
+        price: subscription.price,
+        status: subscription.status,
+        startDate: subscription.start_date,
+        endDate: subscription.end_date,
+        nextPaymentDate: subscription.next_payment_date,
+        features: subscription.features
+      };
+    }
+    
     if (req.user.user_type === 'artist') {
       const artist = await TattooArtist.findByUserId(req.user.id);
       if (artist) {
@@ -26,6 +43,7 @@ const getProfile = async (req, res) => {
           Portfolio.findByArtist(artist.id, 5)
         ]);
         additionalData = {
+          ...additionalData,
           artistProfile: artist,
           styles,
           recentPortfolio: portfolio
@@ -36,6 +54,7 @@ const getProfile = async (req, res) => {
       if (client) {
         const favorites = await Client.getFavorites(client.id);
         additionalData = {
+          ...additionalData,
           clientProfile: client,
           favorites: favorites.slice(0, 5)
         };

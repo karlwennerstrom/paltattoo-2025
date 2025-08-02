@@ -498,12 +498,14 @@ const paymentController = {
       console.log('Webhook URL configured:', process.env.MERCADOPAGO_WEBHOOK_URL || 'Using default');
       console.log('Is production:', process.env.NODE_ENV === 'production');
 
-      // Validate required fields
-      if (!type || !data?.id) {
-        console.error('Invalid webhook payload: missing type or data.id', {
+      // Validate required fields - accept either data.id or body.id
+      const webhookId = data?.id || body?.id;
+      if (!type || !webhookId) {
+        console.error('Invalid webhook payload: missing type or webhook ID', {
           type,
-          data,
-          hasDataId: !!data?.id
+          dataId: data?.id,
+          bodyId: body?.id,
+          webhookId
         });
         return res.status(200).send('OK'); // Still return 200 to avoid retries
       }
@@ -511,24 +513,32 @@ const paymentController = {
       // Handle different notification types
       let processed = false;
       
-      if (type === 'payment' && data?.id) {
-        console.log('Processing payment notification for ID:', data.id);
-        await paymentController.handlePaymentNotification(data.id);
+      if (type === 'payment' && (data?.id || webhookId)) {
+        const paymentId = data?.id || webhookId;
+        console.log('Processing payment notification for ID:', paymentId);
+        await paymentController.handlePaymentNotification(paymentId);
         processed = true;
-      } else if (type === 'preapproval' && data?.id) {
-        console.log('Processing preapproval notification for ID:', data.id);
-        await paymentController.handlePreapprovalNotification(data.id);
+      } else if (type === 'preapproval' && (data?.id || webhookId)) {
+        const preapprovalId = data?.id || webhookId;
+        console.log('Processing preapproval notification for ID:', preapprovalId);
+        await paymentController.handlePreapprovalNotification(preapprovalId);
         processed = true;
-      } else if (type === 'subscription_preapproval' && data?.id) {
-        console.log('Processing subscription preapproval notification for ID:', data.id);
-        await paymentController.handlePreapprovalNotification(data.id);
+      } else if (type === 'subscription_preapproval' && (data?.id || webhookId)) {
+        const preapprovalId = data?.id || webhookId;
+        console.log('Processing subscription preapproval notification for ID:', preapprovalId);
+        await paymentController.handlePreapprovalNotification(preapprovalId);
         processed = true;
-      } else if (type === 'authorized_payment' && data?.id) {
-        console.log('Processing authorized payment notification for ID:', data.id);
-        await paymentController.handleAuthorizedPaymentNotification(data.id);
+      } else if (type === 'authorized_payment' && (data?.id || webhookId)) {
+        const paymentId = data?.id || webhookId;
+        console.log('Processing authorized payment notification for ID:', paymentId);
+        await paymentController.handleAuthorizedPaymentNotification(paymentId);
+        processed = true;
+      } else if (type === 'topic_merchant_order_wh' && webhookId) {
+        console.log('Processing merchant order notification for ID:', webhookId);
+        await paymentController.handleMerchantOrderNotification(webhookId);
         processed = true;
       } else {
-        console.log('Unhandled webhook type:', type);
+        console.log('Unhandled webhook type:', type, 'with ID:', webhookId);
       }
 
       const processingTime = Date.now() - startTime;
@@ -832,6 +842,43 @@ const paymentController = {
       await paymentController.handlePaymentNotification(paymentId);
     } catch (error) {
       console.error('Error processing authorized payment notification:', error);
+    }
+  },
+
+  handleMerchantOrderNotification: async (merchantOrderId) => {
+    try {
+      console.log('Processing merchant order notification for ID:', merchantOrderId);
+      
+      // Get merchant order details from MercadoPago
+      const axios = require('axios');
+      const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
+      
+      const response = await axios.get(`https://api.mercadopago.com/merchant_orders/${merchantOrderId}`, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`
+        }
+      });
+      
+      const merchantOrder = response.data;
+      console.log('Merchant order details:', {
+        id: merchantOrder.id,
+        status: merchantOrder.status,
+        external_reference: merchantOrder.external_reference,
+        payments: merchantOrder.payments?.map(p => ({ id: p.id, status: p.status }))
+      });
+      
+      // Process payments within the merchant order
+      if (merchantOrder.payments && merchantOrder.payments.length > 0) {
+        for (const paymentInfo of merchantOrder.payments) {
+          if (paymentInfo.status === 'approved') {
+            console.log('Processing approved payment from merchant order:', paymentInfo.id);
+            await paymentController.handlePaymentNotification(paymentInfo.id);
+          }
+        }
+      }
+      
+    } catch (error) {
+      console.error('Error processing merchant order notification:', error);
     }
   },
 

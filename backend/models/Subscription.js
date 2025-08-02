@@ -416,6 +416,15 @@ class Subscription {
     return result.affectedRows > 0;
   }
 
+  // Actualizar plan de suscripción (alias for updatePlan)
+  static async updatePlan(subscriptionId, newPlanId) {
+    const [result] = await db.execute(
+      'UPDATE user_subscriptions SET plan_id = ?, updated_at = NOW() WHERE id = ?',
+      [newPlanId, subscriptionId]
+    );
+    return result.affectedRows > 0;
+  }
+
   // Actualizar suscripción con registro de cambio
   static async updateSubscriptionWithChange(userId, oldSubscription, newPlanId, changeType, changeReason = null) {
     const connection = await db.getConnection();

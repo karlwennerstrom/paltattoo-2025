@@ -692,10 +692,30 @@ const paymentController = {
         external_reference: preApproval.external_reference
       });
 
+      // Parse external_reference to get plan info
+      let newPlanId = null;
+      if (preApproval.external_reference) {
+        const refParts = preApproval.external_reference.split('_');
+        console.log('External reference parts:', refParts);
+        
+        // Format: user_14_plan_2_1754151881255
+        if (refParts.length >= 4 && refParts[2] === 'plan') {
+          newPlanId = parseInt(refParts[3]);
+          console.log('Extracted plan ID from external reference:', newPlanId);
+        }
+      }
+
       // Find subscription by preapproval ID
       const subscription = await Subscription.getByPreapprovalId(preapprovalId);
       
       if (subscription) {
+        console.log('Found subscription:', {
+          id: subscription.id,
+          user_id: subscription.user_id,
+          current_plan_id: subscription.plan_id,
+          new_plan_id: newPlanId
+        });
+        
         // Update subscription status based on preapproval status
         const statusMap = {
           'authorized': 'authorized',
@@ -706,6 +726,12 @@ const paymentController = {
 
         const newStatus = statusMap[preApproval.status] || 'pending';
         
+        // If we have a new plan ID and status is authorized, update the plan too
+        if (newPlanId && newStatus === 'authorized' && newPlanId !== subscription.plan_id) {
+          console.log(`Updating subscription ${subscription.id} from plan ${subscription.plan_id} to plan ${newPlanId}`);
+          await Subscription.updatePlan(subscription.id, newPlanId);
+        }
+        
         await Subscription.updateStatus(subscription.id, newStatus, {
           startDate: preApproval.date_created ? new Date(preApproval.date_created).toISOString().split('T')[0] : null,
           nextPaymentDate: preApproval.next_payment_date ? new Date(preApproval.next_payment_date).toISOString().split('T')[0] : null
@@ -715,11 +741,14 @@ const paymentController = {
         if (newStatus === 'authorized') {
           try {
             const user = await User.findById(subscription.user_id);
-            const plan = await SubscriptionPlan.findById(subscription.plan_id);
+            // Use the new plan ID if it was updated, otherwise use existing plan
+            const planIdToUse = newPlanId || subscription.plan_id;
+            const plan = await SubscriptionPlan.findById(planIdToUse);
             
             await emailService.sendSubscriptionActivated(user.email, {
               userName: user.first_name || user.email,
-              planName: plan.name
+              planName: plan.name,
+              isChange: newPlanId ? true : false
             });
           } catch (emailError) {
             console.error('Error sending activation email:', emailError);

@@ -625,6 +625,18 @@ const paymentController = {
     try {
       if (paymentInfo.status === 'approved') {
         console.log('Processing approved payment for subscription:', subscription.id);
+        console.log('Payment plan info:', {
+          currentPlan: subscription.plan_id,
+          newPlan: planId,
+          needsUpdate: planId !== subscription.plan_id
+        });
+        
+        // Update plan if it's different
+        if (planId && planId !== subscription.plan_id) {
+          console.log(`Updating subscription ${subscription.id} from plan ${subscription.plan_id} to plan ${planId}`);
+          const planUpdateResult = await Subscription.updatePlan(subscription.id, planId);
+          console.log('Plan update result:', planUpdateResult);
+        }
         
         // Activate subscription
         await Subscription.updateStatus(subscription.id, 'authorized', {
@@ -664,7 +676,7 @@ const paymentController = {
             await emailService.sendSubscriptionActivated(user.email, {
               userName: user.first_name || user.email,
               planName: plan.name,
-              isChange: false
+              isChange: planId !== subscription.plan_id
             });
             
             console.log('Emails sent for subscription activation');

@@ -2,11 +2,22 @@ const { MercadoPagoConfig, Preference, Payment, PreApproval, PreApprovalPlan } =
 
 // Configuración de MercadoPago
 const client = new MercadoPagoConfig({ 
-  accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN || 'TEST-2420278478851432-010220-f91dd4f673b51cc5c8cf80e03b2becd8-183050733',
+  accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN,
   options: {
     timeout: 5000
   }
 });
+
+// Validate required environment variables
+if (!process.env.MERCADOPAGO_ACCESS_TOKEN) {
+  throw new Error('MERCADOPAGO_ACCESS_TOKEN environment variable is required');
+}
+if (!process.env.MERCADOPAGO_APP_ID) {
+  throw new Error('MERCADOPAGO_APP_ID environment variable is required');
+}
+if (!process.env.MERCADOPAGO_USER_ID) {
+  throw new Error('MERCADOPAGO_USER_ID environment variable is required');
+}
 
 // Cliente para preferencias de pago (pagos únicos)
 const preference = new Preference(client);
@@ -34,8 +45,8 @@ const getValidUrl = (url) => {
 
 // Configuración de la aplicación
 const config = {
-  appId: process.env.MERCADOPAGO_APP_ID || '5698143216134280',
-  userId: process.env.MERCADOPAGO_USER_ID || '183050733',
+  appId: process.env.MERCADOPAGO_APP_ID,
+  userId: process.env.MERCADOPAGO_USER_ID,
   notificationUrl: process.env.MERCADOPAGO_WEBHOOK_URL || 
     (process.env.BACKEND_URL?.includes('localhost') 
       ? 'https://webhook.site/#!/unique-id' // URL de prueba para webhooks en desarrollo

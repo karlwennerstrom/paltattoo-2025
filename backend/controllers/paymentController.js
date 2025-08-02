@@ -495,6 +495,10 @@ const paymentController = {
         console.log('Processing preapproval notification for ID:', data.id);
         await paymentController.handlePreapprovalNotification(data.id);
         processed = true;
+      } else if (type === 'subscription_preapproval' && data?.id) {
+        console.log('Processing subscription preapproval notification for ID:', data.id);
+        await paymentController.handlePreapprovalNotification(data.id);
+        processed = true;
       } else if (type === 'authorized_payment' && data?.id) {
         console.log('Processing authorized payment notification for ID:', data.id);
         await paymentController.handleAuthorizedPaymentNotification(data.id);

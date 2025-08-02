@@ -74,3 +74,26 @@ temp/
 *.pem
 *.key
 *.crt
+
+# ⚠️ SECURITY: Test and debug files with sensitive data
+**/test-*.js
+**/manual-*.js
+**/simulate-*.js
+**/debug-*.js
+
+# ⚠️ SECURITY: Files with database credentials or API keys
+**/*credentials*.js
+**/*secrets*.js  
+**/*config-prod*.js
+
+# ⚠️ SECURITY: Backup and temporary files that may contain sensitive data
+*.backup
+*.tmp
+*.temp
+*_backup.*
+*_temp.*
+
+# ⚠️ SECURITY: Documentation with real credentials (keep examples safe)
+*.example.webhook
+*CREDENTIALS*
+*API_KEYS*

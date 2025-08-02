@@ -3,13 +3,10 @@ import { Link, useLocation } from 'react-router-dom';
 import { 
   FiHome,
   FiUsers,
-  FiFileText,
   FiShoppingBag,
   FiCreditCard,
   FiBarChart2,
-  FiSettings,
   FiTag,
-  FiMessageSquare,
   FiX
 } from 'react-icons/fi';
 import { twMerge } from 'tailwind-merge';
@@ -25,16 +22,13 @@ const AdminSidebar = ({ isOpen, onClose }) => {
         { path: '/admin/users', label: 'Usuarios', icon: FiUsers },
         { path: '/admin/offers', label: 'Ofertas', icon: FiTag },
         { path: '/admin/shops', label: 'Tiendas', icon: FiShoppingBag },
-        { path: '/admin/content', label: 'Contenido', icon: FiFileText },
       ]
     },
     {
       section: 'GESTIÓN',
       items: [
-        { path: '/admin/payments', label: 'Pagos', icon: FiCreditCard },
-        { path: '/admin/reports', label: 'Reportes', icon: FiBarChart2 },
-        { path: '/admin/messages', label: 'Mensajes', icon: FiMessageSquare },
-        { path: '/admin/settings', label: 'Configuración', icon: FiSettings },
+        { path: '/admin/subscriptions', label: 'Suscripciones', icon: FiCreditCard },
+        { path: '/admin/payments', label: 'Pagos', icon: FiBarChart2 },
       ]
     }
   ];

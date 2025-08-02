@@ -31,15 +31,13 @@ import DashboardLayout from './components/shared/DashboardLayout';
 
 // Admin pages
 import AdminLayout from './components/admin/AdminLayout';
-import AdminOverview from './components/admin/pages/AdminOverview';
-import AdminUsers from './components/admin/pages/AdminUsers';
-import AdminOffers from './components/admin/pages/AdminOffers';
-import AdminShops from './components/admin/pages/AdminShops';
-import AdminContent from './components/admin/pages/AdminContent';
-import AdminPayments from './components/admin/pages/AdminPayments';
-import AdminReports from './components/admin/pages/AdminReports';
-import AdminMessages from './components/admin/pages/AdminMessages';
-import AdminSettings from './components/admin/pages/AdminSettings';
+// New admin pages for subscription management
+import AdminDashboard from './pages/admin/AdminDashboard';
+import AdminSubscriptions from './pages/admin/AdminSubscriptions';
+import AdminUsers from './pages/admin/AdminUsers';
+import AdminOffers from './pages/admin/AdminOffers';
+import AdminShops from './pages/admin/AdminShops';
+import AdminPayments from './pages/admin/AdminPayments';
 
 // Public pages
 import ArtistsView from './pages/artists/ArtistsView';
@@ -218,15 +216,12 @@ function App() {
             </ProtectedRoute>
           }>
             <Route index element={<Navigate to="/admin/dashboard" replace />} />
-            <Route path="dashboard" element={<AdminOverview />} />
+            <Route path="dashboard" element={<AdminDashboard />} />
+            <Route path="subscriptions" element={<AdminSubscriptions />} />
             <Route path="users" element={<AdminUsers />} />
             <Route path="offers" element={<AdminOffers />} />
             <Route path="shops" element={<AdminShops />} />
-            <Route path="content" element={<AdminContent />} />
             <Route path="payments" element={<AdminPayments />} />
-            <Route path="reports" element={<AdminReports />} />
-            <Route path="messages" element={<AdminMessages />} />
-            <Route path="settings" element={<AdminSettings />} />
           </Route>
 
           {/* Unauthorized page */}

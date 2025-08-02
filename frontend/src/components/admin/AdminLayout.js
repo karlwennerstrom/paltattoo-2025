@@ -13,14 +13,11 @@ const AdminLayout = () => {
     const path = location.pathname.split('/').pop();
     const titles = {
       dashboard: 'Dashboard',
+      subscriptions: 'Suscripciones',
       users: 'Usuarios',
       offers: 'Ofertas',
       shops: 'Tiendas',
-      content: 'Contenido',
-      payments: 'Pagos',
-      reports: 'Reportes',
-      messages: 'Mensajes',
-      settings: 'Configuración'
+      payments: 'Pagos'
     };
     return titles[path] || 'Panel de Administración';
   };

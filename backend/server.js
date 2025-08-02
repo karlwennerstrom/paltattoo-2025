@@ -70,6 +70,7 @@ const statsRoutes = require('./routes/stats');
 const subscriptionRoutes = require('./routes/subscriptions');
 const collectionRoutes = require('./routes/collections');
 const interestRoutes = require('./routes/interest');
+const adminRoutes = require('./routes/admin');
 
 // Import middleware
 const { errorHandler, notFound } = require('./middleware/errorHandler');
@@ -115,6 +116,7 @@ app.use('/api/stats', statsRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/collections', collectionRoutes);
 app.use('/api/interest', interestRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Error handling
 app.use(notFound);

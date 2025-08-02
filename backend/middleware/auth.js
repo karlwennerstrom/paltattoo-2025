@@ -70,5 +70,6 @@ module.exports = {
   authorizeArtist,
   authorizeClient,
   authorizeAdmin,
+  requireAdmin: authorizeAdmin, // Alias for admin routes
   optionalAuth
 };

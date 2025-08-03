@@ -474,10 +474,8 @@ router.get('/users', async (req, res) => {
 router.get('/users/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    console.log('Getting user details for ID:', id);
 
     // Datos del usuario
-    console.log('Executing user query...');
     const [userResult] = await db.execute(`
       SELECT 
         u.*,
@@ -485,13 +483,11 @@ router.get('/users/:id', async (req, res) => {
         up.last_name,
         up.phone,
         up.bio,
-        up.avatar_url
+        up.profile_image as avatar_url
       FROM users u
       LEFT JOIN user_profiles up ON u.id = up.user_id
       WHERE u.id = ?
     `, [id]);
-
-    console.log('User query completed, results:', userResult.length);
 
     if (userResult.length === 0) {
       return res.status(404).json({
@@ -503,7 +499,6 @@ router.get('/users/:id', async (req, res) => {
     const user = userResult[0];
 
     // Suscripción actual
-    console.log('Executing subscription query...');
     const [subscriptionResult] = await db.execute(`
       SELECT 
         s.*,
@@ -518,10 +513,7 @@ router.get('/users/:id', async (req, res) => {
       LIMIT 1
     `, [id]);
 
-    console.log('Subscription query completed');
-
     // Historial de pagos
-    console.log('Executing payment history query...');
     const [paymentHistory] = await db.execute(`
       SELECT 
         ph.*,
@@ -534,8 +526,6 @@ router.get('/users/:id', async (req, res) => {
       LIMIT 10
     `, [id]);
 
-    console.log('Payment history query completed');
-
     res.json({
       success: true,
       data: {
@@ -547,12 +537,9 @@ router.get('/users/:id', async (req, res) => {
 
   } catch (error) {
     console.error('Error getting user details:', error);
-    console.error('Error stack:', error.stack);
-    console.error('Error message:', error.message);
     res.status(500).json({
       success: false,
-      message: 'Error al obtener detalles del usuario',
-      error: error.message
+      message: 'Error al obtener detalles del usuario'
     });
   }
 });

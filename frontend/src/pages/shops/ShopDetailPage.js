@@ -218,14 +218,14 @@ const ShopDetailPage = () => {
                 ) : (
                   <div className="w-16 h-16 rounded-xl bg-accent-500 flex items-center justify-center">
                     <span className="text-white font-bold text-xl">
-                      {shop.name.charAt(0)}
+                      {shop.name ? shop.name.charAt(0) : '?'}
                     </span>
                   </div>
                 )}
                 
                 <div>
                   <div className="flex items-center space-x-2">
-                    <h1 className="text-2xl font-bold text-primary-100">{shop.name}</h1>
+                    <h1 className="text-2xl font-bold text-primary-100">{shop.name || 'Tienda sin nombre'}</h1>
                     {shop.is_featured && (
                       <span className="px-2 py-1 bg-accent-500 text-white text-xs rounded-full">
                         Destacado

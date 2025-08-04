@@ -90,6 +90,8 @@ const PortfolioTab = () => {
   ];
 
   useEffect(() => {
+    // Ensure we start in collections view
+    setCurrentView('collections');
     loadCollections();
     loadSubscriptionInfo();
   }, []);
@@ -118,10 +120,20 @@ const PortfolioTab = () => {
       setLoading(true);
       const response = await collectionService.getAll('my');
       const collectionsData = response.data?.collections || [];
+      console.log('Collections loaded:', collectionsData.length, 'collections');
       setCollections(collectionsData);
+      
+      // If we have no collections and we're showing collection detail, go back to collections view
+      if (collectionsData.length === 0 && currentView === 'collection-detail') {
+        setCurrentView('collections');
+        setSelectedCollection(null);
+      }
     } catch (error) {
       console.error('Error loading collections:', error);
       toast.error('Error al cargar colecciones');
+      // On error, ensure we're in collections view
+      setCurrentView('collections');
+      setSelectedCollection(null);
     } finally {
       setLoading(false);
     }

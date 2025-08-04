@@ -14,7 +14,7 @@ const Register = () => {
     userType: 'client',
     firstName: '',
     lastName: '',
-    phone: ''
+    phone: '+569'
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -22,10 +22,29 @@ const Register = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    
+    // Special handling for phone number
+    if (name === 'phone') {
+      // Ensure the prefix +569 is always present
+      let phoneValue = value;
+      if (!phoneValue.startsWith('+569')) {
+        // If user tries to delete the prefix, restore it
+        phoneValue = '+569';
+      }
+      // Only allow numbers after the prefix
+      const numberPart = phoneValue.substring(4).replace(/\D/g, '');
+      phoneValue = '+569' + numberPart;
+      
+      setFormData(prev => ({
+        ...prev,
+        phone: phoneValue
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
     
     // Clear email error when user types
     if (name === 'email') {
@@ -211,6 +230,7 @@ const Register = () => {
                 type="tel"
                 value={formData.phone}
                 onChange={handleChange}
+                placeholder="+569XXXXXXXX"
                 className="mt-1 block w-full px-3 py-2 border border-white/20 rounded-lg bg-black/40 backdrop-blur-sm text-white placeholder-primary-400 focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-accent-500 transition-all duration-200"
               />
             </div>

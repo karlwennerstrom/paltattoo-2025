@@ -252,7 +252,7 @@ const AdminShops = () => {
                         ) : (
                           <div className="w-10 h-10 bg-gray-700 rounded-full flex items-center justify-center mr-3">
                             <span className="text-gray-400 text-sm">
-                              {shop.name.charAt(0).toUpperCase()}
+                              {shop.name ? shop.name.charAt(0).toUpperCase() : '?'}
                             </span>
                           </div>
                         )}
@@ -421,7 +421,7 @@ const AdminShops = () => {
                 ) : (
                   <div className="w-24 h-24 bg-gray-700 rounded-lg flex items-center justify-center">
                     <span className="text-gray-400 text-2xl">
-                      {selectedShop.shop.name.charAt(0).toUpperCase()}
+                      {selectedShop.shop.name ? selectedShop.shop.name.charAt(0).toUpperCase() : '?'}
                     </span>
                   </div>
                 )}

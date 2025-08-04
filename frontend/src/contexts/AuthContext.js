@@ -62,7 +62,7 @@ export const AuthProvider = ({ children }) => {
       return { success: true, user: userData };
     } catch (error) {
       console.error('Login error:', error);
-      const errorMessage = error.response?.data?.message || 'Error al iniciar sesión';
+      const errorMessage = error.response?.data?.error || error.response?.data?.message || 'Error al iniciar sesión';
       setError(errorMessage);
       toast.error(errorMessage);
       return { success: false, error: errorMessage };
@@ -87,7 +87,7 @@ export const AuthProvider = ({ children }) => {
       return { success: true, user: newUser };
     } catch (error) {
       console.error('Register error:', error);
-      const errorMessage = error.response?.data?.message || 'Error al registrarse';
+      const errorMessage = error.response?.data?.error || error.response?.data?.message || 'Error al registrarse';
       setError(errorMessage);
       toast.error(errorMessage);
       return { success: false, error: errorMessage };

@@ -335,12 +335,12 @@ const ShopsListPage = () => {
                       ) : (
                         <div className="w-12 h-12 rounded-lg bg-accent-500 flex items-center justify-center">
                           <span className="text-white font-bold text-lg">
-                            {shop.name.charAt(0)}
+                            {shop.name ? shop.name.charAt(0) : '?'}
                           </span>
                         </div>
                       )}
                       <div>
-                        <h3 className="font-semibold text-primary-100">{shop.name}</h3>
+                        <h3 className="font-semibold text-primary-100">{shop.name || 'Tienda sin nombre'}</h3>
                         <p className="text-sm text-primary-400">{shop.category}</p>
                       </div>
                     </div>

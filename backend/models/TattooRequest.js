@@ -25,7 +25,7 @@ class TattooRequest {
               bp.name as body_part_name, 
               ts.name as style_name,
               ct.name as color_type_name,
-              r.name as region_name,
+              c.region as region_name,
               c.name as comuna_name,
               (SELECT COUNT(*) FROM proposals p WHERE p.offer_id = o.id) as proposals_count,
               0 as views_count

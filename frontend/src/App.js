@@ -82,6 +82,21 @@ import Footer from './components/layout/Footer';
 import PageWrapper from './components/layout/PageWrapper';
 import RealtimeNotifications from './components/notifications/RealtimeNotifications';
 
+// Dashboard redirect component
+const DashboardRedirect = () => {
+  const { isClient, isArtist, isAdmin } = useAuth();
+  
+  if (isClient) {
+    return <Navigate to="/client/dashboard" replace />;
+  } else if (isArtist) {
+    return <Navigate to="/artist" replace />;
+  } else if (isAdmin) {
+    return <Navigate to="/admin/dashboard" replace />;
+  }
+  
+  return <Navigate to="/" replace />;
+};
+
 function App() {
   console.log('App component loaded');
   const { user, loading } = useAuth();
@@ -149,6 +164,13 @@ function App() {
           <Route path="/safety" element={<PageWrapper><SafetyQualityPage /></PageWrapper>} />
           <Route path="/aftercare" element={<PageWrapper><TattooAftercarePage /></PageWrapper>} />
           <Route path="/inspiration" element={<PageWrapper><InspirationGalleryPage /></PageWrapper>} />
+
+          {/* Dashboard redirect based on user role */}
+          <Route path="/dashboard" element={
+            <ProtectedRoute>
+              <DashboardRedirect />
+            </ProtectedRoute>
+          } />
 
           {/* Protected client routes */}
           <Route path="/client/dashboard" element={

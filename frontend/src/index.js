@@ -18,6 +18,14 @@ window.addEventListener('unhandledrejection', (event) => {
   }
 });
 
+// Suppress ResizeObserver loop limit exceeded warning
+window.addEventListener('error', (event) => {
+  if (event.message && event.message.includes('ResizeObserver loop completed with undelivered notifications')) {
+    event.preventDefault();
+    return false;
+  }
+});
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {

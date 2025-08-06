@@ -10,7 +10,6 @@ const AuthCallback = () => {
 
   useEffect(() => {
     const handleCallback = async () => {
-      const token = searchParams.get('token');
       const error = searchParams.get('error');
 
       if (error) {
@@ -35,44 +34,48 @@ const AuthCallback = () => {
         return;
       }
 
-      if (token) {
-        try {
-          // Save token to localStorage
-          localStorage.setItem('authToken', token);
+      try {
+        // The backend sets an httpOnly cookie, so we need to check auth status
+        // using credentials instead of expecting a token in the URL
+        const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/auth/check`, {
+          credentials: 'include', // Important: include cookies in the request
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
           
-          // Fetch user info using the token
-          const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/auth/profile`, {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          });
-          
-          if (response.ok) {
-            const userData = await response.json();
+          if (data.authenticated && data.user) {
+            // Since we're using httpOnly cookies, we don't have a token to store
+            // The cookie is already set by the backend
+            // We'll use a placeholder token to indicate authenticated state
+            const placeholderToken = 'google-oauth-cookie';
+            localStorage.setItem('authToken', placeholderToken);
             
-            // Update auth context
-            loginWithToken(userData.user, token);
+            // Update auth context with user data
+            loginWithToken(data.user, placeholderToken);
             
             toast.success('¡Inicio de sesión exitoso!');
             
             // Redirect based on user type
-            if (userData.user.userType === 'artist') {
+            if (data.user.userType === 'artist' || data.user.user_type === 'artist') {
               navigate('/artist');
-            } else if (userData.user.userType === 'admin') {
+            } else if (data.user.userType === 'admin' || data.user.user_type === 'admin') {
               navigate('/admin/dashboard');
             } else {
               navigate('/feed');
             }
           } else {
-            throw new Error('Error al obtener información del usuario');
+            throw new Error('No se pudo verificar la autenticación');
           }
-        } catch (error) {
-          console.error('Auth callback error:', error);
-          toast.error('Error al procesar la autenticación');
-          navigate('/login');
+        } else {
+          throw new Error('Error al verificar la autenticación');
         }
-      } else {
-        toast.error('No se recibió token de autenticación');
+      } catch (error) {
+        console.error('Auth callback error:', error);
+        toast.error('Error al procesar la autenticación');
         navigate('/login');
       }
     };

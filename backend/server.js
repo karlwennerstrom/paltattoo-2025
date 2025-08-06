@@ -160,7 +160,6 @@ app.get('/', (req, res) => {
 app.get('/health', async (req, res) => {
   try {
     // Test database connection
-    const { testConnection } = require('./config/database');
     const dbHealthy = await testConnection();
     
     const healthStatus = {
@@ -220,8 +219,7 @@ const PORT = process.env.PORT || 5000;
 // Initialize Socket.io
 socketService.initialize(server);
 
-// Test database connection before starting server
-const { testConnection } = require('./config/database');
+// testConnection already imported above
 
 // Check required environment variables
 function checkRequiredEnvVars() {

@@ -283,15 +283,20 @@ const googleAuth = (req, res, next) => {
 };
 
 const googleCallback = (req, res, next) => {
+  console.log('🔄 Google OAuth callback initiated');
   const passport = require('passport');
   passport.authenticate('google', { session: false }, async (err, user, info) => {
+    console.log('📋 OAuth callback - err:', err ? err.message : 'none');
+    console.log('📋 OAuth callback - user:', user ? `User ID: ${user.id}` : 'none');
+    console.log('📋 OAuth callback - info:', info);
+    
     if (err) {
-      console.error('Google OAuth error:', err);
+      console.error('❌ Google OAuth error:', err);
       return res.redirect(`${process.env.FRONTEND_URL}/login?error=oauth_error`);
     }
     
     if (!user) {
-      console.error('Google OAuth: No user returned');
+      console.error('❌ Google OAuth: No user returned');
       return res.redirect(`${process.env.FRONTEND_URL}/login?error=oauth_failed`);
     }
     
@@ -323,6 +328,7 @@ const googleCallback = (req, res, next) => {
       
       // Generate JWT token for completed profile
       const token = generateToken(user.id, user.user_type);
+      console.log('🔑 Generated token for user:', user.id);
       
       // Set JWT token in httpOnly cookie
       res.cookie('authToken', token, {
@@ -332,6 +338,7 @@ const googleCallback = (req, res, next) => {
         maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
       });
       
+      console.log('🍪 Cookie set, redirecting to:', `${process.env.FRONTEND_URL}/auth/callback`);
       // Redirect to frontend without token in URL
       return res.redirect(`${process.env.FRONTEND_URL}/auth/callback`);
     } catch (error) {
@@ -339,6 +346,63 @@ const googleCallback = (req, res, next) => {
       return res.redirect(`${process.env.FRONTEND_URL}/login?error=token_error`);
     }
   })(req, res, next);
+};
+
+const googleVerify = async (req, res) => {
+  try {
+    console.log('🔍 Google verify called');
+    console.log('🍪 Cookies received:', req.cookies);
+    
+    // Check if we have an auth token in cookies
+    const token = req.cookies?.authToken;
+    if (!token) {
+      console.log('❌ No auth token in cookies');
+      return res.status(401).json({ error: 'No authentication token found' });
+    }
+    
+    console.log('🔑 Found token in cookies, verifying...');
+    
+    // Verify the token
+    const { verifyToken } = require('../config/jwt');
+    const decoded = verifyToken(token);
+    const user = await User.findById(decoded.userId);
+    
+    if (!user || !user.is_active) {
+      console.log('❌ Invalid token or inactive user');
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+    
+    console.log('✅ Token verified for user:', user.id);
+    const profile = await User.getProfile(user.id);
+    
+    res.json({
+      authenticated: true,
+      user: {
+        id: profile.id,
+        email: profile.email,
+        userType: profile.user_type,
+        user_type: profile.user_type,
+        firstName: profile.first_name,
+        lastName: profile.last_name,
+        phone: profile.phone,
+        profileImage: profile.profile_image,
+        subscription: profile.subscription_plan_name ? {
+          planId: profile.subscription_plan_id,
+          planName: profile.subscription_plan_name,
+          status: profile.subscription_status,
+          price: profile.subscription_plan_price
+        } : {
+          planId: 'basic',
+          planName: 'basico',
+          status: 'active',
+          price: 0
+        }
+      }
+    });
+  } catch (error) {
+    console.error('❌ Google verify error:', error);
+    res.status(401).json({ error: 'Token verification failed' });
+  }
 };
 
 const forgotPassword = async (req, res) => {
@@ -498,9 +562,14 @@ const completeProfile = async (req, res) => {
 
 const checkAuth = async (req, res) => {
   try {
+    console.log('🔍 Auth check called');
+    console.log('🍪 Cookies received:', req.cookies);
+    console.log('👤 User from middleware:', req.user ? `ID: ${req.user.id}` : 'none');
+    
     // This endpoint is called after authenticate middleware
     // So if we get here, the user is authenticated
     const profile = await User.getProfile(req.user.id);
+    console.log('✅ Profile fetched for user:', req.user.id);
     
     res.json({
       authenticated: true,
@@ -540,6 +609,7 @@ module.exports = {
   updateProfile,
   googleAuth,
   googleCallback,
+  googleVerify,
   completeProfile,
   forgotPassword,
   resetPassword: [resetPasswordValidation, handleValidationErrors, resetPassword],

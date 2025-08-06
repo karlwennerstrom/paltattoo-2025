@@ -10,9 +10,14 @@ const AuthCallback = () => {
 
   useEffect(() => {
     const handleCallback = async () => {
+      console.log('🔄 AuthCallback: Starting OAuth callback process');
+      console.log('📋 Current URL:', window.location.href);
+      console.log('🔍 Search params:', [...searchParams.entries()]);
+      
       const error = searchParams.get('error');
 
       if (error) {
+        console.error('❌ OAuth error detected:', error);
         let errorMessage = 'Error al iniciar sesión con Google';
         
         switch (error) {
@@ -35,19 +40,39 @@ const AuthCallback = () => {
       }
 
       try {
-        // The backend sets an httpOnly cookie, so we need to check auth status
-        // using credentials instead of expecting a token in the URL
-        const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/auth/check`, {
+        console.log('🔗 Making auth check request to backend...');
+        const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+        console.log('🌐 API URL:', apiUrl);
+        
+        // First attempt: try to get auth status using cookies
+        let response = await fetch(`${apiUrl}/auth/check`, {
           credentials: 'include', // Important: include cookies in the request
           headers: {
             'Content-Type': 'application/json'
           }
         });
         
+        console.log('📡 Response status:', response.status);
+        console.log('📡 Response ok:', response.ok);
+
+        // If auth check fails with 401, try to get a fresh token via callback endpoint
+        if (!response.ok && response.status === 401) {
+          console.log('🔄 Auth check failed, trying to get fresh token...');
+          response = await fetch(`${apiUrl}/auth/google/verify`, {
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          });
+          console.log('📡 Verify response status:', response.status);
+        }
+        
         if (response.ok) {
           const data = await response.json();
+          console.log('✅ Auth check response:', data);
           
           if (data.authenticated && data.user) {
+            console.log('🎉 User authenticated successfully:', data.user);
             // Since we're using httpOnly cookies, we don't have a token to store
             // The cookie is already set by the backend
             // We'll use a placeholder token to indicate authenticated state
@@ -68,13 +93,17 @@ const AuthCallback = () => {
               navigate('/feed');
             }
           } else {
+            console.error('❌ Authentication failed:', { authenticated: data.authenticated, hasUser: !!data.user });
             throw new Error('No se pudo verificar la autenticación');
           }
         } else {
+          console.error('❌ Auth check request failed:', response.status, response.statusText);
+          const errorText = await response.text();
+          console.error('❌ Error response:', errorText);
           throw new Error('Error al verificar la autenticación');
         }
       } catch (error) {
-        console.error('Auth callback error:', error);
+        console.error('💥 Auth callback error:', error);
         toast.error('Error al procesar la autenticación');
         navigate('/login');
       }

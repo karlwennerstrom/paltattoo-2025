@@ -43,7 +43,7 @@ app.use(helmet({
     },
   },
   crossOriginEmbedderPolicy: false, // Required for some external resources
-  frameguard: { action: 'deny' }, // Explicit X-Frame-Options header
+  frameguard: { action: 'sameorigin' }, // Allow framing from same origin
 }));
 
 // Rate limiting configuration

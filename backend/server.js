@@ -20,7 +20,14 @@ ensureDirectories();
 
 // Trust proxy - required when behind a reverse proxy (Railway, Heroku, etc.)
 // This allows Express to correctly identify client IPs from X-Forwarded-* headers
-app.set('trust proxy', true);
+// Use specific configuration instead of 'true' for security
+if (process.env.NODE_ENV === 'production') {
+  // In production, trust the first proxy (Railway, Vercel, etc.)
+  app.set('trust proxy', 1);
+} else {
+  // In development, don't trust any proxies
+  app.set('trust proxy', false);
+}
 
 // Security middleware - Helmet for security headers
 app.use(helmet({
@@ -45,10 +52,6 @@ const apiLimiter = rateLimit({
   message: 'Demasiadas solicitudes desde esta IP, por favor intenta de nuevo más tarde.',
   standardHeaders: true,
   legacyHeaders: false,
-  // Trust proxy headers for correct IP identification
-  validate: {
-    xForwardedForHeader: false, // Disable the validation that's causing the error
-  },
 });
 
 const authLimiter = rateLimit({
@@ -56,10 +59,6 @@ const authLimiter = rateLimit({
   max: 5, // Limit each IP to 5 requests per windowMs
   message: 'Demasiados intentos de autenticación, por favor intenta de nuevo más tarde.',
   skipSuccessfulRequests: true,
-  // Trust proxy headers for correct IP identification
-  validate: {
-    xForwardedForHeader: false, // Disable the validation that's causing the error
-  },
 });
 
 // Configure CORS for development and production

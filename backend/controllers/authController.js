@@ -99,7 +99,7 @@ const register = async (req, res) => {
     res.cookie('authToken', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     });
 
@@ -143,7 +143,7 @@ const login = async (req, res) => {
     res.cookie('authToken', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     });
 
@@ -314,7 +314,7 @@ const googleCallback = (req, res, next) => {
         res.cookie('authToken', tempToken, {
           httpOnly: true,
           secure: process.env.NODE_ENV === 'production',
-          sameSite: 'strict',
+          sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
           maxAge: 60 * 60 * 1000 // 1 hour for profile completion
         });
         
@@ -328,7 +328,7 @@ const googleCallback = (req, res, next) => {
       res.cookie('authToken', token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
         maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
       });
       
@@ -472,7 +472,7 @@ const completeProfile = async (req, res) => {
     res.cookie('authToken', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     });
     

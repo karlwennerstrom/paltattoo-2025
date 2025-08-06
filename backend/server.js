@@ -43,6 +43,7 @@ app.use(helmet({
     },
   },
   crossOriginEmbedderPolicy: false, // Required for some external resources
+  frameguard: { action: 'deny' }, // Explicit X-Frame-Options header
 }));
 
 // Rate limiting configuration
@@ -101,7 +102,7 @@ app.use(session({
     secure: process.env.NODE_ENV === 'production', // Only use secure cookies in production
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    sameSite: 'strict'
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict'
   }
 }));
 

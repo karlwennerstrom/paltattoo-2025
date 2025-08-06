@@ -7,7 +7,9 @@ const passport = require('./config/passport');
 const http = require('http');
 const socketService = require('./services/socketService');
 const ensureDirectories = require('./utils/ensureDirectories');
-
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const cookieParser = require('cookie-parser');
 
 dotenv.config();
 
@@ -16,6 +18,37 @@ const server = http.createServer(app);
 
 ensureDirectories();
 
+// Security middleware - Helmet for security headers
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      scriptSrc: ["'self'", "https://sdk.mercadopago.com", "https://www.mercadopago.com"],
+      imgSrc: ["'self'", "data:", "https:", "blob:"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      connectSrc: ["'self'", "https://api.mercadopago.com", "wss:", "ws:"],
+      frameSrc: ["'self'", "https://www.mercadopago.com"],
+    },
+  },
+  crossOriginEmbedderPolicy: false, // Required for some external resources
+}));
+
+// Rate limiting configuration
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  message: 'Demasiadas solicitudes desde esta IP, por favor intenta de nuevo más tarde.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // Limit each IP to 5 requests per windowMs
+  message: 'Demasiados intentos de autenticación, por favor intenta de nuevo más tarde.',
+  skipSuccessfulRequests: true,
+});
 
 // Configure CORS for development and production
 const allowedOrigins = process.env.NODE_ENV === 'production' 
@@ -26,6 +59,9 @@ app.use(cors({
   origin: allowedOrigins,
   credentials: true
 }));
+
+// Cookie parser middleware
+app.use(cookieParser());
 
 // Webhook endpoint needs raw body for signature validation
 app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
@@ -40,13 +76,21 @@ const uploadsPath = getRailwayUploadPath();
 app.use('/uploads', express.static(uploadsPath));
 
 // Session configuration for Passport
+if (!process.env.SESSION_SECRET) {
+  console.error('SESSION_SECRET not set in environment variables!');
+  process.exit(1);
+}
+
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'your-secret-key',
+  secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
+  name: 'paltattoo_session', // Change default session name
   cookie: {
     secure: process.env.NODE_ENV === 'production', // Only use secure cookies in production
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    sameSite: 'strict'
   }
 }));
 
@@ -100,6 +144,14 @@ app.get('/', (req, res) => {
     }
   });
 });
+
+// Apply rate limiting to API routes
+app.use('/api/', apiLimiter);
+
+// Apply stricter rate limiting to auth routes
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
+app.use('/api/auth/forgot-password', authLimiter);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/catalogs', catalogRoutes);

@@ -144,7 +144,11 @@ class Collection {
     const values = [collectionId];
     
     if (limit) {
-      query += ` LIMIT ${parseInt(limit)}`;
+      const limitValue = parseInt(limit);
+      if (!isNaN(limitValue) && limitValue > 0 && limitValue <= 100) {
+        query += ' LIMIT ?';
+        values.push(limitValue);
+      }
     }
     
     const [rows] = await promisePool.execute(query, values);

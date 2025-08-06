@@ -148,44 +148,53 @@ static async search(filters = {}) {
   const conditions = [];
   const values = [];
   
-  if (filters.status) {
+  // Helper function to check if value is valid (not null, undefined, or empty string)
+  const isValidValue = (value) => value !== null && value !== undefined && value !== '';
+  
+  if (isValidValue(filters.status)) {
     conditions.push('o.status = ?');
     values.push(filters.status);
   }
   
-  if (filters.styleId) {
+  if (isValidValue(filters.styleId)) {
     conditions.push('o.style_id = ?');
-    values.push(filters.styleId);
+    values.push(parseInt(filters.styleId));
   }
   
-  if (filters.bodyPartId) {
+  if (isValidValue(filters.bodyPartId)) {
     conditions.push('o.body_part_id = ?');
-    values.push(filters.bodyPartId);
+    values.push(parseInt(filters.bodyPartId));
   }
   
-  if (filters.colorTypeId) {
+  if (isValidValue(filters.colorTypeId)) {
     conditions.push('o.color_type_id = ?');
-    values.push(filters.colorTypeId);
+    values.push(parseInt(filters.colorTypeId));
   }
   
-  if (filters.minBudget) {
-    conditions.push('o.budget_max >= ?');
-    values.push(filters.minBudget);
+  if (isValidValue(filters.minBudget)) {
+    const minBudget = parseFloat(filters.minBudget);
+    if (!isNaN(minBudget) && minBudget > 0) {
+      conditions.push('o.budget_max >= ?');
+      values.push(minBudget);
+    }
   }
   
-  if (filters.maxBudget) {
-    conditions.push('o.budget_min <= ?');
-    values.push(filters.maxBudget);
+  if (isValidValue(filters.maxBudget)) {
+    const maxBudget = parseFloat(filters.maxBudget);
+    if (!isNaN(maxBudget) && maxBudget > 0) {
+      conditions.push('o.budget_min <= ?');
+      values.push(maxBudget);
+    }
   }
   
-  if (filters.regionId) {
+  if (isValidValue(filters.regionId)) {
     conditions.push('co.region = ?');
     values.push(filters.regionId);
   }
   
-  if (filters.comunaId) {
+  if (isValidValue(filters.comunaId)) {
     conditions.push('c.comuna_id = ?');
-    values.push(filters.comunaId);
+    values.push(parseInt(filters.comunaId));
   }
   
   if (conditions.length > 0) {
@@ -194,14 +203,33 @@ static async search(filters = {}) {
   
   query += ' ORDER BY o.created_at DESC';
   
-  if (filters.limit) {
-    const limit = parseInt(filters.limit);
-    query += ` LIMIT ${limit}`;
+  // Handle LIMIT and OFFSET properly - OFFSET requires LIMIT in MySQL
+  let limit = 20; // Default limit
+  let offset = 0; // Default offset
+  
+  // Parse and validate limit
+  if (isValidValue(filters.limit)) {
+    const parsedLimit = parseInt(filters.limit);
+    if (!isNaN(parsedLimit) && parsedLimit > 0 && parsedLimit <= 100) {
+      limit = parsedLimit;
+    }
   }
   
-  if (filters.offset) {
-    const offset = parseInt(filters.offset);
-    query += ` OFFSET ${offset}`;
+  // Parse and validate offset
+  if (isValidValue(filters.offset)) {
+    const parsedOffset = parseInt(filters.offset);
+    if (!isNaN(parsedOffset) && parsedOffset >= 0) {
+      offset = parsedOffset;
+    }
+  }
+  
+  // Always add LIMIT, and OFFSET only if > 0
+  query += ' LIMIT ?';
+  values.push(limit);
+  
+  if (offset > 0) {
+    query += ' OFFSET ?';
+    values.push(offset);
   }
   
   const [rows] = await promisePool.execute(query, values);

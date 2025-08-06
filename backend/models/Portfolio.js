@@ -147,6 +147,9 @@ class Portfolio {
   }
 
   static async getByStyle(styleId, limit = 20) {
+    const limitValue = parseInt(limit);
+    const safeLimit = (!isNaN(limitValue) && limitValue > 0 && limitValue <= 100) ? limitValue : 20;
+    
     const [rows] = await promisePool.execute(
       `SELECT pi.*, ts.name as style_name,
               ta.studio_name, up.first_name, up.last_name
@@ -157,14 +160,17 @@ class Portfolio {
        LEFT JOIN tattoo_styles ts ON pi.style_id = ts.id
        WHERE pi.style_id = ? AND u.is_active = true
        ORDER BY pi.created_at DESC
-       LIMIT ${parseInt(limit)}`,
-      [styleId]
+       LIMIT ?`,
+      [styleId, safeLimit]
     );
     
     return rows;
   }
 
   static async getRecent(limit = 20) {
+    const limitValue = parseInt(limit);
+    const safeLimit = (!isNaN(limitValue) && limitValue > 0 && limitValue <= 100) ? limitValue : 20;
+    
     const [rows] = await promisePool.execute(
       `SELECT pi.*, ts.name as style_name,
               ta.studio_name, ta.rating, up.first_name, up.last_name
@@ -175,7 +181,8 @@ class Portfolio {
        LEFT JOIN tattoo_styles ts ON pi.style_id = ts.id
        WHERE u.is_active = true AND ta.is_verified = true
        ORDER BY pi.created_at DESC
-       LIMIT ${parseInt(limit)}`
+       LIMIT ?`,
+      [safeLimit]
     );
     
     return rows;

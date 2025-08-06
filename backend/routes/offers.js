@@ -62,8 +62,23 @@ router.get('/my', authenticate, authorizeClient, async (req, res) => {
   }
 });
 
+// Test endpoint
+router.get('/test', async (req, res) => {
+  try {
+    const [rows] = await require('../config/database').promisePool.execute(
+      'SELECT COUNT(*) as count FROM tattoo_offers WHERE status = ?', 
+      ['active']
+    );
+    res.json({ count: rows[0].count, message: 'Database connection works' });
+  } catch (error) {
+    console.error('Test query error:', error);
+    res.status(500).json({ error: 'Test failed', details: error.message });
+  }
+});
+
 router.get('/', optionalAuth, async (req, res) => {
   try {
+    console.log('Query params:', req.query);
     const filters = {
       status: req.query.status || 'active',
       styleId: req.query.style,
@@ -76,6 +91,7 @@ router.get('/', optionalAuth, async (req, res) => {
       limit: req.query.limit || 20,
       offset: req.query.offset || 0
     };
+    console.log('Filters:', filters);
     
     const offers = await TattooRequest.search(filters);
     

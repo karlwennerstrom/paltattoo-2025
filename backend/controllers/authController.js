@@ -9,7 +9,11 @@ const emailService = require('../services/emailService');
 
 const registerValidation = [
   body('email').isEmail().withMessage('Email inválido'),
-  body('password').isLength({ min: 6 }).withMessage('La contraseña debe tener al menos 6 caracteres'),
+  body('password')
+    .isLength({ min: 8 })
+    .withMessage('La contraseña debe tener al menos 8 caracteres')
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
+    .withMessage('La contraseña debe incluir mayúsculas, minúsculas, números y caracteres especiales'),
   body('userType').isIn(['client', 'artist']).withMessage('Tipo de usuario inválido'),
   body('firstName').notEmpty().withMessage('El nombre es requerido'),
   body('lastName').notEmpty().withMessage('El apellido es requerido')
@@ -18,6 +22,15 @@ const registerValidation = [
 const loginValidation = [
   body('email').isEmail().withMessage('Email inválido'),
   body('password').notEmpty().withMessage('La contraseña es requerida')
+];
+
+const resetPasswordValidation = [
+  body('token').notEmpty().withMessage('Token es requerido'),
+  body('password')
+    .isLength({ min: 8 })
+    .withMessage('La contraseña debe tener al menos 8 caracteres')
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
+    .withMessage('La contraseña debe incluir mayúsculas, minúsculas, números y caracteres especiales')
 ];
 
 const register = async (req, res) => {
@@ -82,6 +95,14 @@ const register = async (req, res) => {
       type: user.user_type
     }).catch(err => console.error('Welcome email error:', err));
     
+    // Set JWT token in httpOnly cookie
+    res.cookie('authToken', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    });
+
     res.status(201).json({
       message: 'Usuario registrado exitosamente',
       user: {
@@ -93,8 +114,7 @@ const register = async (req, res) => {
         lastName: user.last_name,
         phone: user.phone,
         profileImage: user.profile_image
-      },
-      token
+      }
     });
   } catch (error) {
     console.error('Registration error:', error);
@@ -119,6 +139,14 @@ const login = async (req, res) => {
     const token = generateToken(user.id, user.user_type);
     const profile = await User.getProfile(user.id);
     
+    // Set JWT token in httpOnly cookie
+    res.cookie('authToken', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    });
+
     res.json({
       message: 'Login exitoso',
       user: {
@@ -142,8 +170,7 @@ const login = async (req, res) => {
           status: 'active',
           price: 0
         }
-      },
-      token
+      }
     });
   } catch (error) {
     console.error('Login error:', error);
@@ -235,9 +262,13 @@ const updateProfile = async (req, res) => {
 
 const logout = async (req, res) => {
   try {
-    // In a JWT-based system, logout is typically handled client-side
-    // by removing the token from localStorage
-    // Here we just return a success message
+    // Clear the authToken cookie
+    res.clearCookie('authToken', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict'
+    });
+    
     res.json({ message: 'Logout exitoso' });
   } catch (error) {
     console.error('Logout error:', error);
@@ -278,14 +309,31 @@ const googleCallback = (req, res, next) => {
       if (!isCompleted) {
         // Generate temporary token for profile completion
         const tempToken = generateToken(user.id, 'incomplete');
-        return res.redirect(`${process.env.FRONTEND_URL}/complete-profile?token=${tempToken}`);
+        
+        // Set temporary token in httpOnly cookie
+        res.cookie('authToken', tempToken, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'strict',
+          maxAge: 60 * 60 * 1000 // 1 hour for profile completion
+        });
+        
+        return res.redirect(`${process.env.FRONTEND_URL}/complete-profile`);
       }
       
       // Generate JWT token for completed profile
       const token = generateToken(user.id, user.user_type);
       
-      // Redirect to frontend with token
-      return res.redirect(`${process.env.FRONTEND_URL}/auth/callback?token=${token}`);
+      // Set JWT token in httpOnly cookie
+      res.cookie('authToken', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+      });
+      
+      // Redirect to frontend without token in URL
+      return res.redirect(`${process.env.FRONTEND_URL}/auth/callback`);
     } catch (error) {
       console.error('Google OAuth token generation error:', error);
       return res.redirect(`${process.env.FRONTEND_URL}/login?error=token_error`);
@@ -420,6 +468,14 @@ const completeProfile = async (req, res) => {
       type: profile.user_type
     }).catch(err => console.error('Welcome email error:', err));
     
+    // Set JWT token in httpOnly cookie
+    res.cookie('authToken', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    });
+    
     res.json({
       message: 'Perfil completado exitosamente',
       user: {
@@ -432,12 +488,47 @@ const completeProfile = async (req, res) => {
         phone: profile.phone,
         bio: profile.bio,
         profileImage: profile.profile_image
-      },
-      token
+      }
     });
   } catch (error) {
     console.error('Complete profile error:', error);
     res.status(500).json({ error: 'Error al completar perfil' });
+  }
+};
+
+const checkAuth = async (req, res) => {
+  try {
+    // This endpoint is called after authenticate middleware
+    // So if we get here, the user is authenticated
+    const profile = await User.getProfile(req.user.id);
+    
+    res.json({
+      authenticated: true,
+      user: {
+        id: profile.id,
+        email: profile.email,
+        userType: profile.user_type,
+        user_type: profile.user_type,
+        firstName: profile.first_name,
+        lastName: profile.last_name,
+        phone: profile.phone,
+        profileImage: profile.profile_image,
+        subscription: profile.subscription_plan_name ? {
+          planId: profile.subscription_plan_id,
+          planName: profile.subscription_plan_name,
+          status: profile.subscription_status,
+          price: profile.subscription_plan_price
+        } : {
+          planId: 'basic',
+          planName: 'basico',
+          status: 'active',
+          price: 0
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Check auth error:', error);
+    res.status(500).json({ error: 'Error al verificar autenticación' });
   }
 };
 
@@ -451,5 +542,6 @@ module.exports = {
   googleCallback,
   completeProfile,
   forgotPassword,
-  resetPassword
+  resetPassword: [resetPasswordValidation, handleValidationErrors, resetPassword],
+  checkAuth
 };

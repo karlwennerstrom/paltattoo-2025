@@ -3,7 +3,13 @@ const User = require('../models/User');
 
 const authenticate = async (req, res, next) => {
   try {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
+    // Try to get token from cookie first, then from header
+    let token = req.cookies?.authToken;
+    
+    // Fallback to Authorization header for backward compatibility
+    if (!token) {
+      token = req.header('Authorization')?.replace('Bearer ', '');
+    }
     
     if (!token) {
       return res.status(401).json({ error: 'Por favor autentícate' });
@@ -47,7 +53,13 @@ const authorizeAdmin = async (req, res, next) => {
 
 const optionalAuth = async (req, res, next) => {
   try {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
+    // Try to get token from cookie first, then from header
+    let token = req.cookies?.authToken;
+    
+    // Fallback to Authorization header for backward compatibility
+    if (!token) {
+      token = req.header('Authorization')?.replace('Bearer ', '');
+    }
     
     if (token) {
       const decoded = verifyToken(token);

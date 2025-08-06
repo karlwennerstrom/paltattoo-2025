@@ -256,13 +256,20 @@ async function startServer() {
       process.exit(1);
     }
 
-    server.listen(PORT, () => {
+    server.listen(PORT, '0.0.0.0', () => {
       console.log(`✅ Server is running on port ${PORT}`);
       console.log(`📋 API documentation available at http://localhost:${PORT}`);
       console.log(`🔌 Socket.io server initialized`);
       console.log(`📁 Uploads directory: ${uploadsPath}`);
       console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`🔐 Trust proxy: ${app.get('trust proxy')}`);
+    });
+
+    server.on('error', (error) => {
+      console.error('❌ Server error:', error);
+      if (error.code === 'EADDRINUSE') {
+        console.error(`❌ Port ${PORT} is already in use`);
+      }
     });
 
   } catch (error) {

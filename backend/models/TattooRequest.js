@@ -158,24 +158,24 @@ static async search(filters = {}) {
   
   if (isValidValue(filters.styleId)) {
     conditions.push('o.style_id = ?');
-    values.push(parseInt(filters.styleId));
+    values.push(String(parseInt(filters.styleId)));
   }
   
   if (isValidValue(filters.bodyPartId)) {
     conditions.push('o.body_part_id = ?');
-    values.push(parseInt(filters.bodyPartId));
+    values.push(String(parseInt(filters.bodyPartId)));
   }
   
   if (isValidValue(filters.colorTypeId)) {
     conditions.push('o.color_type_id = ?');
-    values.push(parseInt(filters.colorTypeId));
+    values.push(String(parseInt(filters.colorTypeId)));
   }
   
   if (isValidValue(filters.minBudget)) {
     const minBudget = parseFloat(filters.minBudget);
     if (!isNaN(minBudget) && minBudget > 0) {
       conditions.push('o.budget_max >= ?');
-      values.push(minBudget);
+      values.push(String(minBudget));
     }
   }
   
@@ -183,18 +183,18 @@ static async search(filters = {}) {
     const maxBudget = parseFloat(filters.maxBudget);
     if (!isNaN(maxBudget) && maxBudget > 0) {
       conditions.push('o.budget_min <= ?');
-      values.push(maxBudget);
+      values.push(String(maxBudget));
     }
   }
   
   if (isValidValue(filters.regionId)) {
     conditions.push('co.region = ?');
-    values.push(filters.regionId);
+    values.push(String(filters.regionId));
   }
   
   if (isValidValue(filters.comunaId)) {
     conditions.push('c.comuna_id = ?');
-    values.push(parseInt(filters.comunaId));
+    values.push(String(parseInt(filters.comunaId)));
   }
   
   if (conditions.length > 0) {
@@ -225,11 +225,11 @@ static async search(filters = {}) {
   
   // Always add LIMIT, and OFFSET only if > 0
   query += ' LIMIT ?';
-  values.push(limit);
+  values.push(String(limit));
   
   if (offset > 0) {
     query += ' OFFSET ?';
-    values.push(offset);
+    values.push(String(offset));
   }
   
   const [rows] = await promisePool.execute(query, values);

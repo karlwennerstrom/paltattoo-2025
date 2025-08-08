@@ -30,21 +30,29 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 // Security middleware - Helmet for security headers
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-      scriptSrc: ["'self'", "https://sdk.mercadopago.com", "https://www.mercadopago.com"],
-      imgSrc: ["'self'", "data:", "https:", "blob:"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      connectSrc: ["'self'", "https://api.mercadopago.com", "wss:", "ws:"],
-      frameSrc: ["'self'", "https://www.mercadopago.com"],
+// Temporarily disable CSP for OAuth redirects
+app.use((req, res, next) => {
+  // Skip helmet for OAuth routes
+  if (req.path.includes('/auth/google')) {
+    return next();
+  }
+  
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        scriptSrc: ["'self'", "https://sdk.mercadopago.com", "https://www.mercadopago.com"],
+        imgSrc: ["'self'", "data:", "https:", "blob:"],
+        fontSrc: ["'self'", "https://fonts.gstatic.com"],
+        connectSrc: ["'self'", "https://api.mercadopago.com", "wss:", "ws:"],
+        frameSrc: ["'self'", "https://www.mercadopago.com"],
+      },
     },
-  },
-  crossOriginEmbedderPolicy: false, // Required for some external resources
-  frameguard: { action: 'sameorigin' }, // Allow framing from same origin
-}));
+    crossOriginEmbedderPolicy: false,
+    frameguard: { action: 'sameorigin' },
+  })(req, res, next);
+});
 
 // Rate limiting configuration
 const apiLimiter = rateLimit({

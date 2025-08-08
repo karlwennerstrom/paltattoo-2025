@@ -340,7 +340,23 @@ const googleCallback = (req, res, next) => {
           }
         }));
         
-        return res.redirect(`${process.env.FRONTEND_URL}/complete-profile#auth=${authData}`);
+        // Store auth data temporarily
+        const authKey = require('crypto').randomBytes(32).toString('hex');
+        global.tempAuthStore = global.tempAuthStore || {};
+        global.tempAuthStore[authKey] = {
+          data: {
+            token: tempToken,
+            user: {
+              id: user.id,
+              email: user.email,
+              userType: 'incomplete',
+              needsCompletion: true
+            }
+          },
+          expires: Date.now() + 5 * 60 * 1000
+        };
+        
+        return res.redirect(`${process.env.FRONTEND_URL}/complete-profile?key=${authKey}`);
       }
       
       // Generate JWT token for completed profile
@@ -370,11 +386,27 @@ const googleCallback = (req, res, next) => {
       const authData = encodeURIComponent(JSON.stringify(authDataObj));
       console.log('🔐 Encoded auth data length:', authData.length);
       
-      // Use hash instead of query params to avoid issues with Vercel
-      const fullRedirectUrl = `${redirectUrl}#auth=${authData}`;
-      console.log('🚀 Full redirect URL:', fullRedirectUrl.substring(0, 200) + '...');
+      // Store auth data temporarily in a session or memory store
+      const authKey = require('crypto').randomBytes(32).toString('hex');
       
-      // Redirect to frontend with auth data in hash
+      // Store auth data temporarily (expires in 5 minutes)
+      global.tempAuthStore = global.tempAuthStore || {};
+      global.tempAuthStore[authKey] = {
+        data: authDataObj,
+        expires: Date.now() + 5 * 60 * 1000 // 5 minutes
+      };
+      
+      // Clean up expired entries
+      Object.keys(global.tempAuthStore).forEach(key => {
+        if (global.tempAuthStore[key].expires < Date.now()) {
+          delete global.tempAuthStore[key];
+        }
+      });
+      
+      // Redirect with just the key
+      const fullRedirectUrl = `${redirectUrl}?key=${authKey}`;
+      console.log('🚀 Redirecting with auth key:', authKey);
+      
       return res.redirect(fullRedirectUrl);
     } catch (error) {
       console.error('Google OAuth token generation error:', error);
@@ -386,6 +418,40 @@ const googleCallback = (req, res, next) => {
 const googleVerify = async (req, res) => {
   try {
     console.log('🔍 Google verify called');
+    const { key } = req.query;
+    
+    if (!key) {
+      console.log('❌ No auth key provided');
+      return res.status(401).json({ error: 'No authentication key' });
+    }
+    
+    // Retrieve auth data from temporary store
+    const authEntry = global.tempAuthStore?.[key];
+    
+    if (!authEntry || authEntry.expires < Date.now()) {
+      console.log('❌ Auth key expired or not found');
+      return res.status(401).json({ error: 'Authentication key expired or invalid' });
+    }
+    
+    // Clean up the used key
+    delete global.tempAuthStore[key];
+    
+    console.log('✅ Auth data retrieved successfully');
+    return res.json({
+      authenticated: true,
+      token: authEntry.data.token,
+      user: authEntry.data.user
+    });
+  } catch (error) {
+    console.error('💥 Google verify error:', error);
+    res.status(401).json({ error: 'Token verification failed' });
+  }
+};
+
+// Original cookie-based verify for backwards compatibility
+const googleVerifyCookie = async (req, res) => {
+  try {
+    console.log('🔍 Google verify (cookie) called');
     console.log('🍪 Cookies received:', req.cookies);
     
     // Check if we have an auth token in cookies

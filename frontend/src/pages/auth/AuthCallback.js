@@ -20,22 +20,13 @@ const AuthCallback = () => {
         origin: window.location.origin
       });
       
-      // Check both query params and hash for auth data
       const error = searchParams.get('error');
-      let authData = searchParams.get('auth');
-      
-      // If no auth in query params, check hash
-      if (!authData && window.location.hash) {
-        const hashParams = new URLSearchParams(window.location.hash.substring(1));
-        authData = hashParams.get('auth');
-        console.log('🔐 Found auth data in hash');
-      }
+      const authKey = searchParams.get('key');
       
       console.log('📦 Extracted values:', {
         error: error,
-        authData: authData ? `Present (${authData.length} chars)` : 'Not present',
-        hasAuth: !!authData,
-        hash: window.location.hash
+        authKey: authKey ? `Present (${authKey.length} chars)` : 'Not present',
+        hasKey: !!authKey
       });
 
       if (error) {
@@ -61,60 +52,72 @@ const AuthCallback = () => {
         return;
       }
 
-      // Check if we have auth data in URL
-      if (authData) {
+      // Check if we have an auth key
+      if (authKey) {
         try {
-          console.log('🔑 Auth data received from URL');
-          console.log('🔑 Auth data length:', authData.length);
-          console.log('🔑 First 100 chars:', authData.substring(0, 100));
+          console.log('🔑 Auth key received, fetching auth data...');
           
-          const decodedString = decodeURIComponent(authData);
-          console.log('🔓 Decoded string:', decodedString.substring(0, 200));
-          
-          const decodedData = JSON.parse(decodedString);
-          console.log('✅ Decoded auth data:', decodedData);
-          
-          if (decodedData.token && decodedData.user) {
-            // Store the token
-            localStorage.setItem('authToken', decodedData.token);
-            
-            // Update auth context with user data
-            loginWithToken(decodedData.user, decodedData.token);
-            
-            toast.success('¡Inicio de sesión exitoso!');
-            
-            // Clear the URL and hash to remove sensitive data
-            window.history.replaceState({}, document.title, '/auth/callback');
-            
-            // Redirect based on user type
-            if (decodedData.user.userType === 'artist') {
-              navigate('/artist');
-            } else if (decodedData.user.userType === 'admin') {
-              navigate('/admin/dashboard');
-            } else {
-              navigate('/feed');
+          const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+          const response = await fetch(`${apiUrl}/auth/google/verify?key=${authKey}`, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json'
             }
-            return;
+          });
+          
+          console.log('📡 Verify response status:', response.status);
+          
+          if (response.ok) {
+            const data = await response.json();
+            console.log('✅ Auth data retrieved:', data);
+            
+            if (data.authenticated && data.token && data.user) {
+              // Store the token
+              localStorage.setItem('authToken', data.token);
+              
+              // Update auth context with user data
+              loginWithToken(data.user, data.token);
+              
+              toast.success('¡Inicio de sesión exitoso!');
+              
+              // Clear the URL to remove the key
+              window.history.replaceState({}, document.title, '/auth/callback');
+              
+              // Redirect based on user type
+              if (data.user.userType === 'artist') {
+                navigate('/artist');
+              } else if (data.user.userType === 'admin') {
+                navigate('/admin/dashboard');
+              } else if (data.user.needsCompletion) {
+                navigate('/complete-profile');
+              } else {
+                navigate('/feed');
+              }
+              return;
+            }
+          } else {
+            const errorData = await response.json();
+            console.error('❌ Verify failed:', errorData);
+            throw new Error(errorData.error || 'Error al verificar autenticación');
           }
-        } catch (parseError) {
-          console.error('💥 Error parsing auth data:', parseError);
-          toast.error('Error al procesar la autenticación');
+        } catch (error) {
+          console.error('💥 Error fetching auth data:', error);
+          toast.error(error.message || 'Error al procesar la autenticación');
           navigate('/login');
           return;
         }
       }
       
-      // If no auth data in URL or hash, show error
-      console.error('❌ No auth data received');
+      // If no auth key in URL, show error
+      console.error('❌ No auth key received');
       console.error('❌ URL analysis:', {
         fullURL: window.location.href,
         search: window.location.search,
-        hash: window.location.hash,
         searchParams: Object.fromEntries(searchParams.entries()),
-        authParam: searchParams.get('auth'),
+        keyParam: searchParams.get('key'),
         errorParam: searchParams.get('error')
       });
-      toast.error('No se recibió token de autenticación');
+      toast.error('No se recibió clave de autenticación');
       navigate('/login');
       } catch (error) {
         console.error('💥 Auth callback error:', error);

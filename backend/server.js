@@ -108,6 +108,7 @@ app.use((req, res, next) => {
     console.log('🔍 OAuth Request:', {
       method: req.method,
       path: req.path,
+      fullPath: req.originalUrl,
       query: req.query,
       headers: {
         origin: req.headers.origin,
@@ -115,6 +116,33 @@ app.use((req, res, next) => {
         'user-agent': req.headers['user-agent']
       }
     });
+  }
+  next();
+});
+
+// Response logging for OAuth routes
+app.use((req, res, next) => {
+  if (req.path.includes('/auth/google')) {
+    const originalSend = res.send;
+    const originalRedirect = res.redirect;
+    
+    res.send = function(data) {
+      console.log('📤 OAuth Response:', {
+        path: req.path,
+        statusCode: res.statusCode,
+        data: typeof data === 'string' ? data.substring(0, 200) : data
+      });
+      return originalSend.call(this, data);
+    };
+    
+    res.redirect = function(url) {
+      console.log('🚀 OAuth Redirect:', {
+        from: req.path,
+        to: url,
+        statusCode: res.statusCode
+      });
+      return originalRedirect.call(this, url);
+    };
   }
   next();
 });

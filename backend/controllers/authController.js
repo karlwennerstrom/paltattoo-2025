@@ -396,6 +396,9 @@ const googleCallback = (req, res, next) => {
         expires: Date.now() + 5 * 60 * 1000 // 5 minutes
       };
       
+      console.log('💾 Stored auth data with key:', authKey);
+      console.log('💾 Store now contains keys:', Object.keys(global.tempAuthStore));
+      
       // Clean up expired entries
       Object.keys(global.tempAuthStore).forEach(key => {
         if (global.tempAuthStore[key].expires < Date.now()) {
@@ -406,6 +409,7 @@ const googleCallback = (req, res, next) => {
       // Redirect with just the key
       const fullRedirectUrl = `${redirectUrl}?key=${authKey}`;
       console.log('🚀 Redirecting with auth key:', authKey);
+      console.log('🚀 Full redirect URL:', fullRedirectUrl);
       
       return res.redirect(fullRedirectUrl);
     } catch (error) {
@@ -418,6 +422,9 @@ const googleCallback = (req, res, next) => {
 const googleVerify = async (req, res) => {
   try {
     console.log('🔍 Google verify called');
+    console.log('📋 Request query:', req.query);
+    console.log('🗃️ Temp auth store keys:', Object.keys(global.tempAuthStore || {}));
+    
     const { key } = req.query;
     
     if (!key) {
@@ -425,12 +432,22 @@ const googleVerify = async (req, res) => {
       return res.status(401).json({ error: 'No authentication key' });
     }
     
+    console.log('🔑 Looking for key:', key);
+    
     // Retrieve auth data from temporary store
     const authEntry = global.tempAuthStore?.[key];
     
-    if (!authEntry || authEntry.expires < Date.now()) {
-      console.log('❌ Auth key expired or not found');
-      return res.status(401).json({ error: 'Authentication key expired or invalid' });
+    if (!authEntry) {
+      console.log('❌ Key not found in store');
+      console.log('Available keys:', Object.keys(global.tempAuthStore || {}));
+      return res.status(401).json({ error: 'Authentication key not found' });
+    }
+    
+    if (authEntry.expires < Date.now()) {
+      console.log('❌ Auth key expired');
+      console.log('Expiry time:', new Date(authEntry.expires));
+      console.log('Current time:', new Date());
+      return res.status(401).json({ error: 'Authentication key expired' });
     }
     
     // Clean up the used key

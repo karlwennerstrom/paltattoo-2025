@@ -18,6 +18,17 @@ const server = http.createServer(app);
 
 ensureDirectories();
 
+// Trust proxy - required when behind a reverse proxy (Railway, Heroku, etc.)
+// This allows Express to correctly identify client IPs from X-Forwarded-* headers
+// Use specific configuration instead of 'true' for security
+if (process.env.NODE_ENV === 'production') {
+  // In production, trust the first proxy (Railway, Vercel, etc.)
+  app.set('trust proxy', 1);
+} else {
+  // In development, don't trust any proxies
+  app.set('trust proxy', false);
+}
+
 // Security middleware - Helmet for security headers
 app.use(helmet({
   contentSecurityPolicy: {
@@ -32,6 +43,7 @@ app.use(helmet({
     },
   },
   crossOriginEmbedderPolicy: false, // Required for some external resources
+  frameguard: { action: 'sameorigin' }, // Allow framing from same origin
 }));
 
 // Rate limiting configuration
@@ -90,7 +102,7 @@ app.use(session({
     secure: process.env.NODE_ENV === 'production', // Only use secure cookies in production
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    sameSite: 'strict'
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict'
   }
 }));
 
@@ -120,14 +132,13 @@ const adminRoutes = require('./routes/admin');
 const { errorHandler, notFound } = require('./middleware/errorHandler');
 const { testConnection } = require('./config/database');
 
-// Test database connection on startup
-testConnection();
-
 // Routes
 app.get('/', (req, res) => {
   res.json({ 
     message: 'TattooConnect API is running',
     version: '1.0.0',
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
     endpoints: {
       auth: '/api/auth',
       catalogs: '/api/catalogs',
@@ -143,6 +154,35 @@ app.get('/', (req, res) => {
       collections: '/api/collections'
     }
   });
+});
+
+// Health check endpoint for Railway
+app.get('/health', async (req, res) => {
+  try {
+    // Test database connection
+    const dbHealthy = await testConnection();
+    
+    const healthStatus = {
+      status: dbHealthy ? 'healthy' : 'unhealthy',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      database: dbHealthy ? 'connected' : 'disconnected',
+      memory: process.memoryUsage(),
+      environment: process.env.NODE_ENV || 'development'
+    };
+    
+    if (dbHealthy) {
+      res.status(200).json(healthStatus);
+    } else {
+      res.status(503).json(healthStatus);
+    }
+  } catch (error) {
+    res.status(503).json({
+      status: 'error',
+      timestamp: new Date().toISOString(),
+      error: error.message
+    });
+  }
 });
 
 // Apply rate limiting to API routes
@@ -179,10 +219,93 @@ const PORT = process.env.PORT || 5000;
 // Initialize Socket.io
 socketService.initialize(server);
 
-server.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-  console.log(`API documentation available at http://localhost:${PORT}`);
-  console.log(`Socket.io server initialized`);
-  console.log(`Uploads directory: ${uploadsPath}`);
+// testConnection already imported above
 
+// Check required environment variables
+function checkRequiredEnvVars() {
+  const required = [
+    'SESSION_SECRET',
+    'JWT_SECRET',
+    'DB_HOST',
+    'DB_USER', 
+    'DB_PASSWORD',
+    'DB_NAME'
+  ];
+  
+  const missing = required.filter(key => !process.env[key]);
+  
+  if (missing.length > 0) {
+    console.error('❌ Missing required environment variables:', missing.join(', '));
+    console.error('Please set these variables before starting the server.');
+    process.exit(1);
+  }
+  
+  console.log('✅ All required environment variables are set');
+}
+
+async function startServer() {
+  try {
+    console.log('🔍 Checking environment variables...');
+    checkRequiredEnvVars();
+    
+    console.log('🔗 Testing database connection...');
+    const dbConnected = await testConnection();
+    
+    if (!dbConnected) {
+      console.error('❌ Failed to connect to database. Server will not start.');
+      process.exit(1);
+    }
+
+    server.listen(PORT, '0.0.0.0', () => {
+      console.log(`✅ Server is running on port ${PORT}`);
+      console.log(`📋 API documentation available at http://localhost:${PORT}`);
+      console.log(`🔌 Socket.io server initialized`);
+      console.log(`📁 Uploads directory: ${uploadsPath}`);
+      console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`🔐 Trust proxy: ${app.get('trust proxy')}`);
+    });
+
+    server.on('error', (error) => {
+      console.error('❌ Server error:', error);
+      if (error.code === 'EADDRINUSE') {
+        console.error(`❌ Port ${PORT} is already in use`);
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Failed to start server:', error.message);
+    console.error('Full error:', error);
+    process.exit(1);
+  }
+}
+
+// Graceful shutdown handling
+process.on('SIGTERM', () => {
+  console.log('🛑 SIGTERM received, shutting down gracefully...');
+  server.close(() => {
+    console.log('✅ Process terminated gracefully');
+    process.exit(0);
+  });
 });
+
+process.on('SIGINT', () => {
+  console.log('🛑 SIGINT received, shutting down gracefully...');
+  server.close(() => {
+    console.log('✅ Process terminated gracefully');
+    process.exit(0);
+  });
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  console.error('💥 Uncaught Exception:', error);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('💥 Unhandled Rejection at:', promise, 'reason:', reason);
+  process.exit(1);
+});
+
+// Start the server
+startServer();

@@ -24,6 +24,7 @@ router.get('/verify-token', authenticate, (req, res) => {
 // Google OAuth routes
 router.get('/google', authController.googleAuth);
 router.get('/google/callback', authController.googleCallback);
+router.get('/google/verify', authController.googleVerify);
 router.post('/complete-profile', authenticate, authController.completeProfile);
 
 // Password reset routes

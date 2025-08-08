@@ -8,15 +8,19 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true, // Include cookies in requests
 });
 
 // Request interceptor to add auth token
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('authToken');
-    if (token) {
+    // Only add Authorization header if we have a real JWT token
+    // Don't add it for the placeholder 'google-oauth-cookie' token
+    if (token && token !== 'google-oauth-cookie') {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    // When using Google OAuth, authentication is handled via httpOnly cookies
     return config;
   },
   (error) => {

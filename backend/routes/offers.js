@@ -88,8 +88,8 @@ router.get('/', optionalAuth, async (req, res) => {
       maxBudget: req.query.maxBudget,
       regionId: req.query.region,
       comunaId: req.query.comuna,
-      limit: req.query.limit || 20,
-      offset: req.query.offset || 0
+      limit: parseInt(req.query.limit) || 20,
+      offset: parseInt(req.query.offset) || 0
     };
     console.log('Filters:', filters);
     

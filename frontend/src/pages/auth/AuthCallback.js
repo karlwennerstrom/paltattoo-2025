@@ -15,6 +15,7 @@ const AuthCallback = () => {
       console.log('🔍 Search params:', [...searchParams.entries()]);
       
       const error = searchParams.get('error');
+      const authData = searchParams.get('auth');
 
       if (error) {
         console.error('❌ OAuth error detected:', error);
@@ -39,69 +40,47 @@ const AuthCallback = () => {
         return;
       }
 
-      try {
-        console.log('🔗 Making auth check request to backend...');
-        const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
-        console.log('🌐 API URL:', apiUrl);
-        
-        // First attempt: try to get auth status using cookies
-        let response = await fetch(`${apiUrl}/auth/check`, {
-          credentials: 'include', // Important: include cookies in the request
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
-        
-        console.log('📡 Response status:', response.status);
-        console.log('📡 Response ok:', response.ok);
-
-        // If auth check fails with 401, try to get a fresh token via callback endpoint
-        if (!response.ok && response.status === 401) {
-          console.log('🔄 Auth check failed, trying to get fresh token...');
-          response = await fetch(`${apiUrl}/auth/google/verify`, {
-            credentials: 'include',
-            headers: {
-              'Content-Type': 'application/json'
-            }
-          });
-          console.log('📡 Verify response status:', response.status);
-        }
-        
-        if (response.ok) {
-          const data = await response.json();
-          console.log('✅ Auth check response:', data);
+      // Check if we have auth data in URL
+      if (authData) {
+        try {
+          console.log('🔑 Auth data received from URL');
+          const decodedData = JSON.parse(decodeURIComponent(authData));
+          console.log('✅ Decoded auth data:', decodedData);
           
-          if (data.authenticated && data.user) {
-            console.log('🎉 User authenticated successfully:', data.user);
-            // Since we're using httpOnly cookies, we don't have a token to store
-            // The cookie is already set by the backend
-            // We'll use a placeholder token to indicate authenticated state
-            const placeholderToken = 'google-oauth-cookie';
-            localStorage.setItem('authToken', placeholderToken);
+          if (decodedData.token && decodedData.user) {
+            // Store the token
+            localStorage.setItem('authToken', decodedData.token);
             
             // Update auth context with user data
-            loginWithToken(data.user, placeholderToken);
+            loginWithToken(decodedData.user, decodedData.token);
             
             toast.success('¡Inicio de sesión exitoso!');
             
+            // Clear the URL to remove sensitive data
+            window.history.replaceState({}, document.title, '/auth/callback');
+            
             // Redirect based on user type
-            if (data.user.userType === 'artist' || data.user.user_type === 'artist') {
+            if (decodedData.user.userType === 'artist') {
               navigate('/artist');
-            } else if (data.user.userType === 'admin' || data.user.user_type === 'admin') {
+            } else if (decodedData.user.userType === 'admin') {
               navigate('/admin/dashboard');
             } else {
               navigate('/feed');
             }
-          } else {
-            console.error('❌ Authentication failed:', { authenticated: data.authenticated, hasUser: !!data.user });
-            throw new Error('No se pudo verificar la autenticación');
+            return;
           }
-        } else {
-          console.error('❌ Auth check request failed:', response.status, response.statusText);
-          const errorText = await response.text();
-          console.error('❌ Error response:', errorText);
-          throw new Error('Error al verificar la autenticación');
+        } catch (parseError) {
+          console.error('💥 Error parsing auth data:', parseError);
+          toast.error('Error al procesar la autenticación');
+          navigate('/login');
+          return;
         }
+      }
+      
+      // If no auth data in URL, show error
+      console.error('❌ No auth data received');
+      toast.error('No se recibió token de autenticación');
+      navigate('/login');
       } catch (error) {
         console.error('💥 Auth callback error:', error);
         toast.error('Error al procesar la autenticación');

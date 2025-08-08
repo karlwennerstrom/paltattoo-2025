@@ -315,32 +315,42 @@ const googleCallback = (req, res, next) => {
         // Generate temporary token for profile completion
         const tempToken = generateToken(user.id, 'incomplete');
         
-        // Set temporary token in httpOnly cookie
-        res.cookie('authToken', tempToken, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
-          maxAge: 60 * 60 * 1000 // 1 hour for profile completion
-        });
+        // For cross-domain authentication, pass token in URL
+        const authData = encodeURIComponent(JSON.stringify({
+          token: tempToken,
+          user: {
+            id: user.id,
+            email: user.email,
+            userType: 'incomplete',
+            needsCompletion: true
+          }
+        }));
         
-        return res.redirect(`${process.env.FRONTEND_URL}/complete-profile`);
+        return res.redirect(`${process.env.FRONTEND_URL}/complete-profile?auth=${authData}`);
       }
       
       // Generate JWT token for completed profile
       const token = generateToken(user.id, user.user_type);
       console.log('🔑 Generated token for user:', user.id);
       
-      // Set JWT token in httpOnly cookie
-      res.cookie('authToken', token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
-        maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-      });
+      // For cross-domain authentication, we need to pass the token in the URL
+      // since httpOnly cookies don't work reliably across different domains
+      console.log('🔑 Redirecting with token to:', `${process.env.FRONTEND_URL}/auth/callback`);
       
-      console.log('🍪 Cookie set, redirecting to:', `${process.env.FRONTEND_URL}/auth/callback`);
-      // Redirect to frontend without token in URL
-      return res.redirect(`${process.env.FRONTEND_URL}/auth/callback`);
+      // Encode user data and token for URL
+      const authData = encodeURIComponent(JSON.stringify({
+        token,
+        user: {
+          id: user.id,
+          email: user.email,
+          userType: user.user_type,
+          firstName: user.first_name,
+          lastName: user.last_name
+        }
+      }));
+      
+      // Redirect to frontend with auth data
+      return res.redirect(`${process.env.FRONTEND_URL}/auth/callback?auth=${authData}`);
     } catch (error) {
       console.error('Google OAuth token generation error:', error);
       return res.redirect(`${process.env.FRONTEND_URL}/login?error=token_error`);

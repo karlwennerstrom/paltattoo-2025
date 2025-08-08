@@ -340,7 +340,7 @@ const googleCallback = (req, res, next) => {
           }
         }));
         
-        return res.redirect(`${process.env.FRONTEND_URL}/complete-profile?auth=${authData}`);
+        return res.redirect(`${process.env.FRONTEND_URL}/complete-profile#auth=${authData}`);
       }
       
       // Generate JWT token for completed profile
@@ -370,10 +370,11 @@ const googleCallback = (req, res, next) => {
       const authData = encodeURIComponent(JSON.stringify(authDataObj));
       console.log('🔐 Encoded auth data length:', authData.length);
       
-      const fullRedirectUrl = `${redirectUrl}?auth=${authData}`;
+      // Use hash instead of query params to avoid issues with Vercel
+      const fullRedirectUrl = `${redirectUrl}#auth=${authData}`;
       console.log('🚀 Full redirect URL:', fullRedirectUrl.substring(0, 200) + '...');
       
-      // Redirect to frontend with auth data
+      // Redirect to frontend with auth data in hash
       return res.redirect(fullRedirectUrl);
     } catch (error) {
       console.error('Google OAuth token generation error:', error);

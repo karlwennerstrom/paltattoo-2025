@@ -15,19 +15,27 @@ const AuthCallback = () => {
       console.log('📋 Full URL object:', {
         href: window.location.href,
         search: window.location.search,
+        hash: window.location.hash,
         pathname: window.location.pathname,
         origin: window.location.origin
       });
-      console.log('🔍 Search params:', [...searchParams.entries()]);
-      console.log('🔍 Raw search string:', window.location.search);
       
+      // Check both query params and hash for auth data
       const error = searchParams.get('error');
-      const authData = searchParams.get('auth');
+      let authData = searchParams.get('auth');
+      
+      // If no auth in query params, check hash
+      if (!authData && window.location.hash) {
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        authData = hashParams.get('auth');
+        console.log('🔐 Found auth data in hash');
+      }
       
       console.log('📦 Extracted values:', {
         error: error,
         authData: authData ? `Present (${authData.length} chars)` : 'Not present',
-        hasAuth: !!authData
+        hasAuth: !!authData,
+        hash: window.location.hash
       });
 
       if (error) {
@@ -75,7 +83,7 @@ const AuthCallback = () => {
             
             toast.success('¡Inicio de sesión exitoso!');
             
-            // Clear the URL to remove sensitive data
+            // Clear the URL and hash to remove sensitive data
             window.history.replaceState({}, document.title, '/auth/callback');
             
             // Redirect based on user type
@@ -96,11 +104,12 @@ const AuthCallback = () => {
         }
       }
       
-      // If no auth data in URL, show error
+      // If no auth data in URL or hash, show error
       console.error('❌ No auth data received');
       console.error('❌ URL analysis:', {
         fullURL: window.location.href,
         search: window.location.search,
+        hash: window.location.hash,
         searchParams: Object.fromEntries(searchParams.entries()),
         authParam: searchParams.get('auth'),
         errorParam: searchParams.get('error')

@@ -284,21 +284,35 @@ const googleAuth = (req, res, next) => {
 
 const googleCallback = (req, res, next) => {
   console.log('🔄 Google OAuth callback initiated');
+  console.log('📍 Request URL:', req.url);
+  console.log('🌐 Frontend URL from env:', process.env.FRONTEND_URL);
+  console.log('🔐 NODE_ENV:', process.env.NODE_ENV);
+  
   const passport = require('passport');
   passport.authenticate('google', { session: false }, async (err, user, info) => {
     console.log('📋 OAuth callback - err:', err ? err.message : 'none');
     console.log('📋 OAuth callback - user:', user ? `User ID: ${user.id}` : 'none');
-    console.log('📋 OAuth callback - info:', info);
+    console.log('📋 OAuth callback - info:', JSON.stringify(info));
     
     if (err) {
       console.error('❌ Google OAuth error:', err);
+      console.error('❌ Error stack:', err.stack);
       return res.redirect(`${process.env.FRONTEND_URL}/login?error=oauth_error`);
     }
     
     if (!user) {
       console.error('❌ Google OAuth: No user returned');
+      console.error('❌ Info object:', info);
       return res.redirect(`${process.env.FRONTEND_URL}/login?error=oauth_failed`);
     }
+    
+    console.log('✅ User authenticated via Google');
+    console.log('👤 User details:', {
+      id: user.id,
+      email: user.email,
+      user_type: user.user_type,
+      profile_completed: user.profile_completed
+    });
     
     try {
       // Check if user needs to complete profile
@@ -332,13 +346,16 @@ const googleCallback = (req, res, next) => {
       // Generate JWT token for completed profile
       const token = generateToken(user.id, user.user_type);
       console.log('🔑 Generated token for user:', user.id);
+      console.log('🔑 Token length:', token.length);
+      console.log('🔑 User type:', user.user_type);
       
       // For cross-domain authentication, we need to pass the token in the URL
       // since httpOnly cookies don't work reliably across different domains
-      console.log('🔑 Redirecting with token to:', `${process.env.FRONTEND_URL}/auth/callback`);
+      const redirectUrl = `${process.env.FRONTEND_URL}/auth/callback`;
+      console.log('🔑 Base redirect URL:', redirectUrl);
       
       // Encode user data and token for URL
-      const authData = encodeURIComponent(JSON.stringify({
+      const authDataObj = {
         token,
         user: {
           id: user.id,
@@ -347,10 +364,17 @@ const googleCallback = (req, res, next) => {
           firstName: user.first_name,
           lastName: user.last_name
         }
-      }));
+      };
+      console.log('📦 Auth data object:', JSON.stringify(authDataObj));
+      
+      const authData = encodeURIComponent(JSON.stringify(authDataObj));
+      console.log('🔐 Encoded auth data length:', authData.length);
+      
+      const fullRedirectUrl = `${redirectUrl}?auth=${authData}`;
+      console.log('🚀 Full redirect URL:', fullRedirectUrl.substring(0, 200) + '...');
       
       // Redirect to frontend with auth data
-      return res.redirect(`${process.env.FRONTEND_URL}/auth/callback?auth=${authData}`);
+      return res.redirect(fullRedirectUrl);
     } catch (error) {
       console.error('Google OAuth token generation error:', error);
       return res.redirect(`${process.env.FRONTEND_URL}/login?error=token_error`);

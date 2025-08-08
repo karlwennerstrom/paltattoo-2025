@@ -12,10 +12,23 @@ const AuthCallback = () => {
     const handleCallback = async () => {
       console.log('🔄 AuthCallback: Starting OAuth callback process');
       console.log('📋 Current URL:', window.location.href);
+      console.log('📋 Full URL object:', {
+        href: window.location.href,
+        search: window.location.search,
+        pathname: window.location.pathname,
+        origin: window.location.origin
+      });
       console.log('🔍 Search params:', [...searchParams.entries()]);
+      console.log('🔍 Raw search string:', window.location.search);
       
       const error = searchParams.get('error');
       const authData = searchParams.get('auth');
+      
+      console.log('📦 Extracted values:', {
+        error: error,
+        authData: authData ? `Present (${authData.length} chars)` : 'Not present',
+        hasAuth: !!authData
+      });
 
       if (error) {
         console.error('❌ OAuth error detected:', error);
@@ -44,7 +57,13 @@ const AuthCallback = () => {
       if (authData) {
         try {
           console.log('🔑 Auth data received from URL');
-          const decodedData = JSON.parse(decodeURIComponent(authData));
+          console.log('🔑 Auth data length:', authData.length);
+          console.log('🔑 First 100 chars:', authData.substring(0, 100));
+          
+          const decodedString = decodeURIComponent(authData);
+          console.log('🔓 Decoded string:', decodedString.substring(0, 200));
+          
+          const decodedData = JSON.parse(decodedString);
           console.log('✅ Decoded auth data:', decodedData);
           
           if (decodedData.token && decodedData.user) {
@@ -79,6 +98,13 @@ const AuthCallback = () => {
       
       // If no auth data in URL, show error
       console.error('❌ No auth data received');
+      console.error('❌ URL analysis:', {
+        fullURL: window.location.href,
+        search: window.location.search,
+        searchParams: Object.fromEntries(searchParams.entries()),
+        authParam: searchParams.get('auth'),
+        errorParam: searchParams.get('error')
+      });
       toast.error('No se recibió token de autenticación');
       navigate('/login');
       } catch (error) {

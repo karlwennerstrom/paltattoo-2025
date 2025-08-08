@@ -63,9 +63,15 @@ const authLimiter = rateLimit({
 });
 
 // Configure CORS for development and production
+console.log('🌐 CORS Configuration:');
+console.log('  NODE_ENV:', process.env.NODE_ENV);
+console.log('  FRONTEND_URL:', process.env.FRONTEND_URL);
+
 const allowedOrigins = process.env.NODE_ENV === 'production' 
   ? [process.env.FRONTEND_URL] 
   : ["http://localhost:3000", "http://127.0.0.1:3000", "https://paltattoo-2025.vercel.app"];
+
+console.log('  Allowed origins:', allowedOrigins);
 
 app.use(cors({
   origin: function(origin, callback) {
@@ -87,6 +93,23 @@ app.use(cors({
 
 // Cookie parser middleware
 app.use(cookieParser());
+
+// Request logging middleware for debugging
+app.use((req, res, next) => {
+  if (req.path.includes('/auth/google')) {
+    console.log('🔍 OAuth Request:', {
+      method: req.method,
+      path: req.path,
+      query: req.query,
+      headers: {
+        origin: req.headers.origin,
+        referer: req.headers.referer,
+        'user-agent': req.headers['user-agent']
+      }
+    });
+  }
+  next();
+});
 
 // Webhook endpoint needs raw body for signature validation
 app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));

@@ -57,15 +57,27 @@ const AuthCallback = () => {
         try {
           console.log('🔑 Auth key received, fetching auth data...');
           
+          // Debug environment variables
+          console.log('🔧 Environment check:', {
+            apiUrl: process.env.REACT_APP_API_URL,
+            nodeEnv: process.env.NODE_ENV,
+            currentOrigin: window.location.origin
+          });
+          
           const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
-          const response = await fetch(`${apiUrl}/auth/google/verify?key=${authKey}`, {
+          const verifyUrl = `${apiUrl}/auth/google/verify?key=${authKey}`;
+          console.log('🔗 Attempting to fetch:', verifyUrl);
+          
+          const response = await fetch(verifyUrl, {
             method: 'GET',
             headers: {
               'Content-Type': 'application/json'
-            }
+            },
+            credentials: 'include' // Include cookies in the request
           });
           
           console.log('📡 Verify response status:', response.status);
+          console.log('📡 Response headers:', response.headers);
           
           if (response.ok) {
             const data = await response.json();

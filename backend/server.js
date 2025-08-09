@@ -315,6 +315,19 @@ function checkRequiredEnvVars() {
   console.log('✅ All required environment variables are set');
 }
 
+// Global error handlers
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+  console.error('❌ Rejection details:', JSON.stringify(reason, null, 2));
+  // Don't exit the process in production, just log
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('❌ Uncaught Exception:', error);
+  console.error('❌ Stack:', error.stack);
+  // Don't exit the process in production, just log
+});
+
 async function startServer() {
   try {
     console.log('🔍 Checking environment variables...');

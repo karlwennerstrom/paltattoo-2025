@@ -360,10 +360,18 @@ const googleCallback = (req, res, next) => {
       }
       
       // Generate JWT token for completed profile
-      const token = generateToken(user.id, user.user_type);
-      console.log('🔑 Generated token for user:', user.id);
-      console.log('🔑 Token length:', token.length);
-      console.log('🔑 User type:', user.user_type);
+      let token;
+      try {
+        console.log('🎯 About to generate token...');
+        token = generateToken(user.id, user.user_type);
+        console.log('🔑 Generated token for user:', user.id);
+        console.log('🔑 Token length:', token.length);
+        console.log('🔑 User type:', user.user_type);
+      } catch (tokenError) {
+        console.error('❌ Token generation failed:', tokenError);
+        console.error('❌ Token error stack:', tokenError.stack);
+        return res.redirect(`${process.env.FRONTEND_URL}/login?error=token_generation_failed`);
+      }
       
       // For cross-domain authentication, we need to pass the token in the URL
       // since httpOnly cookies don't work reliably across different domains
@@ -387,7 +395,17 @@ const googleCallback = (req, res, next) => {
       console.log('🔐 Encoded auth data length:', authData.length);
       
       // Store auth data temporarily in a session or memory store
-      const authKey = require('crypto').randomBytes(32).toString('hex');
+      let authKey;
+      try {
+        console.log('🔑 About to generate auth key...');
+        const crypto = require('crypto');
+        authKey = crypto.randomBytes(32).toString('hex');
+        console.log('🔑 Generated auth key successfully');
+      } catch (keyError) {
+        console.error('❌ Auth key generation failed:', keyError);
+        console.error('❌ Key error stack:', keyError.stack);
+        return res.redirect(`${process.env.FRONTEND_URL}/login?error=key_generation_failed`);
+      }
       
       // Store auth data temporarily (expires in 5 minutes)
       global.tempAuthStore = global.tempAuthStore || {};
@@ -411,7 +429,14 @@ const googleCallback = (req, res, next) => {
       console.log('🚀 Redirecting with auth key:', authKey);
       console.log('🚀 Full redirect URL:', fullRedirectUrl);
       
-      return res.redirect(fullRedirectUrl);
+      try {
+        console.log('🚀 About to perform redirect...');
+        return res.redirect(fullRedirectUrl);
+      } catch (redirectError) {
+        console.error('❌ Redirect failed:', redirectError);
+        console.error('❌ Redirect error stack:', redirectError.stack);
+        return res.status(500).json({ error: 'Redirect failed', details: redirectError.message });
+      }
     } catch (error) {
       console.error('Google OAuth token generation error:', error);
       return res.redirect(`${process.env.FRONTEND_URL}/login?error=token_error`);

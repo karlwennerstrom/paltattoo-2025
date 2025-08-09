@@ -90,8 +90,10 @@ const ShopsListPage = () => {
     } catch (err) {
       setError('Error al cargar las tiendas');
       console.error('Error loading shops:', err);
-      // Generate mock data as fallback
-      generateMockShops();
+      // Only generate mock data if there's no data at all
+      if (shops.length === 0) {
+        generateMockShops();
+      }
     } finally {
       setLoading(false);
     }

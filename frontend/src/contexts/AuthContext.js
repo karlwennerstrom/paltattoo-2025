@@ -87,6 +87,16 @@ export const AuthProvider = ({ children }) => {
       return { success: true, user: newUser };
     } catch (error) {
       console.error('Register error:', error);
+      
+      // Check if it's a validation error with array of errors
+      if (error.response?.data?.errors && Array.isArray(error.response.data.errors)) {
+        return { 
+          success: false, 
+          validationErrors: error.response.data.errors,
+          error: 'Por favor corrige los errores en el formulario'
+        };
+      }
+      
       const errorMessage = error.response?.data?.error || error.response?.data?.message || 'Error al registrarse';
       setError(errorMessage);
       toast.error(errorMessage);

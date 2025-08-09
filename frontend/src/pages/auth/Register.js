@@ -19,6 +19,8 @@ const Register = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [emailError, setEmailError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -46,9 +48,14 @@ const Register = () => {
       }));
     }
     
-    // Clear email error when user types
+    // Clear errors when user types
     if (name === 'email') {
       setEmailError('');
+      setFieldErrors(prev => ({ ...prev, email: '' }));
+    }
+    if (name === 'password') {
+      setPasswordError('');
+      setFieldErrors(prev => ({ ...prev, password: '' }));
     }
   };
 
@@ -57,6 +64,8 @@ const Register = () => {
     setIsLoading(true);
     setError('');
     setEmailError('');
+    setPasswordError('');
+    setFieldErrors({});
 
     // Validate password match
     if (formData.password !== formData.confirmPassword) {
@@ -81,11 +90,25 @@ const Register = () => {
         if (result.user.userType === 'artist') {
           navigate('/artist');
         } else {
-          navigate('/feed');
+          navigate('/client/dashboard');
         }
       } else {
-        // Check if it's a duplicate email error
-        if (result.error && result.error.toLowerCase().includes('email') && result.error.toLowerCase().includes('registrado')) {
+        // Check if it's validation errors
+        if (result.validationErrors && Array.isArray(result.validationErrors)) {
+          const errors = {};
+          result.validationErrors.forEach(error => {
+            if (error.path === 'password') {
+              setPasswordError(error.msg);
+              errors.password = error.msg;
+            } else if (error.path === 'email') {
+              setEmailError(error.msg);
+              errors.email = error.msg;
+            } else {
+              errors[error.path] = error.msg;
+            }
+          });
+          setFieldErrors(errors);
+        } else if (result.error && result.error.toLowerCase().includes('email') && result.error.toLowerCase().includes('registrado')) {
           setEmailError('Este email ya está registrado. ¿Quieres iniciar sesión?');
           toast.error('Este email ya está registrado');
         } else {
@@ -246,8 +269,15 @@ const Register = () => {
                 value={formData.password}
                 onChange={handleChange}
                 required
-                className="mt-1 block w-full px-3 py-2 border border-white/20 rounded-lg bg-black/40 backdrop-blur-sm text-white placeholder-primary-400 focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-accent-500 transition-all duration-200"
+                className={`mt-1 block w-full px-3 py-2 border rounded-lg bg-black/40 backdrop-blur-sm text-white placeholder-primary-400 focus:outline-none focus:ring-2 transition-all duration-200 ${
+                  passwordError || fieldErrors.password
+                    ? 'border-red-500 focus:ring-red-500 focus:border-red-500' 
+                    : 'border-white/20 focus:ring-accent-500 focus:border-accent-500'
+                }`}
               />
+              {(passwordError || fieldErrors.password) && (
+                <p className="mt-1 text-sm text-red-400">{passwordError || fieldErrors.password}</p>
+              )}
             </div>
 
             <div>
@@ -261,8 +291,15 @@ const Register = () => {
                 value={formData.confirmPassword}
                 onChange={handleChange}
                 required
-                className="mt-1 block w-full px-3 py-2 border border-white/20 rounded-lg bg-black/40 backdrop-blur-sm text-white placeholder-primary-400 focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-accent-500 transition-all duration-200"
+                className={`mt-1 block w-full px-3 py-2 border rounded-lg bg-black/40 backdrop-blur-sm text-white placeholder-primary-400 focus:outline-none focus:ring-2 transition-all duration-200 ${
+                  formData.password !== formData.confirmPassword && formData.confirmPassword !== ''
+                    ? 'border-red-500 focus:ring-red-500 focus:border-red-500' 
+                    : 'border-white/20 focus:ring-accent-500 focus:border-accent-500'
+                }`}
               />
+              {formData.password !== formData.confirmPassword && formData.confirmPassword !== '' && (
+                <p className="mt-1 text-sm text-red-400">Las contraseñas no coinciden</p>
+              )}
             </div>
 
             {error && (

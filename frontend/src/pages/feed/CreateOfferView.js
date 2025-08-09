@@ -65,7 +65,13 @@ const CreateOfferView = () => {
       const uniqueStyles = [...new Map((stylesRes.data || []).map(item => [item.id, item])).values()];
       const uniqueBodyParts = [...new Map((bodyPartsRes.data || []).map(item => [item.id, item])).values()];
       const uniqueColorTypes = [...new Map((colorTypesRes.data || []).map(item => [item.id, item])).values()];
-      const uniqueRegions = [...new Map((regionsRes.data || []).map(item => [item.id, item])).values()];
+      
+      // Handle regions - they come as an array of strings
+      const regionsArray = regionsRes.data || [];
+      const uniqueRegions = regionsArray.map((region, index) => ({
+        id: region, // Use region name as ID since backend expects it
+        name: region
+      }));
       
       setCatalogs({
         styles: uniqueStyles,
@@ -114,7 +120,22 @@ const CreateOfferView = () => {
     if (regionId) {
       try {
         const comunasRes = await catalogService.getComunas(regionId);
-        const uniqueComunas = [...new Map((comunasRes.data || []).map(item => [item.id, item])).values()];
+        const comunasArray = comunasRes.data || [];
+        
+        // Remove duplicates by name (case insensitive)
+        const uniqueComunas = [];
+        const seenNames = new Set();
+        
+        for (const comuna of comunasArray) {
+          const nameKey = comuna.name.toLowerCase();
+          if (!seenNames.has(nameKey)) {
+            seenNames.add(nameKey);
+            uniqueComunas.push(comuna);
+          }
+        }
+        
+        // Sort alphabetically
+        uniqueComunas.sort((a, b) => a.name.localeCompare(b.name));
         
         setCatalogs(prev => ({
           ...prev,

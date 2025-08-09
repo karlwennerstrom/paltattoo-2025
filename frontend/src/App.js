@@ -172,6 +172,24 @@ function App() {
             </ProtectedRoute>
           } />
 
+          {/* Unauthorized page */}
+          <Route path="/unauthorized" element={
+            <PageWrapper>
+              <div className="min-h-screen bg-primary-900 flex items-center justify-center">
+                <div className="text-center">
+                  <h1 className="text-2xl font-bold text-primary-100 mb-4">Acceso No Autorizado</h1>
+                  <p className="text-primary-300 mb-6">No tienes permisos para acceder a esta página.</p>
+                  <button 
+                    onClick={() => window.history.back()}
+                    className="bg-accent-500 text-white px-6 py-2 rounded-lg hover:bg-accent-600 transition"
+                  >
+                    Volver
+                  </button>
+                </div>
+              </div>
+            </PageWrapper>
+          } />
+
           {/* Protected client routes */}
           <Route path="/client/dashboard" element={
             <ProtectedRoute requiredRole="client">
@@ -179,7 +197,7 @@ function App() {
             </ProtectedRoute>
           } />
           <Route path="/feed" element={
-            <ProtectedRoute requiredRole="artist">
+            <ProtectedRoute>
               <PageWrapper><FeedView /></PageWrapper>
             </ProtectedRoute>
           } />

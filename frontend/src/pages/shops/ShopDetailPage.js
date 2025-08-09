@@ -32,7 +32,26 @@ const ShopDetailPage = () => {
       
       // Load shop details
       const response = await sponsoredShopsService.getById(id);
-      setShop(response.data);
+      
+      // Handle different response structures
+      const shopData = response.data?.data || response.data;
+      
+      // Ensure the shop data has the expected structure
+      if (shopData && typeof shopData === 'object') {
+        setShop({
+          ...shopData,
+          // Map backend fields to expected frontend fields
+          comuna_name: shopData.city || shopData.comuna_name,
+          region_name: shopData.region || shopData.region_name,
+          business_hours: shopData.business_hours || {},
+          tags: shopData.tags || [],
+          website_url: shopData.website || shopData.website_url,
+          instagram_url: shopData.instagram || shopData.instagram_url,
+          facebook_url: shopData.facebook || shopData.facebook_url
+        });
+      } else {
+        throw new Error('Invalid shop data received');
+      }
       setError(null);
     } catch (err) {
       console.error('Error loading shop:', err);

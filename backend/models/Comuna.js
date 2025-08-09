@@ -26,10 +26,22 @@ class Comuna {
 
   static async getByRegion(region) {
     const [rows] = await promisePool.execute(
-      'SELECT * FROM comunas WHERE region = ? ORDER BY name',
+      'SELECT DISTINCT id, name, region, created_at FROM comunas WHERE region = ? ORDER BY name',
       [region]
     );
-    return rows;
+    
+    // Remove duplicates based on name (in case DISTINCT doesn't work as expected)
+    const uniqueComunas = [];
+    const seenNames = new Set();
+    
+    for (const comuna of rows) {
+      if (!seenNames.has(comuna.name.toLowerCase())) {
+        seenNames.add(comuna.name.toLowerCase());
+        uniqueComunas.push(comuna);
+      }
+    }
+    
+    return uniqueComunas;
   }
 
   static async getRegions() {

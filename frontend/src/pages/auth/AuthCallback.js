@@ -123,9 +123,12 @@ const AuthCallback = () => {
                 } else if (data.user.needsCompletion) {
                   console.log('📝 Redirecting to complete profile');
                   navigate('/complete-profile');
+                } else if (data.user.userType === 'client') {
+                  console.log('👤 Redirecting to client dashboard');
+                  navigate('/client/dashboard');
                 } else {
-                  console.log('📱 Redirecting to feed');
-                  navigate('/feed');
+                  console.log('📱 Redirecting to home');
+                  navigate('/');
                 }
                 return;
               } else {

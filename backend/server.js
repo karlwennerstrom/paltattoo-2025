@@ -76,7 +76,7 @@ console.log('  NODE_ENV:', process.env.NODE_ENV);
 console.log('  FRONTEND_URL:', process.env.FRONTEND_URL);
 
 const allowedOrigins = process.env.NODE_ENV === 'production' 
-  ? [process.env.FRONTEND_URL] 
+  ? [process.env.FRONTEND_URL, 'https://paltattoo-2025.vercel.app'] 
   : ["http://localhost:3000", "http://127.0.0.1:3000", "https://paltattoo-2025.vercel.app"];
 
 console.log('  Allowed origins:', allowedOrigins);

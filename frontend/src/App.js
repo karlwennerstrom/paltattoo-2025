@@ -2,6 +2,7 @@ import React from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { useAuth } from './contexts/AuthContext';
+import ErrorBoundary from './components/common/ErrorBoundary';
 
 // Auth pages
 import Login from './pages/auth/Login';
@@ -117,11 +118,12 @@ function App() {
   const isDashboardRoute = isAdminRoute || isArtistDashboardRoute || isMainDashboardRoute;
 
   return (
-    <div className="App min-h-screen bg-primary-900">
-      <Toaster position="top-right" />
-      {user && <RealtimeNotifications />}
-      {!isDashboardRoute && <Navbar />}
-      <main>
+    <ErrorBoundary>
+      <div className="App min-h-screen bg-primary-900">
+        <Toaster position="top-right" />
+        {user && <RealtimeNotifications />}
+        {!isDashboardRoute && <Navbar />}
+        <main>
         <Routes>
           {/* Public routes */}
           <Route path="/" element={<PageWrapper fullScreen><HomePage /></PageWrapper>} />
@@ -288,6 +290,7 @@ function App() {
       </main>
       {!isDashboardRoute && <Footer />}
     </div>
+    </ErrorBoundary>
   );
 }
 

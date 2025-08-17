@@ -22,9 +22,36 @@ window.addEventListener('unhandledrejection', (event) => {
 window.addEventListener('error', (event) => {
   if (event.message && event.message.includes('ResizeObserver loop completed with undelivered notifications')) {
     event.preventDefault();
+    event.stopImmediatePropagation();
     return false;
   }
 });
+
+// Also suppress ResizeObserver errors in console
+const resizeObserverErr = /ResizeObserver loop completed with undelivered notifications/;
+const originalError = console.error;
+console.error = (...args) => {
+  if (args.length > 0 && typeof args[0] === 'string' && resizeObserverErr.test(args[0])) {
+    return; // Suppress this specific error
+  }
+  originalError.apply(console, args);
+};
+
+// Throttle resize events to prevent ResizeObserver issues
+let resizeTimeout;
+const originalAddEventListener = window.addEventListener;
+window.addEventListener = function(type, listener, options) {
+  if (type === 'resize') {
+    const throttledListener = function(event) {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        listener(event);
+      }, 100); // 100ms throttle
+    };
+    return originalAddEventListener.call(this, type, throttledListener, options);
+  }
+  return originalAddEventListener.call(this, type, listener, options);
+};
 
 const queryClient = new QueryClient({
   defaultOptions: {

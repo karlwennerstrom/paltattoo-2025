@@ -6,6 +6,7 @@ import PortfolioGallery from './PortfolioGallery';
 import ContactInfo from './ContactInfo';
 import SpecialtiesDisplay from './SpecialtiesDisplay';
 import SubscriptionBadge from '../common/SubscriptionBadge';
+import RatingDisplay from '../ratings/RatingDisplay';
 import { getProfileImageUrl } from '../../utils/imageHelpers';
 
 const PublicArtistProfile = ({ artist, className = '' }) => {
@@ -20,7 +21,7 @@ const PublicArtistProfile = ({ artist, className = '' }) => {
   const tabs = [
     { id: 'portfolio', label: 'Portfolio', count: artist?.portfolioImages?.length || 0 },
     { id: 'about', label: 'Sobre mí', count: null },
-    ...(artist?.reviewsCount > 0 ? [{ id: 'reviews', label: 'Reseñas', count: artist?.reviewsCount }] : []),
+    { id: 'reviews', label: 'Calificaciones', count: artist?.reviewsCount || null },
     { id: 'contact', label: 'Contacto', count: null },
   ];
 
@@ -105,27 +106,11 @@ const PublicArtistProfile = ({ artist, className = '' }) => {
 
       case 'reviews':
         return (
-          <div className="space-y-4">
-            <Card>
-              <div className="text-center mb-6">
-                <div className="flex justify-center mb-2">
-                  {getRatingStars(artist?.rating || 0)}
-                </div>
-                <p className="text-2xl font-bold text-primary-100">{artist?.rating || 0}</p>
-                <p className="text-primary-400">{artist?.reviewsCount || 0} reseñas</p>
-              </div>
-
-              {artist?.reviewsCount > 0 ? (
-                <div className="text-center text-primary-400">
-                  <p>Las reseñas aparecerán aquí cuando los clientes dejen comentarios.</p>
-                </div>
-              ) : (
-                <div className="text-center text-primary-400">
-                  <p>Aún no hay reseñas para este artista.</p>
-                </div>
-              )}
-            </Card>
-          </div>
+          <RatingDisplay 
+            userId={artist?.id} 
+            showStats={true}
+            maxVisible={10}
+          />
         );
 
       case 'contact':

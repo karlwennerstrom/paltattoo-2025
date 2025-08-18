@@ -66,10 +66,10 @@ const CreateOfferView = () => {
       const uniqueBodyParts = [...new Map((bodyPartsRes.data || []).map(item => [item.id, item])).values()];
       const uniqueColorTypes = [...new Map((colorTypesRes.data || []).map(item => [item.id, item])).values()];
       
-      // Handle regions - they come as an array of strings
+      // Handle regions - they come as an array of strings, transform to objects
       const regionsArray = regionsRes.data || [];
       const uniqueRegions = regionsArray.map((region, index) => ({
-        id: region, // Use region name as ID since backend expects it
+        id: region, // Use region name as ID
         name: region
       }));
       
@@ -310,7 +310,7 @@ const CreateOfferView = () => {
         sizeDescription: formData.sizeDescription,
         budgetMin: parseInt(formData.budgetMin),
         budgetMax: parseInt(formData.budgetMax),
-        regionId: parseInt(formData.regionId),
+        regionId: formData.regionId, // Send as string (region name)
         comunaId: parseInt(formData.comunaId),
         deadline: formData.deadline || null
       };

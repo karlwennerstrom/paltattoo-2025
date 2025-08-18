@@ -110,12 +110,15 @@ const PaymentsTab = () => {
       
       // Check if we have a real subscription response  
       const subscriptionData = subscriptionRes.data?.data || subscriptionRes.data;
+      
+      // Check if we have a valid subscription (including checking plan_type)
       const hasValidSubscription = subscriptionData && 
                                   (subscriptionData.status === 'active' || subscriptionData.status === 'authorized') &&
-                                  (subscriptionData.price > 0 || subscriptionData.amount > 0);
+                                  (subscriptionData.plan_type !== 'basic' && subscriptionData.plan_type !== 'basico');
       
       if (hasValidSubscription) {
         // Use the subscriptionData we already extracted above
+        console.log('Valid subscription found:', subscriptionData);
         
         // Ensure features is an array
         const processedSubscription = {
@@ -126,8 +129,18 @@ const PaymentsTab = () => {
         };
         
         setCurrentSubscription(processedSubscription);
+      } else if (subscriptionData && subscriptionData.plan_type) {
+        // We have subscription data but it's basic plan
+        console.log('Basic plan subscription found:', subscriptionData);
+        setCurrentSubscription({
+          ...subscriptionData,
+          features: Array.isArray(subscriptionData.features) 
+            ? subscriptionData.features 
+            : defaultSubscription.features
+        });
       } else {
-        // If no subscription data or inactive/free subscription, use basic plan
+        // No subscription data at all, use default basic plan
+        console.log('No subscription data found, using default basic plan');
         setCurrentSubscription({
           ...defaultSubscription,
           plan_name: 'basico',
@@ -874,23 +887,23 @@ const PaymentsTab = () => {
             // Simplified plan detection logic
             let isCurrentPlan = false;
             
-            // Get user's actual plan from context (this should be the source of truth)
-            const contextPlanName = userPlanName.toLowerCase();
+            // Get the actual plan from currentSubscription (more reliable than context)
+            const currentPlanType = currentSubscription?.plan_type?.toLowerCase() || 
+                                   currentSubscription?.plan_name?.toLowerCase() || 
+                                   userPlanName.toLowerCase();
             
-            // Simple matching logic based on user's actual plan
-            if (contextPlanName === 'basic' || contextPlanName === 'basico') {
-              // User is on basic plan - only mark basic as current
-              isCurrentPlan = plan.price === 0 || 
-                             String(plan.id || '').toLowerCase() === 'basic' ||
-                             String(plan.name || '').toLowerCase().includes('básico');
-            } else if (contextPlanName === 'premium') {
-              // User is on premium plan - only mark premium as current
-              isCurrentPlan = String(plan.id || '').toLowerCase() === 'premium' ||
-                             String(plan.name || '').toLowerCase() === 'premium';
-            } else if (contextPlanName === 'pro') {
-              // User is on pro plan - only mark pro as current
-              isCurrentPlan = String(plan.id || '').toLowerCase() === 'pro' ||
-                             String(plan.name || '').toLowerCase() === 'pro';
+            // Match based on plan_type or plan ID
+            if (plan.plan_type) {
+              isCurrentPlan = plan.plan_type.toLowerCase() === currentPlanType;
+            } else if (plan.id) {
+              // Fallback to ID-based matching
+              if (currentPlanType === 'basic' || currentPlanType === 'basico' || currentPlanType === 'básico') {
+                isCurrentPlan = String(plan.id).toLowerCase() === 'basic' || plan.price === 0;
+              } else if (currentPlanType === 'premium') {
+                isCurrentPlan = String(plan.id).toLowerCase() === 'premium' || plan.id === 2;
+              } else if (currentPlanType === 'pro') {
+                isCurrentPlan = String(plan.id).toLowerCase() === 'pro' || plan.id === 3;
+              }
             }
             
             

@@ -274,15 +274,17 @@ const ClientDashboard = () => {
                   </div>
                 </div>
                 
-                {/* Debug info */}
-                <div className="mt-2 text-xs text-primary-500">
-                  Socket: {socket && socket.isConnected() ? '🟢 Conectado' : '🔴 Desconectado'}
-                  {socket && socket.isConnected() && (
-                    <span className="ml-2">
-                      (Actualizaciones en tiempo real activas)
-                    </span>
-                  )}
-                </div>
+                {/* Debug info - hidden in production */}
+                {process.env.NODE_ENV === 'development' && (
+                  <div className="mt-2 text-xs text-primary-500">
+                    Socket: {socket && socket.isConnected() ? '🟢 Conectado' : '🔴 Desconectado'}
+                    {socket && socket.isConnected() && (
+                      <span className="ml-2">
+                        (Actualizaciones en tiempo real activas)
+                      </span>
+                    )}
+                  </div>
+                )}
                 
                 <div className="flex items-center justify-between">
                   <span className="text-primary-400">Nuevas ofertas hoy</span>
@@ -406,6 +408,32 @@ const ClientDashboard = () => {
             </p>
           </div>
         </div>
+
+        {/* New Proposals Alert */}
+        {activeOffers.some(offer => offer.proposals_count > 0) && (
+          <div className="bg-gradient-to-r from-accent-500/20 to-success-500/20 border border-accent-500/30 rounded-xl p-4 mb-6">
+            <div className="flex items-center space-x-3">
+              <div className="bg-accent-500 rounded-full p-2">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <h4 className="text-white font-semibold">¡Nuevas propuestas recibidas!</h4>
+                <p className="text-primary-300 text-sm">
+                  Tienes {activeOffers.reduce((total, offer) => total + (offer.proposals_count || 0), 0)} propuestas esperando tu revisión
+                </p>
+              </div>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => navigate('/my-requests')}
+              >
+                Ver propuestas
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Active Requests Section */}
         {activeOffers.length > 0 && (

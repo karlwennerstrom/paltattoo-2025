@@ -251,7 +251,19 @@ const updateProfile = async (req, res) => {
         lastName: profile.last_name,
         phone: profile.phone,
         bio: profile.bio,
-        profileImage: profile.profile_image
+        profileImage: profile.profile_image,
+        subscription: profile.subscription_plan_name ? {
+          planId: profile.subscription_plan_id,
+          planName: profile.subscription_plan_name,
+          status: profile.subscription_status,
+          price: profile.subscription_plan_price
+        } : {
+          // Default to Basic plan if no subscription found
+          planId: 'basic',
+          planName: 'basico',
+          status: 'active',
+          price: 0
+        }
       }
     });
   } catch (error) {

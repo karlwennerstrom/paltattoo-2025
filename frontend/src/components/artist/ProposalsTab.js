@@ -7,8 +7,10 @@ import Modal from '../common/Modal';
 import { getTattooImageUrl, getProfileImageUrl } from '../../utils/imageHelpers';
 import { proposalService, profileService } from '../../services/api';
 import toast from 'react-hot-toast';
-import { FiMail, FiClock, FiCheckCircle, FiXCircle, FiDollarSign, FiCalendar, FiEdit2, FiTrash2, FiEye, FiArrowRight } from 'react-icons/fi';
+import { FiMail, FiClock, FiCheckCircle, FiXCircle, FiDollarSign, FiCalendar, FiEdit2, FiTrash2, FiEye, FiArrowRight, FiStar } from 'react-icons/fi';
 import { useAuth } from '../../contexts/AuthContext';
+import RatingForm from '../ratings/RatingForm';
+import { ratingService } from '../../services/api';
 
 const ProposalsTab = () => {
   const { user } = useAuth();
@@ -19,6 +21,7 @@ const ProposalsTab = () => {
   const [proposals, setProposals] = useState([]);
   const [allProposals, setAllProposals] = useState([]); // Store all proposals for counting
   const [artistProfile, setArtistProfile] = useState(null);
+  const [showRatingForm, setShowRatingForm] = useState(null); // Proposal ID for rating form
 
   useEffect(() => {
     loadProposals();
@@ -383,6 +386,17 @@ const ProposalsTab = () => {
                         Ver Detalles
                       </Button>
                       
+                      {proposal.status === 'accepted' && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setShowRatingForm(proposal)}
+                          className="text-yellow-400 hover:text-yellow-300"
+                        >
+                          <FiStar size={16} />
+                        </Button>
+                      )}
+                      
                       {proposal.status === 'pending' && (
                         <Button
                           variant="ghost"
@@ -554,9 +568,22 @@ const ProposalsTab = () => {
                   {viewingProposal.client_phone && (
                     <div>
                       <p className="text-xs text-primary-500 mb-1">Teléfono</p>
-                      <p className="text-sm text-primary-100">
-                        {viewingProposal.client_phone}
-                      </p>
+                      <div className="flex items-center space-x-2">
+                        <p className="text-sm text-primary-100">
+                          {viewingProposal.client_phone}
+                        </p>
+                        <a
+                          href={`https://wa.me/${viewingProposal.client_phone.replace(/\D/g, '')}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded-md transition-colors"
+                        >
+                          <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217s.232.007.332.012c.106.005.249-.04.389.298.143.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289-.087.101-.183.226-.262.304-.087.087-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.86s.274.072.376-.043c.101-.116.433-.506.549-.68.116-.173.231-.145.39-.087s1.011.477 1.184.564.289.13.332.202c.045.072.045.419-.1.824z"/>
+                          </svg>
+                          WhatsApp
+                        </a>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -592,6 +619,33 @@ const ProposalsTab = () => {
               </Button>
             </div>
           </div>
+        )}
+      </Modal>
+
+      {/* Rating Form Modal */}
+      <Modal
+        isOpen={showRatingForm !== null}
+        onClose={() => setShowRatingForm(null)}
+        title="Calificar Cliente"
+        size="md"
+      >
+        {showRatingForm && (
+          <RatingForm
+            ratedUser={{
+              id: showRatingForm.client_id,
+              first_name: showRatingForm.client_first_name,
+              last_name: showRatingForm.client_last_name,
+              profile_image: showRatingForm.client_profile_image,
+              type: 'client'
+            }}
+            tattooRequestId={showRatingForm.tattoo_request_id}
+            proposalId={showRatingForm.id}
+            onRatingSubmitted={(rating) => {
+              toast.success('Calificación enviada exitosamente');
+              setShowRatingForm(null);
+              // Optionally refresh proposals
+            }}
+          />
         )}
       </Modal>
     </div>

@@ -5,6 +5,8 @@ import Button from '../../components/common/Button';
 import { getTattooImageUrl, getProfileImageUrl } from '../../utils/imageHelpers';
 import { useAuth } from '../../contexts/AuthContext';
 import { offerService, proposalService } from '../../services/api';
+import RatingForm from '../../components/ratings/RatingForm';
+import Modal from '../../components/common/Modal';
 import toast from 'react-hot-toast';
 
 const OfferDetailPage = () => {
@@ -15,6 +17,7 @@ const OfferDetailPage = () => {
   const [proposals, setProposals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isFavorited, setIsFavorited] = useState(false);
+  const [showRatingModal, setShowRatingModal] = useState(null);
 
   // Load offer data from API
   useEffect(() => {
@@ -506,6 +509,20 @@ const OfferDetailPage = () => {
                                 </Button>
                               </>
                             )}
+                            {proposal.status === 'accepted' && (
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                onClick={() => setShowRatingModal({
+                                  artist: proposal.artist,
+                                  proposalId: proposal.id,
+                                  offerId: offer.id
+                                })}
+                                className="text-yellow-400 hover:text-yellow-300"
+                              >
+                                ⭐ Calificar Artista
+                              </Button>
+                            )}
                             <Button variant="ghost" size="sm">
                               <Link to={`/artists/${proposal.artist.id}`}>
                                 Ver Perfil
@@ -658,6 +675,32 @@ const OfferDetailPage = () => {
           </Card>
         </div>
       </div>
+
+      {/* Rating Modal */}
+      <Modal
+        isOpen={showRatingModal !== null}
+        onClose={() => setShowRatingModal(null)}
+        title="Calificar Artista"
+        size="md"
+      >
+        {showRatingModal && (
+          <RatingForm
+            ratedUser={{
+              id: showRatingModal.artist.id,
+              first_name: showRatingModal.artist.name.split(' ')[0],
+              last_name: showRatingModal.artist.name.split(' ').slice(1).join(' '),
+              profile_image: showRatingModal.artist.avatar,
+              type: 'artist'
+            }}
+            tattooRequestId={showRatingModal.offerId}
+            proposalId={showRatingModal.proposalId}
+            onRatingSubmitted={(rating) => {
+              toast.success('¡Calificación enviada exitosamente!');
+              setShowRatingModal(null);
+            }}
+          />
+        )}
+      </Modal>
     </PageContainer>
   );
 };

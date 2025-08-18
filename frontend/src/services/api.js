@@ -478,6 +478,49 @@ export const subscriptionsAPI = {
   updatePaymentMethod: (data) => api.put('/subscriptions/payment-method', data),
 };
 
+// Rating services
+export const ratingService = {
+  // Create a new rating
+  create: (data) => api.post('/ratings', data),
+  
+  // Get ratings for a specific user
+  getUserRatings: (userId, options = {}) => {
+    const params = new URLSearchParams();
+    Object.entries(options).forEach(([key, value]) => {
+      if (value !== undefined) params.append(key, value);
+    });
+    return api.get(`/ratings/user/${userId}?${params}`);
+  },
+  
+  // Get ratings given by the authenticated user
+  getMyRatings: (options = {}) => {
+    const params = new URLSearchParams();
+    Object.entries(options).forEach(([key, value]) => {
+      if (value !== undefined) params.append(key, value);
+    });
+    return api.get(`/ratings/my-ratings?${params}`);
+  },
+  
+  // Update a rating
+  update: (ratingId, data) => api.put(`/ratings/${ratingId}`, data),
+  
+  // Delete a rating
+  delete: (ratingId) => api.delete(`/ratings/${ratingId}`),
+  
+  // Check if user can rate a specific transaction
+  canRate: (rated_id, tattoo_request_id, proposal_id) => {
+    const params = new URLSearchParams({
+      rated_id,
+      tattoo_request_id,
+      proposal_id
+    });
+    return api.get(`/ratings/can-rate?${params}`);
+  },
+  
+  // Get overall rating statistics
+  getStats: () => api.get('/ratings/stats')
+};
+
 
 // Default export
 export default api;

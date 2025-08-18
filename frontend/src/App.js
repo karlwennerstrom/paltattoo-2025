@@ -199,7 +199,7 @@ function App() {
             </ProtectedRoute>
           } />
           <Route path="/feed" element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRole="artist">
               <PageWrapper><FeedView /></PageWrapper>
             </ProtectedRoute>
           } />

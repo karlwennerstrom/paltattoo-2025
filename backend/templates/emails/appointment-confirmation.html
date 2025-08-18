@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nueva Cita Programada - PalTattoo</title>
+    <title>Cita Confirmada - PalTattoo</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -24,7 +24,7 @@
             text-align: center;
             margin-bottom: 30px;
             padding-bottom: 20px;
-            border-bottom: 3px solid #ff6b35;
+            border-bottom: 3px solid #28a745;
         }
         .logo {
             font-size: 28px;
@@ -32,9 +32,18 @@
             color: #ff6b35;
             margin-bottom: 10px;
         }
+        .confirmation-badge {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 25px;
+            display: inline-block;
+            font-weight: bold;
+            margin: 10px 0;
+        }
         .appointment-card {
             background-color: #f8f9fa;
-            border-left: 4px solid #ff6b35;
+            border-left: 4px solid #28a745;
             padding: 20px;
             margin: 20px 0;
             border-radius: 5px;
@@ -49,7 +58,7 @@
             color: #555;
         }
         .appointment-detail span {
-            color: #ff6b35;
+            color: #28a745;
             font-weight: 600;
         }
         .btn {
@@ -79,11 +88,20 @@
             color: #666;
             font-size: 14px;
         }
-        .icon {
-            width: 16px;
-            height: 16px;
-            margin-right: 8px;
-            vertical-align: middle;
+        .important-box {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .important-box h4 {
+            color: #856404;
+            margin-top: 0;
+        }
+        .important-box ul {
+            margin: 0;
+            color: #856404;
         }
     </style>
 </head>
@@ -91,15 +109,16 @@
     <div class="container">
         <div class="header">
             <div class="logo">🎨 PalTattoo</div>
-            <h1 style="color: #333; margin: 0;">Nueva Cita Programada</h1>
+            <h1 style="color: #333; margin: 0;">Cita Confirmada</h1>
+            <div class="confirmation-badge">✅ ¡Confirmado!</div>
         </div>
 
         <p>Hola <strong>{{clientName}}</strong>,</p>
         
-        <p>¡Excelente noticia! Tu cita con <strong>{{artistName}}</strong> ha sido programada exitosamente.</p>
+        <p>¡Excelente! Tu cita con <strong>{{artistName}}</strong> ha sido <strong>confirmada exitosamente</strong>.</p>
 
         <div class="appointment-card">
-            <h3 style="color: #ff6b35; margin-top: 0;">📅 Detalles de tu Cita</h3>
+            <h3 style="color: #28a745; margin-top: 0;">📅 Detalles de tu Cita</h3>
             
             <div class="appointment-detail">
                 <strong>🎨 Tatuador:</strong>
@@ -130,15 +149,15 @@
             
             {{#if estimatedPrice}}
             <div class="appointment-detail">
-                <strong>💰 Precio Est.:</strong>
-                <span>${{estimatedPrice}}</span>
+                <strong>💰 Precio Estimado:</strong>
+                <span>{{estimatedPrice}}</span>
             </div>
             {{/if}}
             
             {{#if depositAmount}}
             <div class="appointment-detail">
-                <strong>💳 Depósito:</strong>
-                <span>${{depositAmount}}</span>
+                <strong>💳 Depósito Requerido:</strong>
+                <span>{{depositAmount}}</span>
             </div>
             {{/if}}
         </div>
@@ -155,22 +174,28 @@
             <a href="{{artistProfileUrl}}" class="btn btn-secondary">Perfil del Tatuador</a>
         </div>
 
-        <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 20px 0;">
-            <h4 style="color: #856404; margin-top: 0;">⚠️ Importante:</h4>
-            <ul style="margin: 0; color: #856404;">
-                <li>Llega 10 minutos antes de tu cita</li>
-                <li>Trae una identificación válida</li>
-                <li>Asegúrate de haber comido antes de la sesión</li>
-                <li>No consumas alcohol 24 horas antes</li>
+        <div class="important-box">
+            <h4>⚠️ Información Importante:</h4>
+            <ul>
+                <li><strong>Puntualidad:</strong> Llega 10 minutos antes de tu cita</li>
+                <li><strong>Documentación:</strong> Trae una identificación válida</li>
+                <li><strong>Preparación:</strong> Asegúrate de haber comido antes de la sesión</li>
+                <li><strong>Salud:</strong> No consumas alcohol 24 horas antes</li>
                 {{#if depositAmount}}
-                <li>El depósito de ${{depositAmount}} debe estar pagado antes de la cita</li>
+                <li><strong>Depósito:</strong> Asegúrate de que el depósito de {{depositAmount}} esté pagado antes de la cita</li>
                 {{/if}}
             </ul>
         </div>
 
-        <p>Si necesitas modificar o cancelar tu cita, por favor hazlo con al menos 24 horas de anticipación.</p>
+        <div style="background-color: #d1ecf1; border: 1px solid #bee5eb; padding: 15px; border-radius: 5px; margin: 20px 0;">
+            <p style="margin: 0; color: #0c5460;">
+                <strong>💡 Recordatorio:</strong> Si necesitas modificar o cancelar tu cita, por favor hazlo con al menos 24 horas de anticipación contactando directamente al tatuador.
+            </p>
+        </div>
 
-        <p>¡Estamos emocionados de ver tu nuevo tatuaje!</p>
+        <p style="text-align: center; font-size: 18px; color: #28a745; font-weight: bold;">
+            ¡Estamos emocionados de ver tu nuevo tatuaje! 🎨
+        </p>
 
         <div class="footer">
             <p><strong>PalTattoo</strong><br>

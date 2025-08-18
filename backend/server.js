@@ -57,15 +57,22 @@ app.use((req, res, next) => {
 // Rate limiting configuration
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
+  max: process.env.NODE_ENV === 'production' ? 100 : 1000, // More lenient in development
   message: 'Demasiadas solicitudes desde esta IP, por favor intenta de nuevo más tarde.',
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => {
+    // Skip rate limiting for profile endpoint in development
+    if (process.env.NODE_ENV !== 'production' && req.path === '/profile') {
+      return true;
+    }
+    return false;
+  }
 });
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // Limit each IP to 5 requests per windowMs
+  max: process.env.NODE_ENV === 'production' ? 5 : 20, // More lenient in development
   message: 'Demasiados intentos de autenticación, por favor intenta de nuevo más tarde.',
   skipSuccessfulRequests: true,
 });
@@ -199,6 +206,7 @@ const subscriptionRoutes = require('./routes/subscriptions');
 const collectionRoutes = require('./routes/collections');
 const interestRoutes = require('./routes/interest');
 const adminRoutes = require('./routes/admin');
+const ratingRoutes = require('./routes/ratings');
 
 // Import middleware
 const { errorHandler, notFound } = require('./middleware/errorHandler');
@@ -223,7 +231,8 @@ app.get('/', (req, res) => {
       payments: '/api/payments',
       calendar: '/api/calendar',
       sponsoredShops: '/api/sponsored-shops',
-      collections: '/api/collections'
+      collections: '/api/collections',
+      ratings: '/api/ratings'
     }
   });
 });
@@ -281,6 +290,7 @@ app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/collections', collectionRoutes);
 app.use('/api/interest', interestRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/ratings', ratingRoutes);
 
 // Error handling
 app.use(notFound);

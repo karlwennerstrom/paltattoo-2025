@@ -20,7 +20,8 @@ window.addEventListener('unhandledrejection', (event) => {
 
 // Suppress ResizeObserver loop limit exceeded warning
 window.addEventListener('error', (event) => {
-  if (event.message && event.message.includes('ResizeObserver loop completed with undelivered notifications')) {
+  if (event.message && (event.message.includes('ResizeObserver loop completed with undelivered notifications') ||
+                       event.message.includes('ResizeObserver loop limit exceeded'))) {
     event.preventDefault();
     event.stopImmediatePropagation();
     return false;
@@ -28,7 +29,7 @@ window.addEventListener('error', (event) => {
 });
 
 // Also suppress ResizeObserver errors in console
-const resizeObserverErr = /ResizeObserver loop completed with undelivered notifications/;
+const resizeObserverErr = /ResizeObserver loop (completed with undelivered notifications|limit exceeded)/;
 const originalError = console.error;
 console.error = (...args) => {
   if (args.length > 0 && typeof args[0] === 'string' && resizeObserverErr.test(args[0])) {
@@ -51,6 +52,33 @@ window.addEventListener = function(type, listener, options) {
     return originalAddEventListener.call(this, type, throttledListener, options);
   }
   return originalAddEventListener.call(this, type, listener, options);
+};
+
+// Handle ResizeObserver errors during navigation
+let navigationTimeout;
+const originalPushState = window.history.pushState;
+window.history.pushState = function(...args) {
+  clearTimeout(navigationTimeout);
+  const result = originalPushState.apply(this, args);
+  
+  // Debounce any ResizeObserver calculations after navigation
+  navigationTimeout = setTimeout(() => {
+    // Trigger a small delay to allow React to finish rendering
+    if (window.ResizeObserver) {
+      const originalObserve = window.ResizeObserver.prototype.observe;
+      window.ResizeObserver.prototype.observe = function(target) {
+        setTimeout(() => {
+          try {
+            originalObserve.call(this, target);
+          } catch (e) {
+            // Silently catch ResizeObserver errors
+          }
+        }, 0);
+      };
+    }
+  }, 50);
+  
+  return result;
 };
 
 const queryClient = new QueryClient({

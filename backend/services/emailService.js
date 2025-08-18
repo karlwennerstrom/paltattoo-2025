@@ -29,14 +29,37 @@ class EmailService {
       // Replace variables in template
       Object.entries(variables).forEach(([key, value]) => {
         const regex = new RegExp(`{{${key}}}`, 'g');
-        template = template.replace(regex, value);
+        template = template.replace(regex, value || '');
       });
+      
+      // Handle conditional blocks
+      // Remove blocks where the condition variable is null/empty
+      template = this.processConditionalBlocks(template, variables);
       
       return template;
     } catch (error) {
       console.error(`Error loading email template ${templateName}:`, error);
       return null;
     }
+  }
+
+  processConditionalBlocks(template, variables) {
+    // Handle {{#if variable}} blocks
+    const ifPattern = /{{#if\s+(\w+)}}([\s\S]*?){{\/if}}/g;
+    
+    template = template.replace(ifPattern, (match, variable, content) => {
+      const value = variables[variable];
+      
+      // If the variable exists and is truthy, return the content with variables replaced
+      if (value) {
+        return content;
+      }
+      
+      // If the variable doesn't exist or is falsy, remove the entire block
+      return '';
+    });
+    
+    return template;
   }
 
   async send(to, subject, html, attachments = []) {
@@ -81,7 +104,7 @@ class EmailService {
 
     return this.send(
       user.email,
-      'Bienvenido a TattooConnect',
+      'Bienvenido a PalTattoo',
       html || this.getDefaultWelcomeHtml(user)
     );
   }
@@ -97,7 +120,7 @@ class EmailService {
 
     return this.send(
       user.email,
-      'Restablecer contraseña - TattooConnect',
+      'Restablecer contraseña - PalTattoo',
       html || this.getDefaultPasswordResetHtml(user, resetUrl)
     );
   }
@@ -271,8 +294,8 @@ class EmailService {
     // Calculate duration if not provided
     const duration = durationHours || this.calculateDuration(startTime, endTime);
     
-    // Use appointment-notification template since appointment-confirmation doesn't exist
-    const html = await this.loadTemplate('appointment-notification', {
+    // Use the dedicated appointment-confirmation template
+    const html = await this.loadTemplate('appointment-confirmation', {
       clientName: clientName,
       artistName: artistName,
       appointmentTitle: title,
@@ -380,9 +403,9 @@ class EmailService {
   getDefaultWelcomeHtml(user) {
     return `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h1 style="color: #333;">¡Bienvenido a TattooConnect!</h1>
+        <h1 style="color: #333;">¡Bienvenido a PalTattoo!</h1>
         <p>Hola ${user.firstName || user.email},</p>
-        <p>Gracias por registrarte en TattooConnect como ${user.type === 'artist' ? 'tatuador' : 'cliente'}.</p>
+        <p>Gracias por registrarte en PalTattoo como ${user.type === 'artist' ? 'tatuador' : 'cliente'}.</p>
         <p>Ya puedes comenzar a ${user.type === 'artist' ? 'recibir ofertas de tatuajes' : 'publicar tus ideas de tatuajes'}.</p>
         <a href="${process.env.FRONTEND_URL}/login" style="display: inline-block; padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px;">Iniciar sesión</a>
       </div>

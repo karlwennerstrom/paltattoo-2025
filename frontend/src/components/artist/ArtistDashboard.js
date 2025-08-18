@@ -131,7 +131,10 @@ const ArtistDashboard = () => {
       ]);
       
       setStats(statsRes.data);
-      setSubscription(subscriptionRes.data);
+      // Handle subscription data - it might be wrapped in another data object
+      const subscriptionData = subscriptionRes.data?.data || subscriptionRes.data;
+      console.log('Subscription data received:', subscriptionData);
+      setSubscription(subscriptionData);
       setProfile(profileRes.data);
       setPlans(plansRes.data);
     } catch (error) {
@@ -330,20 +333,20 @@ const ArtistDashboard = () => {
             {subscription ? (
               <div className="p-4 bg-primary-700 rounded-lg">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-primary-100 font-medium">{subscription.plan?.name}</span>
+                  <span className="text-primary-100 font-medium">{subscription.plan_name || subscription.plan?.name || 'Plan Básico'}</span>
                   <span className={`px-2 py-1 rounded text-xs ${
-                    subscription.status === 'active' 
+                    subscription.status === 'active' || subscription.status === 'authorized'
                       ? 'bg-success-500 text-white' 
                       : 'bg-warning-500 text-white'
                   }`}>
-                    {subscription.status === 'active' ? 'Activo' : 'Inactivo'}
+                    {subscription.status === 'active' || subscription.status === 'authorized' ? 'Activo' : 'Inactivo'}
                   </span>
                 </div>
                 <p className="text-sm text-primary-400">
-                  Próximo pago: {subscription.nextPayment ? new Date(subscription.nextPayment).toLocaleDateString() : 'N/A'}
+                  Próximo pago: {subscription.next_payment_date || subscription.nextPayment ? new Date(subscription.next_payment_date || subscription.nextPayment).toLocaleDateString() : 'N/A'}
                 </p>
                 <p className="text-sm text-primary-400">
-                  ${subscription.plan?.price || 0}/mes
+                  ${subscription.price || subscription.plan?.price || 0}/mes
                 </p>
               </div>
             ) : (
@@ -414,8 +417,8 @@ const ArtistDashboard = () => {
             <div className="min-w-0 flex-1">
               <h2 className="font-semibold text-white text-sm truncate">{profile?.user?.email || 'artista@email.com'}</h2>
               <div className="flex items-center space-x-2 min-w-0">
-                <SubscriptionBadge subscriptionType={subscription?.plan?.plan_type} size="xs" />
-                {subscription?.status === 'active' && (
+                <SubscriptionBadge subscriptionType={subscription?.plan_type || subscription?.plan?.plan_type} size="xs" />
+                {(subscription?.status === 'active' || subscription?.status === 'authorized') && (
                   <span className="text-xs text-success-400">Activo</span>
                 )}
               </div>

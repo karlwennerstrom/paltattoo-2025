@@ -7,13 +7,34 @@ class TattooRequest {
       colorTypeId, regionId, comunaId, sizeDescription, budgetMin, budgetMax, deadline
     } = requestData;
     
+    // Map region names to IDs (based on actual regions in database)
+    const regionMap = {
+      'Región de Antofagasta': 3,
+      'Región de Arica y Parinacota': 1,
+      'Región de Atacama': 4,
+      'Región de Aysén': 15,
+      'Región de Coquimbo': 5,
+      'Región de La Araucanía': 12,
+      'Región de Los Lagos': 14,
+      'Región de Magallanes': 16,
+      'Región de O\'Higgins': 8,
+      'Región de Tarapacá': 2,
+      'Región de Valparaíso': 6,
+      'Región del Biobío': 11,
+      'Región del Maule': 9,
+      'Región Metropolitana': 7
+    };
+    
+    // Convert region name to ID
+    const regionIdValue = regionMap[regionId] || null;
+    
     const [result] = await promisePool.execute(
       `INSERT INTO tattoo_offers 
        (client_id, title, description, body_part_id, style_id, color_type_id, 
         region_id, comuna_id, size_description, budget_min, budget_max, deadline)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [clientId, title, description, bodyPartId, styleId, colorTypeId,
-       regionId, comunaId, sizeDescription, budgetMin, budgetMax, deadline]
+       regionIdValue, comunaId, sizeDescription, budgetMin, budgetMax, deadline]
     );
     
     return result.insertId;

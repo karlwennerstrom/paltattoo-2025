@@ -44,6 +44,7 @@ class Comuna {
     return uniqueComunas;
   }
 
+
   static async getRegions() {
     const [rows] = await promisePool.execute(
       'SELECT DISTINCT region FROM comunas ORDER BY region'

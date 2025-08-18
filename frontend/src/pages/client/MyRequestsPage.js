@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { PageContainer, Card, Grid } from '../../components/common/Layout';
 import Button from '../../components/common/Button';
 import { getTattooImageUrl } from '../../utils/imageHelpers';
@@ -6,6 +7,7 @@ import { offerService } from '../../services/api';
 import toast from 'react-hot-toast';
 
 const MyRequestsPage = () => {
+  const navigate = useNavigate();
   const [activeFilter, setActiveFilter] = useState('all');
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -139,7 +141,7 @@ const MyRequestsPage = () => {
       subtitle="Gestiona tus solicitudes de tatuajes"
       maxWidth="4xl"
       actions={
-        <Button variant="primary" href="/offers/create">
+        <Button variant="primary" onClick={() => navigate('/offers/create')}>
           <svg className="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
           </svg>
@@ -185,7 +187,7 @@ const MyRequestsPage = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
               <p className="text-primary-400 mb-4">No tienes solicitudes en esta categoría</p>
-              <Button variant="primary" href="/offers/create">
+              <Button variant="primary" onClick={() => navigate('/offers/create')}>
                 Crear Primera Solicitud
               </Button>
             </Card>
@@ -194,7 +196,13 @@ const MyRequestsPage = () => {
               const statusBadge = getStatusBadge(request.status);
               
               return (
-                <Card key={request.id} className="hover:bg-primary-750 transition-colors">
+                <Card key={request.id} className={`hover:bg-primary-750 transition-colors ${
+                  request.status === 'in_progress' 
+                    ? 'border-l-4 border-l-success-500 bg-success-500/5' 
+                    : request.status === 'completed'
+                    ? 'border-l-4 border-l-green-500 bg-green-500/5'
+                    : ''
+                }`}>
                   <div className="flex items-start space-x-4">
                     {/* Image */}
                     <div className="w-24 h-24 bg-primary-800 rounded-lg overflow-hidden flex-shrink-0">
@@ -254,10 +262,10 @@ const MyRequestsPage = () => {
                         <div className="flex items-center space-x-2">
                           {request.status === 'active' && (
                             <>
-                              <Button variant="ghost" size="sm" href={`/offers/${request.id}`}>
+                              <Button variant="ghost" size="sm" onClick={() => navigate(`/offers/${request.id}`)}>
                                 Ver Propuestas
                               </Button>
-                              <Button variant="secondary" size="sm" href={`/offers/${request.id}/edit`}>
+                              <Button variant="secondary" size="sm" onClick={() => navigate(`/offers/${request.id}/edit`)}>
                                 Editar
                               </Button>
                             </>
@@ -267,7 +275,10 @@ const MyRequestsPage = () => {
                               <span className="text-sm text-primary-400">
                                 Con {request.selectedArtist}
                               </span>
-                              <Button variant="primary" size="sm" href={`/requests/${request.id}/progress`}>
+                              <Button variant="ghost" size="sm" onClick={() => navigate(`/offers/${request.id}`)}>
+                                Ver Oferta
+                              </Button>
+                              <Button variant="primary" size="sm" onClick={() => navigate(`/requests/${request.id}/progress`)}>
                                 Ver Progreso
                               </Button>
                             </>
@@ -277,7 +288,7 @@ const MyRequestsPage = () => {
                               <span className="text-sm text-primary-400">
                                 Por {request.selectedArtist}
                               </span>
-                              <Button variant="ghost" size="sm" href={`/requests/${request.id}/review`}>
+                              <Button variant="ghost" size="sm" onClick={() => navigate(`/requests/${request.id}/review`)}>
                                 Ver Resultado
                               </Button>
                             </>

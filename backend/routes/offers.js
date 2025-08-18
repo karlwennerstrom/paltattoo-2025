@@ -17,7 +17,20 @@ const createOfferValidation = [
   body('bodyPartId').isInt().withMessage('Parte del cuerpo inválida'),
   body('styleId').isInt().withMessage('Estilo inválido'),
   body('colorTypeId').isInt().withMessage('Tipo de color inválido'),
-  body('regionId').isInt().withMessage('La región es requerida'),
+  body('regionId').notEmpty().withMessage('La región es requerida')
+    .custom((value) => {
+      const validRegions = [
+        'Región de Antofagasta', 'Región de Arica y Parinacota', 'Región de Atacama',
+        'Región de Aysén', 'Región de Coquimbo', 'Región de La Araucanía',
+        'Región de Los Lagos', 'Región de Magallanes', 'Región de O\'Higgins',
+        'Región de Tarapacá', 'Región de Valparaíso', 'Región del Biobío',
+        'Región del Maule', 'Región Metropolitana'
+      ];
+      if (!validRegions.includes(value)) {
+        throw new Error('Región no válida');
+      }
+      return true;
+    }),
   body('comunaId').optional().isInt().withMessage('Comuna inválida')
 ];
 

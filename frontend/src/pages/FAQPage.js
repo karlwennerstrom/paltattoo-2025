@@ -107,7 +107,7 @@ const FAQPage = () => {
       id: 13,
       category: 'payments',
       question: '¿Qué métodos de pago aceptan?',
-      answer: 'Aceptamos tarjetas de crédito y débito (Visa, Mastercard, American Express), transferencias bancarias, y pagos a través de MercadoPago. También permitimos pagos en efectivo acordados directamente con el tatuador.',
+      answer: 'Todos los pagos se procesan de forma segura a través de MercadoPago, que acepta múltiples métodos de pago. También permitimos pagos en efectivo acordados directamente con el tatuador.',
       popular: true
     },
     {

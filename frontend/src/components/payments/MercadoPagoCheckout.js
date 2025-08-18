@@ -453,11 +453,8 @@ const MercadoPagoCheckout = ({
         <p className="text-xs text-primary-500 mb-2">
           Métodos de pago disponibles:
         </p>
-        <div className="flex items-center justify-center space-x-3">
-          <span className="text-xs bg-primary-700 px-2 py-1 rounded">Visa</span>
-          <span className="text-xs bg-primary-700 px-2 py-1 rounded">Mastercard</span>
-          <span className="text-xs bg-primary-700 px-2 py-1 rounded">Redcompra</span>
-          <span className="text-xs bg-primary-700 px-2 py-1 rounded">Transferencia</span>
+        <div className="flex items-center justify-center">
+          <span className="text-xs bg-primary-700 px-3 py-1 rounded">MercadoPago - Todos los métodos disponibles</span>
         </div>
       </div>
     </Card>

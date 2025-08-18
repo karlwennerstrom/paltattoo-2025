@@ -246,23 +246,11 @@ const PaymentsTab = () => {
   const defaultPaymentMethods = [
     {
       id: 1,
-      type: 'credit_card',
-      brand: 'Visa',
-      last4: '4242',
-      expiryMonth: 12,
-      expiryYear: 2025,
+      type: 'mercadopago',
+      brand: 'MercadoPago',
+      description: 'Cuenta conectada',
       isDefault: true,
-      cardholderName: 'Carlos Mendoza'
-    },
-    {
-      id: 2,
-      type: 'credit_card',
-      brand: 'Mastercard',
-      last4: '8888',
-      expiryMonth: 6,
-      expiryYear: 2026,
-      isDefault: false,
-      cardholderName: 'Carlos Mendoza'
+      status: 'active'
     }
   ];
 
@@ -274,7 +262,7 @@ const PaymentsTab = () => {
       currency: 'CLP',
       description: 'Suscripción Premium - Enero 2024',
       status: 'paid',
-      method: 'Visa •••• 4242',
+      method: 'MercadoPago',
       invoiceUrl: '#'
     },
     {
@@ -284,7 +272,7 @@ const PaymentsTab = () => {
       currency: 'CLP',
       description: 'Suscripción Premium - Diciembre 2023',
       status: 'paid',
-      method: 'Visa •••• 4242',
+      method: 'MercadoPago',
       invoiceUrl: '#'
     },
     {
@@ -294,7 +282,7 @@ const PaymentsTab = () => {
       currency: 'CLP',
       description: 'Suscripción Premium - Noviembre 2023',
       status: 'paid',
-      method: 'Visa •••• 4242',
+      method: 'MercadoPago',
       invoiceUrl: '#'
     },
     {
@@ -304,7 +292,7 @@ const PaymentsTab = () => {
       currency: 'CLP',
       description: 'Suscripción Básica - Octubre 2023',
       status: 'paid',
-      method: 'Mastercard •••• 8888',
+      method: 'MercadoPago',
       invoiceUrl: '#'
     }
   ];
@@ -412,26 +400,11 @@ const PaymentsTab = () => {
   };
 
   const getCardIcon = (brand) => {
-    switch (brand.toLowerCase()) {
-      case 'visa':
-        return (
-          <div className="w-8 h-5 bg-blue-600 rounded text-white text-xs flex items-center justify-center font-bold">
-            VISA
-          </div>
-        );
-      case 'mastercard':
-        return (
-          <div className="w-8 h-5 bg-red-600 rounded text-white text-xs flex items-center justify-center font-bold">
-            MC
-          </div>
-        );
-      default:
-        return (
-          <div className="w-8 h-5 bg-gray-600 rounded text-white text-xs flex items-center justify-center">
-            •••
-          </div>
-        );
-    }
+    return (
+      <div className="w-10 h-6 bg-blue-500 rounded text-white text-xs flex items-center justify-center font-bold">
+        MP
+      </div>
+    );
   };
 
   const handleDownloadInvoice = async (paymentId) => {
@@ -852,7 +825,7 @@ const PaymentsTab = () => {
                 <span className="text-primary-200">
                   {(currentSubscription.price || currentSubscription.amount || 0) === 0 
                     ? 'No requerido' 
-                    : 'Visa •••• 4242'
+                    : 'MercadoPago'
                   }
                 </span>
               </div>
@@ -988,7 +961,7 @@ const PaymentsTab = () => {
                   <div>
                     <div className="flex items-center space-x-2">
                       <span className="text-sm font-medium text-primary-100">
-                        {method.brand} •••• {method.last4}
+                        {method.description || 'MercadoPago'}
                       </span>
                       {method.isDefault && (
                         <span className="px-2 py-1 bg-accent-600 text-white text-xs rounded">
@@ -1330,7 +1303,7 @@ const PaymentsTab = () => {
                     <div className="flex items-center space-x-2">
                       {getCardIcon(deletePaymentModal.method.brand)}
                       <span className="text-sm font-medium text-primary-100">
-                        {deletePaymentModal.method.brand} •••• {deletePaymentModal.method.last4}
+                        {deletePaymentModal.method.description || 'MercadoPago'}
                       </span>
                       {deletePaymentModal.method.isDefault && (
                         <span className="px-2 py-1 bg-accent-600 text-white text-xs rounded">

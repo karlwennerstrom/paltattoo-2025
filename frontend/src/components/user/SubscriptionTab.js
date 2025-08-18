@@ -55,7 +55,7 @@ const SubscriptionTab = () => {
           id: 1,
           amount: 19990,
           status: 'approved',
-          payment_method: 'credit_card',
+          payment_method: 'mercadopago',
           transaction_date: '2024-01-15',
           description: 'Plan Pro - Mensual',
           invoice_url: null,
@@ -75,7 +75,7 @@ const SubscriptionTab = () => {
           id: 3,
           amount: 9990,
           status: 'failed',
-          payment_method: 'credit_card',
+          payment_method: 'mercadopago',
           transaction_date: '2023-11-15',
           description: 'Plan Básico - Mensual',
           invoice_url: null,
@@ -158,7 +158,7 @@ const SubscriptionTab = () => {
       doc.text(`ID de Transacción: ${payment.mercadopago_payment_id}`, 20, 120);
       doc.text(`Fecha: ${new Date(payment.transaction_date).toLocaleDateString('es-CL')}`, 20, 135);
       doc.text(`Descripción: ${payment.description}`, 20, 150);
-      doc.text(`Método de Pago: ${payment.payment_method === 'credit_card' ? 'Tarjeta de Crédito' : 'Tarjeta de Débito'}`, 20, 165);
+      doc.text(`Método de Pago: MercadoPago`, 20, 165);
       doc.text(`Estado: ${getStatusBadge(payment.status).text}`, 20, 180);
       
       // Amount
@@ -367,7 +367,7 @@ const SubscriptionTab = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-white">
-                        {payment.payment_method === 'credit_card' ? 'Tarjeta de Crédito' : 'Tarjeta de Débito'}
+                        MercadoPago
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">

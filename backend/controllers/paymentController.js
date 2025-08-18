@@ -133,10 +133,10 @@ const paymentController = {
             description: prorationDetails.summary.description
           });
         } else {
-          // New subscription - next payment in 1 month
-          const nextMonth = new Date(now);
-          nextMonth.setMonth(nextMonth.getMonth() + 1);
-          nextPaymentDate = nextMonth.toISOString().split('T')[0];
+          // New subscription - next payment in exactly 30 days
+          const nextPayment = new Date(now);
+          nextPayment.setDate(nextPayment.getDate() + 30);
+          nextPaymentDate = nextPayment.toISOString().split('T')[0];
         }
         
         // Create subscription in development mode with authorized status

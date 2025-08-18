@@ -124,7 +124,7 @@ const ArtistPricingPage = () => {
     },
     {
       question: '¿Qué métodos de pago aceptan?',
-      answer: 'Aceptamos tarjetas de crédito, débito, transferencia bancaria y pagos a través de MercadoPago.'
+      answer: 'Todos los pagos se procesan de forma segura a través de MercadoPago, aceptando múltiples formas de pago.'
     },
     {
       question: '¿Ofrecen descuentos para estudios?',

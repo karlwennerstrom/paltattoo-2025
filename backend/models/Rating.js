@@ -131,7 +131,7 @@ const Rating = {
     const proposalQuery = `
       SELECT p.status, p.artist_id, tr.client_id 
       FROM proposals p 
-      JOIN tattoo_requests tr ON p.tattoo_request_id = tr.id
+      JOIN tattoo_offers tr ON p.tattoo_request_id = tr.id
       WHERE p.id = ?
     `;
     const [proposalRows] = await db.execute(proposalQuery, [proposalId]);

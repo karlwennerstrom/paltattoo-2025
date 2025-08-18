@@ -239,7 +239,7 @@ const ArtistSubscription = () => {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-primary-400">Método de pago:</span>
-                      <span className="text-primary-200">Visa •••• 4242</span>
+                      <span className="text-primary-200">MercadoPago</span>
                     </div>
                   </div>
                 </div>
